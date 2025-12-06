@@ -3,8 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../services/event_service.dart';
-
 class EventDetailsPage extends StatefulWidget {
   final String id;
   const EventDetailsPage({super.key, required this.id});
@@ -14,14 +12,15 @@ class EventDetailsPage extends StatefulWidget {
 }
 
 class _EventDetailsPageState extends State<EventDetailsPage> {
-  final _eventService = EventService();
   Map<String, dynamic>? _event;
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadEvent();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadEvent();
+    });
   }
 
   Future<void> _loadEvent() async {
@@ -102,6 +101,15 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                       color: Colors.grey,
                       borderRadius: BorderRadius.circular(10),
                     ),
+                    clipBehavior: Clip.antiAlias,
+                    child: _event!['logo_url'] != null
+                        ? Image.network(
+                            _event!['logo_url'],
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) =>
+                                Container(color: Colors.grey),
+                          )
+                        : Container(color: Colors.grey),
                   ),
                   const SizedBox(width: 30),
                   Flexible(
@@ -112,6 +120,45 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                         fontSize: 55,
                         color: const Color(0xFFF1F1F6),
                       ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // Date and Location
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 50),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.calendar_today_outlined,
+                    color: Color(0xFFF1F1F6),
+                    size: 24,
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    "${_event!['start_date']} - ${_event!['end_date']}",
+                    style: GoogleFonts.roboto(
+                      fontSize: 20,
+                      color: const Color(0xFFF1F1F6),
+                    ),
+                  ),
+                  const SizedBox(width: 40),
+                  const Icon(
+                    Icons.location_on_outlined,
+                    color: Color(0xFFF1F1F6),
+                    size: 24,
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    _event!['location'],
+                    style: GoogleFonts.roboto(
+                      fontSize: 20,
+                      color: const Color(0xFFF1F1F6),
                     ),
                   ),
                 ],
@@ -226,7 +273,16 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                             color: Colors.grey,
                             borderRadius: BorderRadius.circular(20),
                           ),
-                          child: const Center(child: Text("Image")),
+                          clipBehavior: Clip.antiAlias,
+                          child: _event!['image_url'] != null
+                              ? Image.network(
+                                  _event!['image_url'],
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => const Center(
+                                    child: Text("Image Not Found"),
+                                  ),
+                                )
+                              : const Center(child: Text("No Image")),
                         ),
                         const SizedBox(height: 20),
                         GestureDetector(

@@ -2,32 +2,28 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../../auth/services/auth_service.dart';
+
 class EventService {
   final String baseUrl = 'http://localhost:8000/api/v1';
+  final AuthService authService;
 
-  Future<List<dynamic>> getEvents() async {
+  EventService(this.authService);
+
+  Future<List<dynamic>> fetchEvents() async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/events'));
+      final response = await http.get(
+        Uri.parse('$baseUrl/events/'),
+        // headers: {'Authorization': 'Bearer ${authService.token}'}, // If protected
+      );
+
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
+      } else {
+        throw Exception('Failed to load events');
       }
-      return [];
     } catch (e) {
-      print("Error fetching events: $e");
-      return [];
-    }
-  }
-
-  Future<Map<String, dynamic>?> getEvent(int id) async {
-    try {
-      final response = await http.get(Uri.parse('$baseUrl/events/$id'));
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
-      }
-      return null;
-    } catch (e) {
-      print("Error fetching event $id: $e");
-      return null;
+      throw Exception('Error fetching events: $e');
     }
   }
 }

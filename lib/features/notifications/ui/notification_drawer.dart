@@ -52,97 +52,135 @@ class _NotificationDrawerState extends State<NotificationDrawer>
 
   @override
   Widget build(BuildContext context) {
-    return Drawer(
-      width: 540,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(50),
-          bottomLeft: Radius.circular(50),
-        ),
-      ),
-      child: Column(
-        children: [
-          // Header
-          Padding(
-            padding: const EdgeInsets.fromLTRB(30, 25, 30, 20),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  AppLocalizations.of(context)!.notificationsTitle,
-                  style: GoogleFonts.inter(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 18,
-                    color: Colors.black,
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ],
-            ),
-          ),
-          const Divider(height: 1, color: Color(0x66826D6D)),
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 800;
 
-          // Tabs
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
-            child: Container(
-              height: 40,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF1F1F1),
-                borderRadius: BorderRadius.circular(5),
-              ),
-              child: TabBar(
-                controller: _tabController,
-                indicator: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(5),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 2,
+    // Spec: "mobile full screen" -> 100% width on mobile, 540px on desktop
+    // Spec: border-radius: 50px 0px 0px 50px (Desktop usually)
+    // On mobile full screen, we might not want rounded corners on the left if it takes full width?
+    // Or maybe the user literally means "mobile full screen" width but still sliding from right.
+    // Let's assume on Mobile it covers everything, on Desktop it's 540px.
+
+    return Drawer(
+      // Drawer automatically slides from end.
+      // Width property available in newer Flutter versions or use Container inside.
+      width: isMobile ? screenWidth : 540,
+      backgroundColor: Colors.transparent, // Handle styling in container
+      elevation: 0, // Disable default shadow to use custom
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: isMobile
+              ? BorderRadius
+                    .zero // Full screen usually doesn't have rounded corners
+              : const BorderRadius.only(
+                  topLeft: Radius.circular(50),
+                  bottomLeft: Radius.circular(50),
+                ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.5),
+              offset: const Offset(0, 4),
+              blurRadius: 30,
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            // Mobile Safe Area padding
+            if (isMobile) const SizedBox(height: 20),
+
+            // Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(30, 25, 30, 20),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    AppLocalizations.of(context)!.notificationsTitle,
+                    style: GoogleFonts.inter(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 18,
+                      color: Colors.black,
                     ),
-                  ],
-                ),
-                labelColor: Colors.black,
-                unselectedLabelColor: Colors.black54,
-                labelStyle: GoogleFonts.inter(
-                  fontWeight: FontWeight.w500,
-                  fontSize: 14,
-                ),
-                tabs: [
-                  Tab(text: AppLocalizations.of(context)!.all),
-                  Tab(text: AppLocalizations.of(context)!.unread),
-                  Tab(text: AppLocalizations.of(context)!.mentions),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
                 ],
               ),
             ),
-          ),
+            const Divider(height: 1, color: Color(0x66826D6D)),
 
-          // List
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildNotificationList(_notifications), // All
-                _buildNotificationList(
-                  _notifications.where((n) => !n['is_read']).toList(),
-                ), // Unread
-                _buildNotificationList([]), // Mentions (Empty for now)
-              ],
+            // Tabs
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
+              child: Container(
+                height: 40,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F1F1),
+                  borderRadius: BorderRadius.circular(5),
+                ),
+                child: TabBar(
+                  controller: _tabController,
+                  indicator: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(5),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 2,
+                      ),
+                    ],
+                  ),
+                  labelColor: Colors.black,
+                  unselectedLabelColor: Colors.black54,
+                  labelStyle: GoogleFonts.inter(
+                    fontWeight: FontWeight.w500,
+                    fontSize: 14,
+                  ),
+                  tabs: [
+                    Tab(text: AppLocalizations.of(context)!.all),
+                    Tab(text: AppLocalizations.of(context)!.unread),
+                    Tab(text: AppLocalizations.of(context)!.mentions),
+                  ],
+                ),
+              ),
             ),
-          ),
-        ],
+
+            // List
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildNotificationList(_notifications), // All
+                  _buildNotificationList(
+                    _notifications.where((n) => !n['is_read']).toList(),
+                  ), // Unread
+                  _buildNotificationList([]), // Mentions (Empty for now)
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildNotificationList(List<dynamic> items) {
+    if (items.isEmpty) {
+      return Center(
+        child: Text(
+          "No notifications",
+          style: GoogleFonts.inter(color: Colors.grey),
+        ),
+      );
+    }
+
     return ListView.builder(
       itemCount: items.length,
+      padding: EdgeInsets.zero,
       itemBuilder: (context, index) {
         final item = items[index];
         return Container(

@@ -1,6 +1,7 @@
 import 'package:b2c_app/l10n/generated/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
 import '../../../core/app_theme.dart';
 import '../services/auth_service.dart';
@@ -16,7 +17,6 @@ class _LoginPageState extends State<LoginPage> {
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _rememberMe = false;
-  final _authService = AuthService();
 
   @override
   Widget build(BuildContext context) {
@@ -199,8 +199,8 @@ class _LoginPageState extends State<LoginPage> {
                       onChanged: (val) => setState(() => _rememberMe = val!),
                       activeColor: AppColors.checkboxActive,
                       side: const BorderSide(
-                        color: AppColors.checkboxBorder,
-                        width: 1,
+                        color: AppColors.checkboxActive,
+                        width: 1.5,
                       ),
                     ),
                   ),
@@ -217,30 +217,30 @@ class _LoginPageState extends State<LoginPage> {
 
               // Don't have account
               Center(
-                child: GestureDetector(
-                  onTap: () => context.push('/register'),
-                  child: Text(
-                    AppLocalizations.of(context)!.dontHaveAccount,
-                    style: AppTextStyles.dontHaveAccount,
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: GestureDetector(
+                    onTap: () => context.push('/register'),
+                    child: _HoverText(
+                      text: AppLocalizations.of(context)!.dontHaveAccount,
+                      baseStyle: AppTextStyles.dontHaveAccount,
+                      hoverColor: AppColors.buttonBackground,
+                    ),
                   ),
                 ),
               ),
               const SizedBox(height: 25),
 
               // Login Button
-              GestureDetector(
-                onTap: _login,
-                child: Container(
-                  width: double.infinity,
-                  height: 50,
-                  decoration: BoxDecoration(
-                    color: AppColors.buttonBackground,
-                    borderRadius: BorderRadius.circular(45),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    AppLocalizations.of(context)!.loginButton,
-                    style: AppTextStyles.buttonTextLarge,
+              MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
+                  onTap: _login,
+                  child: _HoverContainer(
+                    child: Text(
+                      AppLocalizations.of(context)!.loginButton,
+                      style: AppTextStyles.buttonTextLarge,
+                    ),
                   ),
                 ),
               ),
@@ -267,30 +267,42 @@ class _LoginPageState extends State<LoginPage> {
             Text("All rights reserved", style: AppTextStyles.footer),
             Container(width: 1, height: 12, color: AppColors.textFooter),
             // Privacy Policy
-            GestureDetector(
-              onTap: () {},
-              child: Text(
-                AppLocalizations.of(
-                  context,
-                )!.privacyPolicy.split('|')[1].trim(), // "Privacy Policy"
-                style: AppTextStyles.footer,
+            MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: () {},
+                child: _HoverText(
+                  text: AppLocalizations.of(
+                    context,
+                  )!.privacyPolicy.split('|')[1].trim(), // "Privacy Policy"
+                  baseStyle: AppTextStyles.footer,
+                  hoverColor: AppColors.buttonBackground,
+                ),
               ),
             ),
             Container(width: 1, height: 12, color: AppColors.textFooter),
             // Terms of Use
-            GestureDetector(
-              onTap: () {},
-              child: Text(
-                AppLocalizations.of(context)!.terms,
-                style: AppTextStyles.footer,
+            MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: () {},
+                child: _HoverText(
+                  text: AppLocalizations.of(context)!.terms,
+                  baseStyle: AppTextStyles.footer,
+                  hoverColor: AppColors.buttonBackground,
+                ),
               ),
             ),
-
             Container(width: 1, height: 12, color: AppColors.textFooter),
+            // Powered By
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text("Powered by", style: AppTextStyles.footer),
+                _HoverText(
+                  text: "Powered by",
+                  baseStyle: AppTextStyles.footer,
+                  hoverColor: AppColors.buttonBackground,
+                ),
                 const SizedBox(width: 5),
                 Image.asset("assets/rotating-logo.gif", width: 24, height: 24),
               ],
@@ -302,20 +314,92 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _login() async {
-    final success = await _authService.login(
+    final errorMessage = await context.read<AuthService>().login(
       _usernameController.text,
       _passwordController.text,
+      rememberMe: _rememberMe,
     );
     if (!mounted) return;
-    if (success) {
+    if (errorMessage == null) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text("Login Successful")));
       context.go('/');
     } else {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Login Failed")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(errorMessage), // Show detailed error
+          backgroundColor: Colors.red,
+        ),
+      );
     }
+  }
+}
+
+// Simple Hover Text Widget (Duplicated to avoid extra file for now, ideally in widgets/common)
+class _HoverText extends StatefulWidget {
+  final String text;
+  final TextStyle baseStyle;
+  final Color hoverColor;
+
+  const _HoverText({
+    required this.text,
+    required this.baseStyle,
+    required this.hoverColor,
+  });
+
+  @override
+  State<_HoverText> createState() => _HoverTextState();
+}
+
+class _HoverTextState extends State<_HoverText> {
+  bool _isHovering = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovering = true),
+      onExit: (_) => setState(() => _isHovering = false),
+      child: Text(
+        widget.text,
+        style: widget.baseStyle.copyWith(
+          color: _isHovering ? widget.hoverColor : widget.baseStyle.color,
+        ),
+      ),
+    );
+  }
+}
+
+// Hover Container Widget for Button
+class _HoverContainer extends StatefulWidget {
+  final Widget child;
+
+  const _HoverContainer({required this.child});
+
+  @override
+  State<_HoverContainer> createState() => _HoverContainerState();
+}
+
+class _HoverContainerState extends State<_HoverContainer> {
+  bool _isHovering = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovering = true),
+      onExit: (_) => setState(() => _isHovering = false),
+      child: Container(
+        width: double.infinity,
+        height: 50, // 50 for login
+        decoration: BoxDecoration(
+          color: _isHovering
+              ? AppColors.buttonBackground.withOpacity(0.9)
+              : AppColors.buttonBackground,
+          borderRadius: BorderRadius.circular(45),
+        ),
+        alignment: Alignment.center,
+        child: widget.child,
+      ),
+    );
   }
 }

@@ -1,451 +1,288 @@
-import 'package:b2c_app/l10n/generated/app_localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 
+import '../../events/services/event_service.dart';
 import '../../notifications/ui/notification_drawer.dart';
-import '../../profile/ui/profile_dialog.dart';
+import 'widgets/event_card.dart';
+import 'widgets/profile_dropdown.dart';
 
-class EventCalendarPage extends StatelessWidget {
+class EventCalendarPage extends StatefulWidget {
   const EventCalendarPage({super.key});
 
   @override
+  State<EventCalendarPage> createState() => _EventCalendarPageState();
+}
+
+class _EventCalendarPageState extends State<EventCalendarPage> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+
+  // Search Controller
+  final TextEditingController _searchController = TextEditingController();
+
+  bool _isProfileOpen = false;
+
+  void _toggleProfile() {
+    setState(() {
+      _isProfileOpen = !_isProfileOpen;
+    });
+  }
+
+  void _closeProfile() {
+    if (_isProfileOpen) {
+      setState(() {
+        _isProfileOpen = false;
+      });
+    }
+  }
+
+  void _logout() {
+    // Implement logout logic
+    print("Logout pressed");
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 800; // Mobile breakpoint
+
+    // Configurable dimensions
+    final double navbarHeight = isMobile ? 60.0 : 70.0;
+    final double navbarTopPadding = isMobile ? 10.0 : 20.0;
+
+    final double searchBarTop = navbarHeight + navbarTopPadding + 20;
+    final double searchBarHeight = isMobile ? 45.0 : 50.0;
+
+    final double listTop =
+        searchBarTop + searchBarHeight + (isMobile ? 20 : 40);
+
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor: const Color(0xFF3C4494),
       endDrawer: const NotificationDrawer(),
-      body: Stack(
-        children: [
-          // Nav / Header
-          Positioned(
-            top: 20,
-            left: 40,
-            right: 40,
-            child: SizedBox(
-              height: 126,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // Logo Placeholder
-                  Container(
-                    width: 218,
-                    height: 68,
-                    color: Colors.white.withOpacity(0.2), // Placeholder
-                    child: const Center(
-                      child: Text(
-                        "Logo",
-                        style: TextStyle(color: Colors.white),
-                      ),
-                    ),
-                  ),
-
-                  // Icons (Notification, User)
-                  Row(
-                    children: [
-                      GestureDetector(
-                        onTap: () => Scaffold.of(context).openEndDrawer(),
-                        child: const Icon(
-                          Icons.notifications_none,
-                          color: Colors.white,
-                          size: 30,
-                        ),
-                      ),
-                      const SizedBox(width: 20),
-                      GestureDetector(
-                        onTap: () {
-                          showDialog(
-                            context: context,
-                            builder: (context) => const ProfileDialog(),
-                          );
-                        },
-                        child: const Icon(
-                          Icons.person_outline,
-                          color: Colors.white,
-                          size: 30,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Search Bar
-          Positioned(
-            top: 179,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: Container(
-                width: 1310,
-                height: 64,
-                constraints: BoxConstraints(
-                  maxWidth: MediaQuery.of(context).size.width * 0.9,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF1F1F6).withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(5),
-                ),
+      // Wrap Stack in GestureDetector to handle clicks outside profile
+      body: GestureDetector(
+        onTap: _closeProfile,
+        behavior: HitTestBehavior.translucent,
+        child: Stack(
+          children: [
+            // 1. Navigation Header
+            Positioned(
+              top: navbarTopPadding,
+              left: isMobile ? 20 : 40,
+              right: isMobile ? 20 : 40,
+              child: SizedBox(
+                height: navbarHeight,
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Icon(
-                      Icons.search,
-                      color: Color(0xFFF1F1F6),
-                      size: 36,
-                    ),
-                    const SizedBox(width: 15),
-                    Text(
-                      AppLocalizations.of(context)!.searchPlaceholder,
-                      style: GoogleFonts.roboto(
-                        fontWeight: FontWeight.w500,
-                        fontSize: 24,
-                        color: const Color(0xFFF1F1F6),
+                    // Logo
+                    Container(
+                      width: isMobile ? 120 : 160,
+                      height: isMobile ? 40 : 50,
+                      alignment: Alignment.centerLeft,
+                      child: Image.asset(
+                        'assets/logo.png',
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) =>
+                            const Icon(Icons.error, color: Colors.white),
                       ),
+                    ),
+
+                    // Icons
+                    Row(
+                      children: [
+                        // Bell
+                        Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(50),
+                            onTap: () {
+                              _closeProfile();
+                              _scaffoldKey.currentState?.openEndDrawer();
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.all(5.0),
+                              child: SvgPicture.asset(
+                                'assets/event_calendar/bell.svg',
+                                width: isMobile ? 24 : 28,
+                                height: isMobile ? 24 : 28,
+                                colorFilter: const ColorFilter.mode(
+                                  Colors.white,
+                                  BlendMode.srcIn,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: isMobile ? 15 : 25),
+                        // User
+                        Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(50),
+                            onTap: _toggleProfile,
+                            child: Padding(
+                              padding: const EdgeInsets.all(5.0),
+                              child: SvgPicture.asset(
+                                'assets/event_calendar/user.svg',
+                                width: isMobile ? 24 : 28,
+                                height: isMobile ? 24 : 28,
+                                colorFilter: const ColorFilter.mode(
+                                  Colors.white,
+                                  BlendMode.srcIn,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
             ),
-          ),
 
-          // Event List (Scrollable)
-          Positioned.fill(
-            top: 273,
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  _EventCard(
-                    title: "Turkmenistan–China Innovation Forum",
-                    date: "20-25 may 2025",
-                    location: "Ashgabat, TKM",
-                    days: "35",
-                    hours: "17",
-                    minutes: "59",
-                    seconds: "56",
+            // 2. Search Bar
+            Positioned(
+              top: searchBarTop,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Container(
+                  width: 1310,
+                  height: searchBarHeight,
+                  constraints: BoxConstraints(maxWidth: screenWidth * 0.92),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F1F6).withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(5),
                   ),
-                  const SizedBox(height: 30),
-                  _EventCard(
-                    title: "Another Event Example",
-                    date: "10-12 June 2025",
-                    location: "Mary, TKM",
-                    days: "50",
-                    hours: "10",
-                    minutes: "20",
-                    seconds: "05",
+                  alignment: Alignment.center,
+                  child: TextField(
+                    controller: _searchController,
+                    onTap: _closeProfile, // accessing search closes profile
+                    cursorColor: const Color(0xFFF1F1F6),
+                    style: GoogleFonts.roboto(
+                      fontSize: isMobile ? 16 : 18,
+                      color: const Color(0xFFF1F1F6),
+                      fontWeight: FontWeight.w500,
+                    ),
+                    textAlignVertical:
+                        TextAlignVertical.center, // Vertically center text
+                    decoration: InputDecoration(
+                      isDense: true,
+                      prefixIcon: Icon(
+                        Icons.search,
+                        color: const Color(0xFFF1F1F6),
+                        size: isMobile ? 24 : 28,
+                      ),
+                      hintText: "Search by event name",
+                      hintStyle: GoogleFonts.roboto(
+                        fontWeight: FontWeight.w500,
+                        fontSize: isMobile ? 16 : 18,
+                        color: const Color(
+                          0xFFF1F1F6,
+                        ), // Same color as text for hint
+                      ),
+                      border: InputBorder.none,
+                      contentPadding:
+                          EdgeInsets.zero, // Important for fitting in height
+                    ),
                   ),
-                  const SizedBox(height: 50), // Bottom padding
-                ],
+                ),
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
-class _EventCard extends StatelessWidget {
-  final String title;
-  final String date;
-  final String location;
-  final String days;
-  final String hours;
-  final String minutes;
-  final String seconds;
+            // 3. Scrollable Event List
+            Positioned.fill(
+              top: listTop,
+              child: GestureDetector(
+                onTap: _closeProfile,
+                child: FutureBuilder<List<dynamic>>(
+                  future: context.read<EventService>().fetchEvents(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    } else if (snapshot.hasError) {
+                      return Center(
+                        child: Text(
+                          "Error: ${snapshot.error}",
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      );
+                    } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                      return const Center(
+                        child: Text(
+                          "No events found",
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      );
+                    }
 
-  const _EventCard({
-    required this.title,
-    required this.date,
-    required this.location,
-    required this.days,
-    required this.hours,
-    required this.minutes,
-    required this.seconds,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-    final isMobile = width < 800;
-
-    return Center(
-      child: Container(
-        width: 1310,
-        constraints: BoxConstraints(maxWidth: width * 0.9),
-        height: isMobile ? null : 302, // Auto height for mobile
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(5),
-        ),
-        child: isMobile
-            ? Column(
-                children: [
-                  // Image
-                  Container(
-                    height: 200,
-                    color: Colors.grey[300],
-                    child: const Center(child: Text("Event Image")),
-                  ),
-                  // Content
-                  Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          style: GoogleFonts.montserrat(
-                            fontWeight: FontWeight.w500,
-                            fontSize: 25,
-                            color: const Color(0xFF151938),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        Row(
-                          children: [
-                            const Icon(Icons.calendar_today, size: 20),
-                            const SizedBox(width: 10),
-                            Text(date, style: GoogleFonts.roboto(fontSize: 20)),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            const Icon(Icons.location_on, size: 20),
-                            const SizedBox(width: 10),
-                            Text(
-                              location,
-                              style: GoogleFonts.roboto(fontSize: 20),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Timer Section
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(20),
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Color(0xFF5460CD), Color(0xFF1C045F)],
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                      ),
-                      borderRadius: BorderRadius.only(
-                        bottomLeft: Radius.circular(5),
-                        bottomRight: Radius.circular(5),
-                      ),
-                    ),
-                    child: Column(
-                      children: [
-                        Text(
-                          AppLocalizations.of(context)!.startingIn,
-                          style: GoogleFonts.montserrat(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 25,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        _buildTimerRow(context),
-                      ],
-                    ),
-                  ),
-                ],
-              )
-            : Stack(
-                children: [
-                  // Image
-                  Positioned(
-                    left: 455, // Approx 34%
-                    right: 499, // Approx 38%
-                    top: 0,
-                    bottom: 0,
-                    child: Container(
-                      color: Colors.grey[300],
-                      child: const Center(child: Text("Image")),
-                    ),
-                  ),
-
-                  // Content (Left)
-                  Positioned(
-                    left: 30,
-                    top: 30,
-                    width: 400,
-                    bottom: 30,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Logo/Icon placeholder
-                        Container(
-                          width: 70,
-                          height: 70,
-                          color: Colors.grey[200],
-                        ),
-                        const SizedBox(height: 20),
-                        Text(
-                          title,
-                          style: GoogleFonts.montserrat(
-                            fontWeight: FontWeight.w500,
-                            fontSize: 25,
-                            color: const Color(0xFF151938),
-                          ),
-                        ),
-                        const Spacer(),
-                        Row(
-                          children: [
-                            const Icon(Icons.calendar_today, size: 24),
-                            const SizedBox(width: 10),
-                            Text(date, style: GoogleFonts.roboto(fontSize: 25)),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            const Icon(Icons.location_on, size: 24),
-                            const SizedBox(width: 10),
-                            Text(
-                              location,
-                              style: GoogleFonts.roboto(fontSize: 25),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Timer (Right)
-                  Positioned(
-                    right: 0,
-                    top: 0,
-                    bottom: 0,
-                    width: 500, // Approx
-                    child: Container(
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [Color(0xFF5460CD), Color(0xFF1C045F)],
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                        ),
-                        borderRadius: BorderRadius.only(
-                          topRight: Radius.circular(5),
-                          bottomRight: Radius.circular(5),
-                        ),
-                      ),
-                      child: Stack(
-                        children: [
-                          Positioned(
-                            top: 50,
-                            left: 40,
-                            child: Text(
-                              AppLocalizations.of(context)!.startingIn,
-                              style: GoogleFonts.montserrat(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 35,
-                                color: Colors.white,
+                    final events = snapshot.data!;
+                    return SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      padding: const EdgeInsets.only(bottom: 50),
+                      child: Column(
+                        children: events.map((event) {
+                          return Column(
+                            children: [
+                              EventCard(
+                                title: event['title'] ?? 'No Title',
+                                date: event['date_str'] ?? '',
+                                location: event['location'] ?? '',
+                                imageUrl:
+                                    event['image_url'] ??
+                                    "assets/event_calendar/event1.png",
+                                eventStartTime:
+                                    DateTime.tryParse(
+                                      event['start_time'] ?? '',
+                                    ) ??
+                                    DateTime.now(),
+                                onTap: () {
+                                  // Navigate to Event Menu
+                                  final id =
+                                      event['id']; // Make sure backend sends 'id'
+                                  if (id != null) {
+                                    context.go('/events/$id/menu');
+                                  } else {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text("Event ID missing"),
+                                      ),
+                                    );
+                                  }
+                                },
                               ),
-                            ),
-                          ),
-                          Positioned(
-                            top: 113,
-                            left: 40,
-                            right: 40,
-                            height: 68,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                border: Border.all(color: Colors.white),
-                                borderRadius: BorderRadius.circular(5),
-                              ),
-                              child: Center(child: _buildTimerRow(context)),
-                            ),
-                          ),
-                          Positioned(
-                            bottom: 25,
-                            right: 50,
-                            child: GestureDetector(
-                              onTap: () => context.push(
-                                '/events/1',
-                              ), // Hardcoded ID for now
-                              child: Row(
-                                children: [
-                                  Text(
-                                    AppLocalizations.of(context)!.learnMore,
-                                    style: GoogleFonts.roboto(
-                                      fontWeight: FontWeight.w500,
-                                      fontSize: 20,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  const Icon(
-                                    Icons.arrow_forward,
-                                    color: Colors.white,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
+                              const SizedBox(height: 25),
+                            ],
+                          );
+                        }).toList(),
                       ),
-                    ),
-                  ),
-                ],
+                    );
+                  },
+                ),
               ),
-      ),
-    );
-  }
+            ),
 
-  Widget _buildTimerRow(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        _buildTimeUnit(days, AppLocalizations.of(context)!.days),
-        _buildSeparator(),
-        _buildTimeUnit(hours, AppLocalizations.of(context)!.hours),
-        _buildSeparator(),
-        _buildTimeUnit(minutes, AppLocalizations.of(context)!.minutes),
-        _buildSeparator(),
-        _buildTimeUnit(seconds, AppLocalizations.of(context)!.seconds),
-      ],
-    );
-  }
-
-  Widget _buildTimeUnit(String value, String label) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          value,
-          style: GoogleFonts.inter(
-            fontWeight: FontWeight.w600,
-            fontSize: 30, // Slightly smaller for fit
-            color: Colors.white,
-          ),
-        ),
-        Text(
-          label,
-          style: GoogleFonts.montserrat(
-            fontWeight: FontWeight.w500,
-            fontSize: 10,
-            color: Colors.white.withOpacity(0.8),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSeparator() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 5),
-      child: Text(
-        ":",
-        style: GoogleFonts.inter(
-          fontWeight: FontWeight.w600,
-          fontSize: 30,
-          color: Colors.white,
+            // 4. Profile Dropdown Overlay
+            if (_isProfileOpen)
+              Positioned(
+                top: navbarTopPadding + navbarHeight + 5,
+                right: isMobile ? 20 : 65,
+                left: isMobile ? 20 : null,
+                child: ProfileDropdown(onLogout: _logout),
+              ),
+          ],
         ),
       ),
     );

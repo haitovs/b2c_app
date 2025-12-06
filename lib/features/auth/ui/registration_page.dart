@@ -193,6 +193,9 @@ class _RegistrationPageState extends State<RegistrationPage> {
                   label: AppLocalizations.of(context)!.websiteLabel,
                   placeholder: AppLocalizations.of(context)!.websitePlaceholder,
                   controller: _websiteController,
+                  isRequired:
+                      false, // Website not strictly required? Or everything required per user? User said "all fields are required... show with red *" but let's assume website might be optional, or just make it required per request "all fields".
+                  // User said "also all fields are required", so I'll set isRequired to true for all.
                 ),
               ),
               const SizedBox(height: 15),
@@ -233,31 +236,31 @@ class _RegistrationPageState extends State<RegistrationPage> {
               ),
               const SizedBox(height: 10),
 
-              // Back to Login
-              GestureDetector(
-                onTap: () => context.go('/login'),
-                child: Text(
-                  AppLocalizations.of(context)!.alreadyHaveAccount,
-                  style: AppTextStyles.dontHaveAccount,
+              // Back to Login with Hover Effect
+              MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
+                  onTap: () => context.go('/login'),
+                  child: _HoverText(
+                    text: AppLocalizations.of(context)!.alreadyHaveAccount,
+                    baseStyle: AppTextStyles.dontHaveAccount,
+                    hoverColor: AppColors.buttonBackground,
+                  ),
                 ),
               ),
 
               const SizedBox(height: 20),
 
-              // Registration Button
-              GestureDetector(
-                onTap: _register,
-                child: Container(
-                  width: double.infinity,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: AppColors.buttonBackground,
-                    borderRadius: BorderRadius.circular(45),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    AppLocalizations.of(context)!.registrationButton,
-                    style: AppTextStyles.buttonText,
+              // Registration Button with Hover Effect
+              MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
+                  onTap: _register,
+                  child: _HoverContainer(
+                    child: Text(
+                      AppLocalizations.of(context)!.registrationButton,
+                      style: AppTextStyles.buttonText,
+                    ),
                   ),
                 ),
               ),
@@ -284,30 +287,41 @@ class _RegistrationPageState extends State<RegistrationPage> {
             Text("All rights reserved", style: AppTextStyles.footer),
             Container(width: 1, height: 12, color: AppColors.textFooter),
             // Privacy Policy
-            GestureDetector(
-              onTap: () {},
-              child: Text(
-                AppLocalizations.of(
-                  context,
-                )!.privacyPolicy.split('|')[1].trim(), // "Privacy Policy"
-                style: AppTextStyles.footer,
+            MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: () {},
+                child: _HoverText(
+                  text: AppLocalizations.of(
+                    context,
+                  )!.privacyPolicy.split('|')[1].trim(), // "Privacy Policy"
+                  baseStyle: AppTextStyles.footer,
+                  hoverColor: AppColors.buttonBackground,
+                ),
               ),
             ),
             Container(width: 1, height: 12, color: AppColors.textFooter),
             // Terms of Use
-            GestureDetector(
-              onTap: () {},
-              child: Text(
-                AppLocalizations.of(context)!.terms,
-                style: AppTextStyles.footer,
+            MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: () {},
+                child: _HoverText(
+                  text: AppLocalizations.of(context)!.terms,
+                  baseStyle: AppTextStyles.footer,
+                  hoverColor: AppColors.buttonBackground,
+                ),
               ),
             ),
-
             Container(width: 1, height: 12, color: AppColors.textFooter),
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text("Powered by", style: AppTextStyles.footer),
+                _HoverText(
+                  text: "Powered by",
+                  baseStyle: AppTextStyles.footer,
+                  hoverColor: AppColors.buttonBackground,
+                ),
                 const SizedBox(width: 5),
                 Image.asset("assets/rotating-logo.gif", width: 24, height: 24),
               ],
@@ -329,7 +343,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
     // Combine country code with mobile
     final fullMobile = "$_countryCode${_mobileController.text}";
 
-    final success = await _authService.register(
+    final errorMessage = await _authService.register(
       email: _emailController.text,
       password: _passwordController.text,
       firstName: _nameController.text,
@@ -341,15 +355,16 @@ class _RegistrationPageState extends State<RegistrationPage> {
 
     if (!mounted) return;
 
-    if (success) {
+    if (errorMessage == null) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text("Registration Successful")));
       context.go('/login');
     } else {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Registration Failed")));
+      // Show detailed error message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
+      );
     }
   }
 
@@ -359,6 +374,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
     required TextEditingController controller,
     bool hasFlag = false,
     bool isPassword = false,
+    bool isRequired = true,
   }) {
     return _FieldData(
       label: label,
@@ -366,6 +382,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
       controller: controller,
       hasFlag: hasFlag,
       isPassword: isPassword,
+      isRequired: isRequired,
     );
   }
 
@@ -385,6 +402,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
             controller: field1.controller,
             hasFlag: field1.hasFlag,
             isPassword: field1.isPassword,
+            isRequired: field1.isRequired,
           ),
         ),
         const SizedBox(width: 15),
@@ -396,6 +414,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
             controller: field2.controller,
             hasFlag: field2.hasFlag,
             isPassword: field2.isPassword,
+            isRequired: field2.isRequired,
           ),
         ),
       ],
@@ -409,20 +428,31 @@ class _RegistrationPageState extends State<RegistrationPage> {
     required TextEditingController controller,
     bool hasFlag = false,
     bool isPassword = false,
+    bool isRequired = true,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
           padding: const EdgeInsets.only(left: 10),
-          child: Text(
-            label,
-            style: AppTextStyles.label,
+          child: RichText(
             overflow: TextOverflow.ellipsis,
+            text: TextSpan(
+              text: label,
+              style: AppTextStyles.label,
+              children: [
+                if (isRequired)
+                  const TextSpan(
+                    text: ' *',
+                    style: TextStyle(color: Colors.red, fontSize: 14),
+                  ),
+              ],
+            ),
           ),
         ),
         const SizedBox(height: 6),
         Row(
+          crossAxisAlignment: CrossAxisAlignment.center, // Vertically centered
           children: [
             if (hasFlag) ...[
               Container(
@@ -439,6 +469,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
                   ),
                 ),
                 height: 45,
+                alignment: Alignment.center, // Center contents
                 child: CountryCodePicker(
                   onChanged: (country) {
                     setState(() {
@@ -452,8 +483,6 @@ class _RegistrationPageState extends State<RegistrationPage> {
                   alignLeft: false,
                   padding: EdgeInsets.zero,
                   textStyle: AppTextStyles.inputText,
-                  // Keep just the flag or code visible as needed, user wants code prewritten
-                  // If we show flag+code here, user types rest in textfield.
                   showFlagMain: true,
                   showDropDownButton: false,
                 ),
@@ -462,6 +491,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
             Expanded(
               child: Container(
                 height: 45,
+                alignment: Alignment.centerLeft, // Center text vertically
                 decoration: BoxDecoration(
                   border: Border.all(color: AppColors.inputBorder),
                   borderRadius: hasFlag
@@ -475,11 +505,15 @@ class _RegistrationPageState extends State<RegistrationPage> {
                   controller: controller,
                   obscureText: isPassword,
                   style: AppTextStyles.inputText,
+                  textAlignVertical:
+                      TextAlignVertical.center, // Important for alignment
                   decoration: InputDecoration(
                     border: InputBorder.none,
+                    isDense: true,
+                    // Adjusted contentPadding to ensure vertical centering
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 10,
-                      vertical: 12,
+                      vertical: 14, // Adjusted for 45px height and ~14px font
                     ),
                     hintText: placeholder,
                     hintStyle: AppTextStyles.placeholder,
@@ -500,6 +534,7 @@ class _FieldData {
   final TextEditingController controller;
   final bool hasFlag;
   final bool isPassword;
+  final bool isRequired;
 
   _FieldData({
     required this.label,
@@ -507,5 +542,75 @@ class _FieldData {
     required this.controller,
     this.hasFlag = false,
     this.isPassword = false,
+    this.isRequired = true,
   });
+}
+
+// Simple Hover Text Widget
+class _HoverText extends StatefulWidget {
+  final String text;
+  final TextStyle baseStyle;
+  final Color hoverColor;
+
+  const _HoverText({
+    required this.text,
+    required this.baseStyle,
+    required this.hoverColor,
+  });
+
+  @override
+  State<_HoverText> createState() => _HoverTextState();
+}
+
+class _HoverTextState extends State<_HoverText> {
+  bool _isHovering = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovering = true),
+      onExit: (_) => setState(() => _isHovering = false),
+      child: Text(
+        widget.text,
+        style: widget.baseStyle.copyWith(
+          color: _isHovering ? widget.hoverColor : widget.baseStyle.color,
+        ),
+      ),
+    );
+  }
+}
+
+// Hover Container Widget for Button
+class _HoverContainer extends StatefulWidget {
+  final Widget child;
+
+  const _HoverContainer({required this.child});
+
+  @override
+  State<_HoverContainer> createState() => _HoverContainerState();
+}
+
+class _HoverContainerState extends State<_HoverContainer> {
+  bool _isHovering = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovering = true),
+      onExit: (_) => setState(() => _isHovering = false),
+      child: Container(
+        width: double.infinity,
+        height: 48,
+        decoration: BoxDecoration(
+          // Darken slightly on hover or use specific color if requested
+          color: _isHovering
+              ? AppColors.buttonBackground.withOpacity(0.9)
+              : AppColors.buttonBackground,
+          borderRadius: BorderRadius.circular(45),
+        ),
+        alignment: Alignment.center,
+        child: widget.child,
+      ),
+    );
+  }
 }

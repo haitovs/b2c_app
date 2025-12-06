@@ -1,12 +1,31 @@
 import 'dart:convert';
 
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
-class AuthService {
-  // TODO: Replace with actual backend URL
+class AuthService extends ChangeNotifier {
+  // Replace with actual backend URL
   final String baseUrl = 'http://localhost:8000/api/v1';
 
-  Future<bool> login(String username, String password) async {
+  Map<String, dynamic>? _currentUser;
+  String? _token;
+
+  Map<String, dynamic>? get currentUser => _currentUser;
+  bool get isAuthenticated => _token != null;
+
+  Future<String?> getToken() async {
+    if (_token != null) return _token;
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('auth_token');
+  }
+
+  /// Returns null on success, or an error message string on failure.
+  Future<String?> login(
+    String username,
+    String password, {
+    bool rememberMe = false,
+  }) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/auth/login'),
@@ -16,20 +35,69 @@ class AuthService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        // TODO: Save token
-        print("Login success: ${data['access_token']}");
-        return true;
+        _token = data['access_token'];
+
+        if (rememberMe) {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('auth_token', _token!);
+        }
+
+        // Fetch user details
+        await _fetchCurrentUser();
+
+        notifyListeners();
+        return null; // Success
       } else {
-        print("Login failed: ${response.body}");
-        return false;
+        return _parseError(response.body);
       }
     } catch (e) {
-      print("Login error: $e");
-      return false;
+      return "An unexpected error occurred: $e";
     }
   }
 
-  Future<bool> register({
+  Future<void> _fetchCurrentUser() async {
+    if (_token == null) return;
+
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/users/me'),
+        headers: {'Authorization': 'Bearer $_token'},
+      );
+
+      if (response.statusCode == 200) {
+        _currentUser = jsonDecode(response.body);
+        notifyListeners();
+      }
+    } catch (e) {
+      print("Error fetching user: $e");
+    }
+  }
+
+  Future<void> tryAutoLogin() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.containsKey('auth_token')) {
+      _token = prefs.getString('auth_token');
+      await _fetchCurrentUser();
+      // If fetch fails (token expired), _currentUser might remain null or we should handle it
+      if (_currentUser != null) {
+        notifyListeners();
+      } else {
+        // Token might be invalid, clear it
+        await logout();
+      }
+    }
+  }
+
+  Future<void> logout() async {
+    _token = null;
+    _currentUser = null;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('auth_token');
+    notifyListeners();
+  }
+
+  /// Returns null on success, or an error message string on failure.
+  Future<String?> register({
     required String email,
     required String password,
     required String firstName,
@@ -54,15 +122,51 @@ class AuthService {
       );
 
       if (response.statusCode == 200) {
-        print("Registration success");
-        return true;
+        return null; // Success
       } else {
-        print("Registration failed: ${response.body}");
-        return false;
+        return _parseError(response.body);
       }
     } catch (e) {
-      print("Registration error: $e");
-      return false;
+      return "An unexpected error occurred: $e";
     }
+  }
+
+  /// Returns null on success, or an error message string on failure.
+  Future<String?> updateProfile(Map<String, dynamic> updates) async {
+    if (_token == null) return "Not authenticated";
+
+    try {
+      final response = await http.patch(
+        Uri.parse('$baseUrl/users/me'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_token',
+        },
+        body: jsonEncode(updates),
+      );
+
+      if (response.statusCode == 200) {
+        // Update local user data with the response
+        _currentUser = jsonDecode(response.body);
+        notifyListeners();
+        return null;
+      } else {
+        return _parseError(response.body);
+      }
+    } catch (e) {
+      return "An unexpected error occurred: $e";
+    }
+  }
+
+  String _parseError(String responseBody) {
+    try {
+      final data = jsonDecode(responseBody);
+      if (data is Map<String, dynamic> && data.containsKey('detail')) {
+        return data['detail'].toString();
+      }
+    } catch (_) {
+      // fallback
+    }
+    return "Operation failed. Please try again.";
   }
 }
