@@ -7,6 +7,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/config/app_config.dart';
 import '../../../../core/providers/site_context_provider.dart';
@@ -342,7 +343,7 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
                         // Sponsors Carousel (endless scrolling)
                         if (_isLoadingSponsors)
                           const SizedBox(
-                            height: 70,
+                            height: 100,
                             child: Center(
                               child: CircularProgressIndicator(
                                 color: Colors.white,
@@ -351,7 +352,7 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
                           )
                         else if (_sponsors.isNotEmpty)
                           SizedBox(
-                            height: 70,
+                            height: 100,
                             child: ListView.builder(
                               controller: _sponsorScrollController,
                               scrollDirection: Axis.horizontal,
@@ -361,162 +362,202 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
                                 final s = _sponsors[index % _sponsors.length];
                                 final tier = s['tier'] as String? ?? 'general';
                                 final tierColor = _getTierColor(tier);
-                                final logoUrl = s['logo'] as String?;
+                                final rawLogoUrl = s['logo'] as String?;
+                                final website = s['website'] as String?;
 
-                                return Container(
-                                  width: 150,
-                                  margin: const EdgeInsets.only(right: 15),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF262B60),
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(
-                                      color: tierColor.withOpacity(0.5),
+                                // Build full logo URL
+                                String? fullLogoUrl;
+                                if (rawLogoUrl != null &&
+                                    rawLogoUrl.isNotEmpty) {
+                                  if (rawLogoUrl.startsWith('http')) {
+                                    fullLogoUrl = rawLogoUrl;
+                                  } else {
+                                    fullLogoUrl =
+                                        '${AppConfig.tourismApiBaseUrl}$rawLogoUrl';
+                                  }
+                                }
+
+                                return GestureDetector(
+                                  onTap: () async {
+                                    if (website != null && website.isNotEmpty) {
+                                      // Add http:// if missing
+                                      String url = website;
+                                      if (!url.startsWith('http://') &&
+                                          !url.startsWith('https://')) {
+                                        url = 'https://$url';
+                                      }
+                                      try {
+                                        final uri = Uri.parse(url);
+                                        await launchUrl(
+                                          uri,
+                                          mode: LaunchMode.externalApplication,
+                                        );
+                                      } catch (e) {
+                                        debugPrint('Could not launch $url: $e');
+                                      }
+                                    }
+                                  },
+                                  child: Container(
+                                    width: 160,
+                                    margin: const EdgeInsets.only(right: 15),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 8,
+                                      horizontal: 10,
                                     ),
-                                  ),
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      if (logoUrl != null && logoUrl.isNotEmpty)
-                                        Image.network(
-                                          logoUrl,
-                                          width: 40,
-                                          height: 30,
-                                          fit: BoxFit.contain,
-                                          errorBuilder: (c, e, s) => Icon(
-                                            Icons.business,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF262B60),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: tierColor.withOpacity(0.5),
+                                      ),
+                                    ),
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        // Logo - takes most of the space
+                                        Expanded(
+                                          child: (fullLogoUrl != null)
+                                              ? Image.network(
+                                                  fullLogoUrl,
+                                                  fit: BoxFit.contain,
+                                                  errorBuilder: (c, e, s) =>
+                                                      Icon(
+                                                        Icons.business,
+                                                        color: tierColor,
+                                                        size: 40,
+                                                      ),
+                                                )
+                                              : Icon(
+                                                  Icons.business,
+                                                  color: tierColor,
+                                                  size: 40,
+                                                ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        // Tier label only
+                                        Text(
+                                          tier.toUpperCase(),
+                                          style: GoogleFonts.roboto(
                                             color: tierColor,
-                                            size: 24,
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 12,
                                           ),
-                                        )
-                                      else
-                                        Icon(
-                                          Icons.business,
-                                          color: tierColor,
-                                          size: 24,
                                         ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        tier.toUpperCase(),
-                                        style: GoogleFonts.roboto(
-                                          color: tierColor,
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 10,
-                                        ),
-                                      ),
-                                      Text(
-                                        s['name'] ?? '',
-                                        style: GoogleFonts.roboto(
-                                          color: Colors.white70,
-                                          fontSize: 10,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
                                 );
                               },
                             ),
                           )
                         else
-                          const SizedBox(height: 70),
+                          const SizedBox(height: 100),
 
                         const SizedBox(height: 25),
 
                         // Grid (responsive: 2 columns mobile, 5 columns desktop)
-                        Center(
-                          child: ConstrainedBox(
-                            constraints: BoxConstraints(
-                              maxWidth: isMobile ? double.infinity : 900,
-                            ),
-                            child: GridView.builder(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              gridDelegate:
-                                  SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: isMobile ? 3 : 5,
-                                    mainAxisSpacing: isMobile ? 4 : 15,
-                                    crossAxisSpacing: isMobile ? 4 : 15,
-                                    childAspectRatio: isMobile ? 0.85 : 1.0,
-                                  ),
-                              itemCount: menuItems.length,
-                              itemBuilder: (context, index) {
-                                final item = menuItems[index];
-                                final isExit = item['isExit'] == true;
-                                final iconName = item['icon'] as String;
+                        Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: isMobile ? 16 : 24,
+                          ),
+                          child: Center(
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(
+                                maxWidth: isMobile ? double.infinity : 900,
+                              ),
+                              child: GridView.builder(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                gridDelegate:
+                                    SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: isMobile ? 3 : 5,
+                                      mainAxisSpacing: isMobile ? 10 : 20,
+                                      crossAxisSpacing: isMobile ? 10 : 20,
+                                      childAspectRatio: isMobile ? 0.9 : 1.0,
+                                    ),
+                                itemCount: menuItems.length,
+                                itemBuilder: (context, index) {
+                                  final item = menuItems[index];
+                                  final isExit = item['isExit'] == true;
+                                  final iconName = item['icon'] as String;
 
-                                return Material(
-                                  color: Colors.transparent,
-                                  child: InkWell(
-                                    onTap: () {
-                                      if (isExit) {
-                                        _onExitEvent();
-                                      } else if (item['route'] != null) {
-                                        context.push(item['route'] as String);
-                                      }
-                                    },
-                                    borderRadius: BorderRadius.circular(12),
-                                    splashColor: Colors.white24,
-                                    highlightColor: Colors.white10,
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        color: isExit
-                                            ? Colors.orange.withOpacity(0.15)
-                                            : Colors.transparent,
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(
+                                  return Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      onTap: () {
+                                        if (isExit) {
+                                          _onExitEvent();
+                                        } else if (item['route'] != null) {
+                                          context.push(item['route'] as String);
+                                        }
+                                      },
+                                      borderRadius: BorderRadius.circular(12),
+                                      splashColor: Colors.white24,
+                                      highlightColor: Colors.white10,
+                                      child: Container(
+                                        decoration: BoxDecoration(
                                           color: isExit
-                                              ? Colors.orange.withOpacity(0.3)
-                                              : Colors.white.withOpacity(0.1),
+                                              ? Colors.orange.withOpacity(0.15)
+                                              : Colors.transparent,
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                          border: Border.all(
+                                            color: isExit
+                                                ? Colors.orange.withOpacity(0.3)
+                                                : Colors.white.withOpacity(0.1),
+                                          ),
+                                        ),
+                                        child: Column(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            if (isExit)
+                                              Icon(
+                                                Icons.exit_to_app,
+                                                color: Colors.orange,
+                                                size: isMobile ? 48 : 52,
+                                              )
+                                            else
+                                              Image.asset(
+                                                'assets/event_menu/$iconName',
+                                                width: isMobile ? 64 : 58,
+                                                height: isMobile ? 64 : 58,
+                                                errorBuilder: (c, e, s) =>
+                                                    const Icon(
+                                                      Icons.image,
+                                                      color: Colors.white54,
+                                                      size: 24,
+                                                    ),
+                                              ),
+                                            SizedBox(height: isMobile ? 4 : 8),
+                                            Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 4.0,
+                                                  ),
+                                              child: Text(
+                                                item['label'] as String,
+                                                textAlign: TextAlign.center,
+                                                style: GoogleFonts.roboto(
+                                                  fontSize: isMobile ? 12 : 16,
+                                                  fontWeight: FontWeight.w500,
+                                                  color: isExit
+                                                      ? Colors.orange
+                                                      : const Color(0xFFF1F1F6),
+                                                ),
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
-                                      child: Column(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          if (isExit)
-                                            const Icon(
-                                              Icons.exit_to_app,
-                                              color: Colors.orange,
-                                              size: 32,
-                                            )
-                                          else
-                                            Image.asset(
-                                              'assets/event_menu/$iconName',
-                                              width: isMobile ? 48 : 48,
-                                              height: isMobile ? 48 : 48,
-                                              errorBuilder: (c, e, s) =>
-                                                  const Icon(
-                                                    Icons.image,
-                                                    color: Colors.white54,
-                                                    size: 24,
-                                                  ),
-                                            ),
-                                          SizedBox(height: isMobile ? 4 : 8),
-                                          Padding(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 4.0,
-                                            ),
-                                            child: Text(
-                                              item['label'] as String,
-                                              textAlign: TextAlign.center,
-                                              style: GoogleFonts.roboto(
-                                                fontSize: isMobile ? 10 : 14,
-                                                fontWeight: FontWeight.w500,
-                                                color: isExit
-                                                    ? Colors.orange
-                                                    : const Color(0xFFF1F1F6),
-                                              ),
-                                              maxLines: 2,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
                                     ),
-                                  ),
-                                );
-                              },
+                                  );
+                                },
+                              ),
                             ),
                           ),
                         ),

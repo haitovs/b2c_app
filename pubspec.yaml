@@ -23,6 +23,7 @@ dependencies:
   country_code_picker: ^3.4.1
   flutter_svg: ^2.2.3
   flutter_riverpod: ^3.0.3
+  url_launcher: ^6.3.0
 
 dev_dependencies:
   flutter_test:

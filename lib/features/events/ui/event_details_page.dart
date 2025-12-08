@@ -141,13 +141,22 @@ class _EventDetailsPageState extends ConsumerState<EventDetailsPage> {
                     child: Row(
                       children: [
                         // Back Arrow
-                        GestureDetector(
-                          onTap: () => context.pop(),
-                          child: SizedBox(
-                            width: isMobile ? 40 : 50,
-                            height: isMobile ? 40 : 50,
-                            child: const Center(
-                              child: Icon(
+                        Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(25),
+                            onTap: () {
+                              if (context.canPop()) {
+                                context.pop();
+                              } else {
+                                context.go('/');
+                              }
+                            },
+                            child: Container(
+                              width: isMobile ? 40 : 50,
+                              height: isMobile ? 40 : 50,
+                              alignment: Alignment.center,
+                              child: const Icon(
                                 Icons.arrow_back,
                                 color: Color(0xFFF1F1F6),
                               ),

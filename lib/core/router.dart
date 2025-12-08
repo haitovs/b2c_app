@@ -1,10 +1,10 @@
 import 'package:b2c_app/features/profile/ui/profile_page.dart';
 import 'package:go_router/go_router.dart';
 
-import '../features/agenda/ui/agenda_page.dart';
 import '../features/auth/services/auth_service.dart';
 import '../features/auth/ui/login_page.dart';
 import '../features/auth/ui/registration_page.dart';
+import '../features/events/ui/agenda_page.dart';
 import '../features/events/ui/event_calendar_page.dart';
 import '../features/events/ui/event_details_page.dart';
 import '../features/events/ui/event_menu_page.dart';
@@ -61,7 +61,7 @@ GoRouter createRouter(AuthService authService) {
           GoRoute(
             path: 'agenda',
             builder: (context, state) =>
-                AgendaPage(id: state.pathParameters['id']!),
+                AgendaPage(eventId: state.pathParameters['id']!),
           ),
           GoRoute(
             path: 'speakers',
