@@ -8,6 +8,9 @@ import 'package:http/http.dart' as http;
 
 import '../../../core/config/app_config.dart';
 import '../../../core/providers/site_context_provider.dart';
+import '../../../core/widgets/custom_app_bar.dart';
+import '../../notifications/ui/notification_drawer.dart';
+import 'widgets/profile_dropdown.dart';
 
 class SpeakerListPage extends ConsumerStatefulWidget {
   final String eventId;
@@ -19,6 +22,9 @@ class SpeakerListPage extends ConsumerStatefulWidget {
 }
 
 class _SpeakerListPageState extends ConsumerState<SpeakerListPage> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  bool _isProfileOpen = false;
+
   List<Map<String, dynamic>> _speakers = [];
   List<Map<String, dynamic>> _filteredSpeakers = [];
   bool _isLoading = true;
@@ -83,6 +89,14 @@ class _SpeakerListPageState extends ConsumerState<SpeakerListPage> {
     });
   }
 
+  void _toggleProfile() {
+    setState(() => _isProfileOpen = !_isProfileOpen);
+  }
+
+  void _closeProfile() {
+    if (_isProfileOpen) setState(() => _isProfileOpen = false);
+  }
+
   String _buildImageUrl(String? path) {
     if (path == null || path.isEmpty) return '';
     if (path.startsWith('http')) return path;
@@ -93,49 +107,92 @@ class _SpeakerListPageState extends ConsumerState<SpeakerListPage> {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
+    final horizontalPadding = isMobile ? 16.0 : 50.0;
 
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor: const Color(0xFF3C4494),
-      body: SafeArea(
-        child: Column(
+      endDrawer: const NotificationDrawer(),
+      body: GestureDetector(
+        onTap: _closeProfile,
+        behavior: HitTestBehavior.translucent,
+        child: Stack(
           children: [
-            // Header
-            _buildHeader(isMobile),
+            SafeArea(
+              child: Column(
+                children: [
+                  // Header
+                  Padding(
+                    padding: EdgeInsets.only(
+                      left: horizontalPadding,
+                      right: horizontalPadding,
+                      top: isMobile ? 12 : 20,
+                    ),
+                    child: _buildHeader(isMobile),
+                  ),
 
-            // Search Bar
-            _buildSearchBar(isMobile),
+                  // Search Bar
+                  Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: horizontalPadding,
+                      vertical: isMobile ? 12 : 20,
+                    ),
+                    child: _buildSearchBar(isMobile),
+                  ),
 
-            const SizedBox(height: 20),
-
-            // Content Container
-            Expanded(
-              child: Container(
-                margin: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 50),
-                decoration: const BoxDecoration(
-                  color: Color(0xFFF1F1F6),
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-                ),
-                child: _isLoading
-                    ? const Center(
-                        child: CircularProgressIndicator(
-                          color: Color(0xFF3C4494),
+                  // Content Container
+                  Expanded(
+                    child: Container(
+                      margin: EdgeInsets.symmetric(
+                        horizontal: horizontalPadding,
+                      ),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFF1F1F6),
+                        borderRadius: BorderRadius.vertical(
+                          top: Radius.circular(20),
                         ),
-                      )
-                    : _filteredSpeakers.isEmpty
-                    ? Center(
-                        child: Text(
-                          _searchQuery.isNotEmpty
-                              ? 'No speakers found for "$_searchQuery"'
-                              : 'No speakers available',
-                          style: GoogleFonts.roboto(
-                            fontSize: 16,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      )
-                    : _buildSpeakersGrid(isMobile),
+                      ),
+                      child: _isLoading
+                          ? const Center(
+                              child: CircularProgressIndicator(
+                                color: Color(0xFF3C4494),
+                              ),
+                            )
+                          : _filteredSpeakers.isEmpty
+                          ? Center(
+                              child: Text(
+                                _searchQuery.isNotEmpty
+                                    ? 'No speakers found for "$_searchQuery"'
+                                    : 'No speakers available',
+                                style: GoogleFonts.roboto(
+                                  fontSize: 16,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            )
+                          : _buildSpeakersGrid(isMobile),
+                    ),
+                  ),
+                ],
               ),
             ),
+
+            // Profile Dropdown
+            if (_isProfileOpen)
+              Positioned(
+                top: isMobile ? 55 : 70,
+                right: horizontalPadding,
+                child: ProfileDropdown(
+                  onClose: _closeProfile,
+                  onLogout: () {
+                    if (context.canPop()) {
+                      context.pop();
+                    } else {
+                      context.go('/');
+                    }
+                  },
+                ),
+              ),
           ],
         ),
       ),
@@ -143,150 +200,125 @@ class _SpeakerListPageState extends ConsumerState<SpeakerListPage> {
   }
 
   Widget _buildHeader(bool isMobile) {
-    return Padding(
-      padding: EdgeInsets.symmetric(
-        horizontal: isMobile ? 16 : 50,
-        vertical: isMobile ? 12 : 20,
+    return Row(
+      children: [
+        // Menu/Back button
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () {
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                context.go('/events/${widget.eventId}/menu');
+              }
+            },
+            borderRadius: BorderRadius.circular(25),
+            child: Container(
+              width: isMobile ? 36 : 50,
+              height: isMobile ? 36 : 50,
+              alignment: Alignment.center,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 20,
+                    height: 2.5,
+                    color: const Color(0xFFF1F1F6),
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    width: 20,
+                    height: 2.5,
+                    color: const Color(0xFFF1F1F6),
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    width: 20,
+                    height: 2.5,
+                    color: const Color(0xFFF1F1F6),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+
+        const SizedBox(width: 16),
+
+        // Title
+        Text(
+          'Speakers',
+          style: GoogleFonts.montserrat(
+            fontSize: isMobile ? 28 : 40,
+            fontWeight: FontWeight.w600,
+            color: const Color(0xFFF1F1F6),
+          ),
+        ),
+
+        const Spacer(),
+
+        // Custom App Bar with notifications and profile
+        CustomAppBar(
+          onProfileTap: _toggleProfile,
+          onNotificationTap: () {
+            _closeProfile();
+            _scaffoldKey.currentState?.openEndDrawer();
+          },
+          isMobile: isMobile,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSearchBar(bool isMobile) {
+    return Container(
+      height: isMobile ? 50 : 64,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F1F6).withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
         children: [
-          // Menu/Back button
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () {
-                if (context.canPop()) {
-                  context.pop();
-                } else {
-                  context.go('/events/${widget.eventId}/menu');
-                }
-              },
-              borderRadius: BorderRadius.circular(25),
-              child: Container(
-                width: 50,
-                height: 50,
-                alignment: Alignment.center,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 24,
-                      height: 3,
-                      margin: const EdgeInsets.symmetric(vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF1F1F6),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    Container(
-                      width: 24,
-                      height: 3,
-                      margin: const EdgeInsets.symmetric(vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF1F1F6),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    Container(
-                      width: 24,
-                      height: 3,
-                      margin: const EdgeInsets.symmetric(vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF1F1F6),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ],
+          SizedBox(width: isMobile ? 16 : 24),
+          Icon(
+            Icons.search,
+            color: const Color(0xFFF1F1F6),
+            size: isMobile ? 28 : 36,
+          ),
+          SizedBox(width: isMobile ? 12 : 20),
+          Expanded(
+            child: TextField(
+              controller: _searchController,
+              onChanged: _filterSpeakers,
+              style: GoogleFonts.roboto(
+                fontSize: isMobile ? 16 : 20,
+                color: const Color(0xFFF1F1F6),
+              ),
+              decoration: InputDecoration(
+                hintText: 'Search speakers',
+                hintStyle: GoogleFonts.roboto(
+                  fontSize: isMobile ? 16 : 20,
+                  color: const Color(0xFFF1F1F6),
                 ),
+                border: InputBorder.none,
               ),
             ),
-          ),
-
-          const SizedBox(width: 16),
-
-          // Title
-          Text(
-            'Speakers',
-            style: GoogleFonts.montserrat(
-              fontSize: isMobile ? 28 : 40,
-              fontWeight: FontWeight.w600,
-              color: const Color(0xFFF1F1F6),
-            ),
-          ),
-
-          const Spacer(),
-
-          // Icons
-          Row(
-            children: [
-              IconButton(
-                onPressed: () {},
-                icon: const Icon(Icons.notifications_outlined),
-                color: Colors.white,
-                iconSize: isMobile ? 24 : 30,
-              ),
-              IconButton(
-                onPressed: () {},
-                icon: const Icon(Icons.person_outline),
-                color: Colors.white,
-                iconSize: isMobile ? 24 : 30,
-              ),
-            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildSearchBar(bool isMobile) {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 50),
-      child: Container(
-        height: isMobile ? 50 : 64,
-        decoration: BoxDecoration(
-          color: const Color(0xFFF1F1F6).withValues(alpha: 0.3),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Row(
-          children: [
-            SizedBox(width: isMobile ? 16 : 24),
-            Icon(
-              Icons.search,
-              color: const Color(0xFFF1F1F6),
-              size: isMobile ? 28 : 36,
-            ),
-            SizedBox(width: isMobile ? 12 : 20),
-            Expanded(
-              child: TextField(
-                controller: _searchController,
-                onChanged: _filterSpeakers,
-                style: GoogleFonts.roboto(
-                  fontSize: isMobile ? 16 : 20,
-                  color: const Color(0xFFF1F1F6),
-                ),
-                decoration: InputDecoration(
-                  hintText: 'Search by name or position',
-                  hintStyle: GoogleFonts.roboto(
-                    fontSize: isMobile ? 16 : 20,
-                    color: const Color(0xFFF1F1F6),
-                  ),
-                  border: InputBorder.none,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildSpeakersGrid(bool isMobile) {
     // Calculate columns based on screen width
-    int crossAxisCount = isMobile ? 2 : 5;
-    if (!isMobile && MediaQuery.of(context).size.width < 1200) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    int crossAxisCount = 2; // Default mobile
+    if (screenWidth >= 1200) {
+      crossAxisCount = 5;
+    } else if (screenWidth >= 900) {
       crossAxisCount = 4;
-    }
-    if (!isMobile && MediaQuery.of(context).size.width < 900) {
+    } else if (screenWidth >= 600) {
       crossAxisCount = 3;
     }
 
@@ -295,9 +327,9 @@ class _SpeakerListPageState extends ConsumerState<SpeakerListPage> {
       child: GridView.builder(
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: crossAxisCount,
-          childAspectRatio: isMobile ? 0.68 : 0.68,
-          crossAxisSpacing: isMobile ? 16 : 44,
-          mainAxisSpacing: isMobile ? 16 : 30,
+          childAspectRatio: 0.72,
+          crossAxisSpacing: isMobile ? 12 : 20,
+          mainAxisSpacing: isMobile ? 12 : 20,
         ),
         itemCount: _filteredSpeakers.length,
         itemBuilder: (context, index) {
@@ -309,9 +341,7 @@ class _SpeakerListPageState extends ConsumerState<SpeakerListPage> {
   }
 
   Widget _buildSpeakerCard(Map<String, dynamic> speaker, bool isMobile) {
-    final name = speaker['name'] ?? '';
-    final surname = speaker['surname'] ?? '';
-    final fullName = '$name $surname'.trim();
+    final name = '${speaker['name'] ?? ''} ${speaker['surname'] ?? ''}'.trim();
     final position = speaker['position'] ?? '';
     final photoUrl = _buildImageUrl(speaker['photo']);
 
@@ -326,13 +356,12 @@ class _SpeakerListPageState extends ConsumerState<SpeakerListPage> {
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(5),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.25),
-              blurRadius: 5,
-              spreadRadius: 2,
-              offset: const Offset(0, 4),
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
@@ -340,19 +369,19 @@ class _SpeakerListPageState extends ConsumerState<SpeakerListPage> {
           children: [
             // Photo - takes ~75% of card
             Expanded(
-              flex: 3,
+              flex: 75,
               child: Container(
                 width: double.infinity,
                 decoration: BoxDecoration(
                   color: Colors.grey[300],
                   borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(5),
+                    top: Radius.circular(8),
                   ),
                 ),
                 child: photoUrl.isNotEmpty
                     ? ClipRRect(
                         borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(5),
+                          top: Radius.circular(8),
                         ),
                         child: Image.network(
                           photoUrl,
@@ -375,31 +404,33 @@ class _SpeakerListPageState extends ConsumerState<SpeakerListPage> {
 
             // Info section - takes ~25% of card
             Expanded(
-              flex: 1,
-              child: Padding(
+              flex: 25,
+              child: Container(
+                width: double.infinity,
                 padding: EdgeInsets.symmetric(
-                  horizontal: isMobile ? 8 : 12,
-                  vertical: isMobile ? 6 : 10,
+                  horizontal: isMobile ? 6 : 10,
+                  vertical: isMobile ? 4 : 8,
                 ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    // Name
-                    Text(
-                      fullName.isNotEmpty ? fullName : 'Unknown Speaker',
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.roboto(
-                        fontSize: isMobile ? 14 : 16,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.black,
+                    Flexible(
+                      child: Text(
+                        name.isNotEmpty ? name : 'Unknown Speaker',
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.roboto(
+                          fontSize: isMobile ? 14 : 16,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF151938),
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    // Position
-                    if (position.isNotEmpty)
-                      Text(
+                    const SizedBox(height: 2),
+                    Flexible(
+                      child: Text(
                         position,
                         textAlign: TextAlign.center,
                         maxLines: 2,
@@ -407,9 +438,10 @@ class _SpeakerListPageState extends ConsumerState<SpeakerListPage> {
                         style: GoogleFonts.roboto(
                           fontSize: isMobile ? 10 : 12,
                           fontWeight: FontWeight.w500,
-                          color: Colors.black,
+                          color: Colors.black54,
                         ),
                       ),
+                    ),
                   ],
                 ),
               ),

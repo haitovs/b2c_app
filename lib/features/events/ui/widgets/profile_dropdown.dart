@@ -6,9 +6,10 @@ import '../../../../core/app_theme.dart';
 import '../../../auth/services/auth_service.dart';
 
 class ProfileDropdown extends StatefulWidget {
-  final VoidCallback? onLogout; // Optional now as we use AuthService directly
+  final VoidCallback? onLogout;
+  final VoidCallback? onClose; // Callback to close the dropdown
 
-  const ProfileDropdown({super.key, this.onLogout});
+  const ProfileDropdown({super.key, this.onLogout, this.onClose});
 
   @override
   State<ProfileDropdown> createState() => _ProfileDropdownState();
@@ -51,6 +52,12 @@ class _ProfileDropdownState extends State<ProfileDropdown>
     });
   }
 
+  void _closeAndNavigate(VoidCallback action) {
+    // Close the dropdown first, then perform the action
+    widget.onClose?.call();
+    action();
+  }
+
   @override
   Widget build(BuildContext context) {
     // Watch auth service for user changes
@@ -83,9 +90,7 @@ class _ProfileDropdownState extends State<ProfileDropdown>
             color: Colors.white,
             borderRadius: BorderRadius.circular(5),
             child: InkWell(
-              onTap: () {
-                context.push('/profile');
-              },
+              onTap: () => _closeAndNavigate(() => context.push('/profile')),
               borderRadius: BorderRadius.circular(5),
               child: Container(
                 height: 57,
@@ -193,20 +198,18 @@ class _ProfileDropdownState extends State<ProfileDropdown>
             color: Colors.white,
             borderRadius: BorderRadius.circular(5),
             child: InkWell(
-              onTap: () async {
+              onTap: () => _closeAndNavigate(() async {
                 await authService.logout();
                 if (context.mounted) {
-                  // Go router redirection should handle this automatically if listening,
-                  // but we force push to login for safety
                   context.go('/login');
                 }
-              },
+              }),
               borderRadius: BorderRadius.circular(5),
               child: Container(
                 height: 57,
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Row(
-                  children: const [
+                child: const Row(
+                  children: [
                     Icon(Icons.logout, color: Colors.black),
                     SizedBox(width: 20),
                     Text(
@@ -235,6 +238,8 @@ class _ProfileDropdownState extends State<ProfileDropdown>
         setState(() {
           _currentLanguage = code;
         });
+        // Optionally close after selecting language
+        // widget.onClose?.call();
       },
       child: Text(
         code,

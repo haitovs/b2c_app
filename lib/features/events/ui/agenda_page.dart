@@ -447,6 +447,7 @@ class _AgendaPageState extends ConsumerState<AgendaPage> {
                 top: isMobile ? 55 : 70,
                 right: horizontalPadding,
                 child: ProfileDropdown(
+                  onClose: _closeProfile,
                   onLogout: () {
                     if (context.canPop()) {
                       context.pop();

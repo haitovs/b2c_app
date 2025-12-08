@@ -9,6 +9,9 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/providers/site_context_provider.dart';
+import '../../../core/widgets/custom_app_bar.dart';
+import '../../notifications/ui/notification_drawer.dart';
+import 'widgets/profile_dropdown.dart';
 
 class SpeakerDetailPage extends ConsumerStatefulWidget {
   final String eventId;
@@ -27,6 +30,9 @@ class SpeakerDetailPage extends ConsumerStatefulWidget {
 }
 
 class _SpeakerDetailPageState extends ConsumerState<SpeakerDetailPage> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  bool _isProfileOpen = false;
+
   Map<String, dynamic>? _speaker;
   bool _isLoading = true;
 
@@ -68,6 +74,14 @@ class _SpeakerDetailPageState extends ConsumerState<SpeakerDetailPage> {
     }
   }
 
+  void _toggleProfile() {
+    setState(() => _isProfileOpen = !_isProfileOpen);
+  }
+
+  void _closeProfile() {
+    if (_isProfileOpen) setState(() => _isProfileOpen = false);
+  }
+
   String _buildImageUrl(String? path) {
     if (path == null || path.isEmpty) return '';
     if (path.startsWith('http')) return path;
@@ -91,42 +105,81 @@ class _SpeakerDetailPageState extends ConsumerState<SpeakerDetailPage> {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
+    final horizontalPadding = isMobile ? 16.0 : 50.0;
 
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor: const Color(0xFF3C4494),
-      body: SafeArea(
-        child: Column(
+      endDrawer: const NotificationDrawer(),
+      body: GestureDetector(
+        onTap: _closeProfile,
+        behavior: HitTestBehavior.translucent,
+        child: Stack(
           children: [
-            // Header
-            _buildHeader(isMobile),
+            SafeArea(
+              child: Column(
+                children: [
+                  // Header
+                  Padding(
+                    padding: EdgeInsets.only(
+                      left: horizontalPadding,
+                      right: horizontalPadding,
+                      top: isMobile ? 12 : 20,
+                    ),
+                    child: _buildHeader(isMobile),
+                  ),
 
-            // Content Container
-            Expanded(
-              child: Container(
-                margin: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 50),
-                decoration: const BoxDecoration(
-                  color: Color(0xFFF1F1F6),
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-                ),
-                child: _isLoading
-                    ? const Center(
-                        child: CircularProgressIndicator(
-                          color: Color(0xFF3C4494),
+                  // Content Container
+                  Expanded(
+                    child: Container(
+                      margin: EdgeInsets.symmetric(
+                        horizontal: horizontalPadding,
+                      ),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFF1F1F6),
+                        borderRadius: BorderRadius.vertical(
+                          top: Radius.circular(20),
                         ),
-                      )
-                    : _speaker == null
-                    ? Center(
-                        child: Text(
-                          'Speaker not found',
-                          style: GoogleFonts.roboto(
-                            fontSize: 16,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      )
-                    : _buildContent(isMobile),
+                      ),
+                      child: _isLoading
+                          ? const Center(
+                              child: CircularProgressIndicator(
+                                color: Color(0xFF3C4494),
+                              ),
+                            )
+                          : _speaker == null
+                          ? Center(
+                              child: Text(
+                                'Speaker not found',
+                                style: GoogleFonts.roboto(
+                                  fontSize: 16,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            )
+                          : _buildContent(isMobile),
+                    ),
+                  ),
+                ],
               ),
             ),
+
+            // Profile Dropdown
+            if (_isProfileOpen)
+              Positioned(
+                top: isMobile ? 55 : 70,
+                right: horizontalPadding,
+                child: ProfileDropdown(
+                  onClose: _closeProfile,
+                  onLogout: () {
+                    if (context.canPop()) {
+                      context.pop();
+                    } else {
+                      context.go('/');
+                    }
+                  },
+                ),
+              ),
           ],
         ),
       ),
@@ -134,71 +187,57 @@ class _SpeakerDetailPageState extends ConsumerState<SpeakerDetailPage> {
   }
 
   Widget _buildHeader(bool isMobile) {
-    return Padding(
-      padding: EdgeInsets.symmetric(
-        horizontal: isMobile ? 16 : 50,
-        vertical: isMobile ? 12 : 20,
-      ),
-      child: Row(
-        children: [
-          // Back button
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () {
-                if (context.canPop()) {
-                  context.pop();
-                } else {
-                  context.go('/events/${widget.eventId}/speakers');
-                }
-              },
-              borderRadius: BorderRadius.circular(25),
-              child: Container(
-                width: 50,
-                height: 50,
-                alignment: Alignment.center,
-                child: const Icon(
-                  Icons.arrow_back,
-                  color: Color(0xFFF1F1F6),
-                  size: 28,
-                ),
+    return Row(
+      children: [
+        // Back button
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () {
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                context.go('/events/${widget.eventId}/speakers');
+              }
+            },
+            borderRadius: BorderRadius.circular(25),
+            child: Container(
+              width: isMobile ? 36 : 50,
+              height: isMobile ? 36 : 50,
+              alignment: Alignment.center,
+              child: const Icon(
+                Icons.arrow_back,
+                color: Color(0xFFF1F1F6),
+                size: 28,
               ),
             ),
           ),
+        ),
 
-          const SizedBox(width: 16),
+        const SizedBox(width: 16),
 
-          // Title
-          Text(
-            'Speaker',
-            style: GoogleFonts.montserrat(
-              fontSize: isMobile ? 28 : 40,
-              fontWeight: FontWeight.w600,
-              color: const Color(0xFFF1F1F6),
-            ),
+        // Title
+        Text(
+          'Speaker',
+          style: GoogleFonts.montserrat(
+            fontSize: isMobile ? 28 : 40,
+            fontWeight: FontWeight.w600,
+            color: const Color(0xFFF1F1F6),
           ),
+        ),
 
-          const Spacer(),
+        const Spacer(),
 
-          // Icons
-          Row(
-            children: [
-              IconButton(
-                onPressed: () {},
-                icon: const Icon(Icons.notifications_outlined),
-                color: Colors.white,
-                iconSize: isMobile ? 24 : 30,
-              ),
-              IconButton(
-                onPressed: () {},
-                icon: const Icon(Icons.person_outline),
-                color: Colors.white,
-                iconSize: isMobile ? 24 : 30,
-              ),
-            ],
-          ),
-        ],
-      ),
+        // Custom App Bar with notifications and profile
+        CustomAppBar(
+          onProfileTap: _toggleProfile,
+          onNotificationTap: () {
+            _closeProfile();
+            _scaffoldKey.currentState?.openEndDrawer();
+          },
+          isMobile: isMobile,
+        ),
+      ],
     );
   }
 
@@ -211,7 +250,6 @@ class _SpeakerDetailPageState extends ConsumerState<SpeakerDetailPage> {
     final description = _speaker!['description'] ?? '';
     final phone = _speaker!['phone'] ?? '';
     final email = _speaker!['email'] ?? '';
-    final website = _speaker!['website'] ?? '';
     final photoUrl = _buildImageUrl(_speaker!['photo']);
     final companyPhotoUrl = _buildImageUrl(_speaker!['company_photo']);
 
