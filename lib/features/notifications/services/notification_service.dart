@@ -2,8 +2,10 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../../../core/config/app_config.dart';
+
 class NotificationService {
-  final String baseUrl = 'http://localhost:8000/api/v1';
+  final String baseUrl = '${AppConfig.b2cApiBaseUrl}/api/v1';
 
   Future<List<dynamic>> getNotifications() async {
     // TODO: Add auth token header

@@ -224,4 +224,46 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get confirmPasswordPlaceholder => 'Confirm Password';
+
+  @override
+  String get eventNotFound => 'Event not found';
+
+  @override
+  String get speakerBreadcrumb => 'Speaker';
+
+  @override
+  String get keyThemesTurkmenistanChina =>
+      'Key Themes of the Turkmenistan–China Forum:';
+
+  @override
+  String get participantInstructions =>
+      'To access the mobile application, please click the button below. If you do not find yourself in the list of participants, please complete your registration on the official website. Your personal ID will be sent to the email address you provided.';
+
+  @override
+  String get eventMenu => 'Event Menu';
+
+  @override
+  String get silverSponsor => 'Silver Sponsor';
+
+  @override
+  String get bronzeSponsor => 'Bronze Sponsor';
+
+  @override
+  String get partner => 'Partner';
+
+  @override
+  String get mediaPartner => 'Media Partner';
+
+  @override
+  String get annualExpoTitle =>
+      'Annual Expo CMR forum for international guests';
+
+  @override
+  String get eventMenuLine1 => 'Annual Expo CMR forum for';
+
+  @override
+  String get eventMenuLine2 => 'international guests';
+
+  @override
+  String get exitEvent => 'Exit Event';
 }

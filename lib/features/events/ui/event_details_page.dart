@@ -1,17 +1,28 @@
-import 'package:b2c_app/l10n/generated/app_localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart' as p;
 
-class EventDetailsPage extends StatefulWidget {
+import '../../../../core/providers/site_context_provider.dart';
+import '../../../../core/widgets/custom_app_bar.dart';
+import '../../../../l10n/generated/app_localizations.dart';
+import '../../notifications/ui/notification_drawer.dart';
+import '../services/event_service.dart';
+import 'widgets/profile_dropdown.dart';
+
+class EventDetailsPage extends ConsumerStatefulWidget {
   final String id;
   const EventDetailsPage({super.key, required this.id});
 
   @override
-  State<EventDetailsPage> createState() => _EventDetailsPageState();
+  ConsumerState<EventDetailsPage> createState() => _EventDetailsPageState();
 }
 
-class _EventDetailsPageState extends State<EventDetailsPage> {
+class _EventDetailsPageState extends ConsumerState<EventDetailsPage> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  bool _isProfileOpen = false;
+
   Map<String, dynamic>? _event;
   bool _isLoading = true;
 
@@ -24,295 +35,579 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
   }
 
   Future<void> _loadEvent() async {
-    // Mock data for now
+    try {
+      final eventId = int.tryParse(widget.id);
+      if (eventId == null) {
+        if (mounted) setState(() => _isLoading = false);
+        return;
+      }
+
+      final eventService = p.Provider.of<EventService>(context, listen: false);
+      final eventData = await eventService.fetchEvent(eventId);
+
+      if (!mounted) return;
+
+      if (eventData != null) {
+        setState(() {
+          _event = {
+            "id": eventData['id'],
+            "name": eventData['title'] ?? 'Untitled Event',
+            "description": eventData['description'] ?? '',
+            "start_date": eventData['date_str'] ?? '',
+            "location": eventData['location'] ?? '',
+            "tourism_site_id": eventData['tourism_site_id'],
+            "image_url": eventData['image_url'],
+            "logo_url": eventData['logo_url'],
+          };
+          _isLoading = false;
+        });
+      } else {
+        setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      debugPrint('Error loading event: $e');
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _toggleProfile() {
     setState(() {
-      _event = {
-        "id": widget.id,
-        "name": "Turkmenistan–China Innovation Forum",
-        "description":
-            "Strengthening bilateral cooperation in trade, innovation, and education; Annual exhibitions showcasing cutting-edge technologies and industry developments; Expert-led lectures, panel discussions, and networking sessions; Investment opportunities for international businesses and entrepreneurs; Advancing scientific research and academic collaborationions; Cultural exchange and diplomatic dialogue between nations; Sustainable development, infrastructure, and green energy initiatives.",
-        "start_date": "2025-05-20",
-        "end_date": "2025-05-25",
-        "location": "Ashgabat, TKM",
-      };
-      _isLoading = false;
+      _isProfileOpen = !_isProfileOpen;
     });
-    // final event = await _eventService.getEvent(int.parse(widget.id));
-    // setState(() {
-    //   _event = event;
-    //   _isLoading = false;
-    // });
+  }
+
+  void _closeProfile() {
+    if (_isProfileOpen) {
+      setState(() {
+        _isProfileOpen = false;
+      });
+    }
+  }
+
+  void _onOpenTap() {
+    if (_event != null && _event!.containsKey('tourism_site_id')) {
+      ref
+          .read(siteContextProvider.notifier)
+          .setSiteId(_event!['tourism_site_id']);
+    }
+    context.push('/events/${widget.id}/menu');
   }
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final horizontalPadding = isMobile ? 20.0 : 50.0;
+
     if (_isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(
+        backgroundColor: Color(0xFF3C4494),
+        body: Center(child: CircularProgressIndicator(color: Colors.white)),
+      );
     }
 
     if (_event == null) {
-      return const Scaffold(body: Center(child: Text("Event not found")));
+      return Scaffold(
+        backgroundColor: const Color(0xFF3C4494),
+        body: Center(
+          child: Text(
+            AppLocalizations.of(context)!.eventNotFound,
+            style: const TextStyle(color: Colors.white),
+          ),
+        ),
+      );
     }
 
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor: const Color(0xFF3C4494),
-      body: SingleChildScrollView(
-        child: Column(
+      endDrawer: const NotificationDrawer(),
+      body: GestureDetector(
+        onTap: _closeProfile,
+        behavior: HitTestBehavior.translucent,
+        child: Stack(
           children: [
-            // Header with Back Button
-            Padding(
-              padding: const EdgeInsets.all(50),
-              child: Row(
+            // Main Content
+            SingleChildScrollView(
+              child: Column(
                 children: [
-                  GestureDetector(
-                    onTap: () => context.pop(),
-                    child: Container(
-                      width: 50,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        border: Border.all(
-                          color: const Color(0xFFF1F1F6),
-                          width: 3,
-                        ),
-                        borderRadius: BorderRadius.circular(
-                          10,
-                        ), // Assuming rounded rect based on vector
-                      ),
-                      child: const Icon(
-                        Icons.arrow_back,
-                        color: Color(0xFFF1F1F6),
-                      ),
+                  // Top Bar Area
+                  Padding(
+                    padding: EdgeInsets.only(
+                      left: horizontalPadding,
+                      right: horizontalPadding - 10,
+                      top: isMobile ? 15 : 20,
                     ),
-                  ),
-                ],
-              ),
-            ),
-
-            // Event Title & Image
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 50),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 130,
-                    height: 130,
-                    decoration: BoxDecoration(
-                      color: Colors.grey,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: _event!['logo_url'] != null
-                        ? Image.network(
-                            _event!['logo_url'],
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) =>
-                                Container(color: Colors.grey),
-                          )
-                        : Container(color: Colors.grey),
-                  ),
-                  const SizedBox(width: 30),
-                  Flexible(
-                    child: Text(
-                      _event!['name'],
-                      style: GoogleFonts.montserrat(
-                        fontWeight: FontWeight.w500,
-                        fontSize: 55,
-                        color: const Color(0xFFF1F1F6),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // Date and Location
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 50),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.calendar_today_outlined,
-                    color: Color(0xFFF1F1F6),
-                    size: 24,
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    "${_event!['start_date']} - ${_event!['end_date']}",
-                    style: GoogleFonts.roboto(
-                      fontSize: 20,
-                      color: const Color(0xFFF1F1F6),
-                    ),
-                  ),
-                  const SizedBox(width: 40),
-                  const Icon(
-                    Icons.location_on_outlined,
-                    color: Color(0xFFF1F1F6),
-                    size: 24,
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    _event!['location'],
-                    style: GoogleFonts.roboto(
-                      fontSize: 20,
-                      color: const Color(0xFFF1F1F6),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 50),
-
-            // Main Content Area
-            Container(
-              width: 1310, // Max width
-              constraints: BoxConstraints(
-                maxWidth: MediaQuery.of(context).size.width * 0.9,
-              ),
-              child: Stack(
-                children: [
-                  // Info Card
-                  Container(
-                    width: 929,
-                    padding: const EdgeInsets.all(40),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF1F1F6),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.black),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Row(
                       children: [
-                        // Speakers Dropdown (Mock)
-                        Row(
-                          children: [
-                            Text(
-                              AppLocalizations.of(context)!.speakersLabel,
-                              style: GoogleFonts.roboto(
-                                fontWeight: FontWeight.w500,
-                                fontSize: 18,
-                                color: const Color(0xFF616161),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            const Icon(
-                              Icons.keyboard_arrow_down,
-                              color: Color(0xFF616161),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 20),
-
-                        // Key Themes Title
-                        Center(
-                          child: Text(
-                            AppLocalizations.of(context)!.keyThemesLabel,
-                            style: GoogleFonts.montserrat(
-                              fontWeight: FontWeight.w500,
-                              fontSize: 30,
-                              color: const Color(0xFF231C1C),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 30),
-
-                        // Description
-                        Text(
-                          _event!['description'],
-                          style: GoogleFonts.roboto(
-                            fontWeight: FontWeight.w400,
-                            fontSize: 20,
-                            height: 1.75,
-                            color: const Color(0xD9474551),
-                          ),
-                        ),
-                        const SizedBox(height: 30),
-
-                        // Dear Participants
-                        Center(
-                          child: Text(
-                            AppLocalizations.of(context)!.dearParticipants,
-                            style: GoogleFonts.montserrat(
-                              fontWeight: FontWeight.w500,
-                              fontSize: 25,
-                              color: const Color(0xFF231C1C),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-
-                        // Footer Text
-                        Text(
-                          "To access the mobile application, please click the button below. If you do not find yourself in the list of participants, please complete your registration on the official website. Your personal ID will be sent to the email address you provided.",
-                          style: GoogleFonts.roboto(
-                            fontWeight: FontWeight.w400,
-                            fontSize: 20,
-                            height: 1.75,
-                            color: const Color(0xD9474551),
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Side Image & Button (Desktop Layout)
-                  Positioned(
-                    right: 0,
-                    top: 0,
-                    child: Column(
-                      children: [
-                        Container(
-                          width: 381,
-                          height: 497,
-                          decoration: BoxDecoration(
-                            color: Colors.grey,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          clipBehavior: Clip.antiAlias,
-                          child: _event!['image_url'] != null
-                              ? Image.network(
-                                  _event!['image_url'],
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => const Center(
-                                    child: Text("Image Not Found"),
-                                  ),
-                                )
-                              : const Center(child: Text("No Image")),
-                        ),
-                        const SizedBox(height: 20),
+                        // Back Arrow
                         GestureDetector(
-                          onTap: () =>
-                              context.push('/events/${widget.id}/menu'),
-                          child: Container(
-                            width: 381,
-                            height: 121,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF9CA4CC),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            alignment: Alignment.center,
-                            child: Text(
-                              AppLocalizations.of(context)!.openButton,
-                              style: GoogleFonts.montserrat(
-                                fontWeight: FontWeight.w500,
-                                fontSize: 45,
-                                color: const Color(0xFFF1F1F6),
+                          onTap: () => context.pop(),
+                          child: SizedBox(
+                            width: isMobile ? 40 : 50,
+                            height: isMobile ? 40 : 50,
+                            child: const Center(
+                              child: Icon(
+                                Icons.arrow_back,
+                                color: Color(0xFFF1F1F6),
                               ),
                             ),
                           ),
                         ),
+                        const Spacer(),
+                        // App Bar Icons
+                        CustomAppBar(
+                          onProfileTap: _toggleProfile,
+                          onNotificationTap: () {
+                            _closeProfile();
+                            _scaffoldKey.currentState?.openEndDrawer();
+                          },
+                          isMobile: isMobile,
+                        ),
                       ],
                     ),
                   ),
+
+                  SizedBox(height: isMobile ? 20 : 30),
+
+                  // Title Row: Logo + Event Name
+                  Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: horizontalPadding,
+                    ),
+                    child: isMobile
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Logo
+                              Container(
+                                width: 80,
+                                height: 80,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(10),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.25),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: Image.asset(
+                                    'assets/event_detail/logo_mini.png',
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (c, e, s) =>
+                                        const Icon(Icons.image, size: 40),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 15),
+                              // Event Name
+                              Text(
+                                _event!['name'],
+                                style: GoogleFonts.montserrat(
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 24,
+                                  height: 1.2,
+                                  color: const Color(0xFFF1F1F6),
+                                ),
+                              ),
+                            ],
+                          )
+                        : Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              // Logo
+                              Container(
+                                width: 130,
+                                height: 130,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(10),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.25),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: Image.asset(
+                                    'assets/event_detail/logo_mini.png',
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (c, e, s) =>
+                                        const Icon(Icons.image, size: 50),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 30),
+                              // Event Name
+                              Expanded(
+                                child: Text(
+                                  _event!['name'],
+                                  style: GoogleFonts.montserrat(
+                                    fontWeight: FontWeight.w500,
+                                    fontSize: 45,
+                                    height: 67 / 55,
+                                    color: const Color(0xFFF1F1F6),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                  ),
+
+                  SizedBox(height: isMobile ? 25 : 50),
+
+                  // Content Area: Text Box + Image/Button
+                  Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: horizontalPadding,
+                    ),
+                    child: isMobile
+                        ? Column(
+                            children: [
+                              // Text Box - Mobile
+                              Container(
+                                padding: const EdgeInsets.all(20),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF1F1F6),
+                                  border: Border.all(
+                                    color: Colors.black,
+                                    width: 1,
+                                  ),
+                                  borderRadius: BorderRadius.circular(15),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // Key Themes Title
+                                    Text(
+                                      AppLocalizations.of(
+                                        context,
+                                      )!.keyThemesTurkmenistanChina,
+                                      style: GoogleFonts.montserrat(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w500,
+                                        color: const Color(0xFF231C1C),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 15),
+                                    // Description as bullet list
+                                    ...(_event!['description'] as String)
+                                        .split(';')
+                                        .where((item) => item.trim().isNotEmpty)
+                                        .map(
+                                          (item) => Padding(
+                                            padding: const EdgeInsets.only(
+                                              bottom: 6,
+                                            ),
+                                            child: Row(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  '• ',
+                                                  style: GoogleFonts.roboto(
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.w400,
+                                                    color: const Color(
+                                                      0xD9474551,
+                                                    ),
+                                                  ),
+                                                ),
+                                                Expanded(
+                                                  child: Text(
+                                                    item.trim(),
+                                                    style: GoogleFonts.roboto(
+                                                      fontSize: 14,
+                                                      fontWeight:
+                                                          FontWeight.w400,
+                                                      height: 1.4,
+                                                      color: const Color(
+                                                        0xD9474551,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                    const SizedBox(height: 15),
+                                    // Dear Participants
+                                    Text(
+                                      AppLocalizations.of(
+                                        context,
+                                      )!.dearParticipants,
+                                      style: GoogleFonts.montserrat(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w500,
+                                        color: const Color(0xFF231C1C),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    // Instructions
+                                    Text(
+                                      AppLocalizations.of(
+                                        context,
+                                      )!.participantInstructions,
+                                      style: GoogleFonts.roboto(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w400,
+                                        height: 1.4,
+                                        color: const Color(0xD9474551),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+                              // Open Button - Mobile (smaller)
+                              GestureDetector(
+                                onTap: _onOpenTap,
+                                child: Container(
+                                  width: double.infinity,
+                                  height: 60,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF9CA4CC),
+                                    borderRadius: BorderRadius.circular(15),
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    AppLocalizations.of(context)!.openButton,
+                                    style: GoogleFonts.montserrat(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.w500,
+                                      color: const Color(0xFFF1F1F6),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          )
+                        : Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Text Box
+                              Expanded(
+                                flex: 2,
+                                child: Container(
+                                  padding: const EdgeInsets.all(40),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF1F1F6),
+                                    border: Border.all(
+                                      color: Colors.black,
+                                      width: 1,
+                                    ),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(8.0),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        // Breadcrumbs
+                                        Row(
+                                          children: [
+                                            Text(
+                                              AppLocalizations.of(
+                                                context,
+                                              )!.speakersLabel,
+                                              style: GoogleFonts.roboto(
+                                                fontSize: 18,
+                                                fontWeight: FontWeight.w500,
+                                                color: const Color(0xFF616161),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 5),
+                                            const Icon(
+                                              Icons.chevron_right,
+                                              color: Color(0xFF616161),
+                                              size: 20,
+                                            ),
+                                            Text(
+                                              AppLocalizations.of(
+                                                context,
+                                              )!.speakerBreadcrumb,
+                                              style: GoogleFonts.roboto(
+                                                fontSize: 18,
+                                                fontWeight: FontWeight.w500,
+                                                color: const Color(0xFF616161),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 20),
+                                        // Key Themes Title
+                                        Text(
+                                          AppLocalizations.of(
+                                            context,
+                                          )!.keyThemesTurkmenistanChina,
+                                          style: GoogleFonts.montserrat(
+                                            fontSize: 30,
+                                            fontWeight: FontWeight.w500,
+                                            height: 37 / 30,
+                                            color: const Color(0xFF231C1C),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 20),
+                                        // Description as bullet list
+                                        ...(_event!['description'] as String)
+                                            .split(';')
+                                            .where(
+                                              (item) => item.trim().isNotEmpty,
+                                            )
+                                            .map(
+                                              (item) => Padding(
+                                                padding: const EdgeInsets.only(
+                                                  bottom: 8,
+                                                ),
+                                                child: Row(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      '• ',
+                                                      style: GoogleFonts.roboto(
+                                                        fontSize: 20,
+                                                        fontWeight:
+                                                            FontWeight.w400,
+                                                        color: const Color(
+                                                          0xD9474551,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    Expanded(
+                                                      child: Text(
+                                                        item.trim(),
+                                                        style:
+                                                            GoogleFonts.roboto(
+                                                              fontSize: 20,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w400,
+                                                              height: 35 / 20,
+                                                              color:
+                                                                  const Color(
+                                                                    0xD9474551,
+                                                                  ),
+                                                            ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                        const SizedBox(height: 30),
+                                        // Dear Participants
+                                        Text(
+                                          AppLocalizations.of(
+                                            context,
+                                          )!.dearParticipants,
+                                          style: GoogleFonts.montserrat(
+                                            fontSize: 25,
+                                            fontWeight: FontWeight.w500,
+                                            height: 37 / 25,
+                                            color: const Color(0xFF231C1C),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 20),
+                                        // Instructions
+                                        Text(
+                                          AppLocalizations.of(
+                                            context,
+                                          )!.participantInstructions,
+                                          style: GoogleFonts.roboto(
+                                            fontSize: 20,
+                                            fontWeight: FontWeight.w400,
+                                            height: 35 / 20,
+                                            color: const Color(0xD9474551),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 30),
+                              // Image + Button Column
+                              Column(
+                                children: [
+                                  // Event Photo
+                                  Container(
+                                    width: 381,
+                                    height: 497,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(20),
+                                      child: Image.asset(
+                                        'assets/event_detail/event_photo.png',
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (c, e, s) => Container(
+                                          color: Colors.grey,
+                                          child: const Icon(
+                                            Icons.image,
+                                            size: 100,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 27),
+                                  // Open Button
+                                  GestureDetector(
+                                    onTap: _onOpenTap,
+                                    child: Container(
+                                      width: 381,
+                                      height: 121,
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF9CA4CC),
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: Text(
+                                        AppLocalizations.of(
+                                          context,
+                                        )!.openButton,
+                                        style: GoogleFonts.montserrat(
+                                          fontSize: 45,
+                                          fontWeight: FontWeight.w500,
+                                          color: const Color(0xFFF1F1F6),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                  ),
+
+                  SizedBox(height: isMobile ? 30 : 50),
                 ],
               ),
             ),
-            const SizedBox(height: 50),
+
+            // Profile Dropdown Overlay
+            if (_isProfileOpen)
+              Positioned(
+                top: isMobile ? 60 : 80,
+                right: isMobile ? 20 : 65,
+                left: isMobile ? 20 : null,
+                child: ProfileDropdown(
+                  onLogout: () {
+                    context.go('/login');
+                  },
+                ),
+              ),
           ],
         ),
       ),

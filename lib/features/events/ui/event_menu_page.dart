@@ -1,178 +1,542 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:http/http.dart' as http;
 
-class EventMenuPage extends StatelessWidget {
+import '../../../../core/config/app_config.dart';
+import '../../../../core/providers/site_context_provider.dart';
+import '../../../../l10n/generated/app_localizations.dart';
+import '../../notifications/ui/notification_drawer.dart';
+import 'widgets/profile_dropdown.dart';
+
+class EventMenuPage extends ConsumerStatefulWidget {
   final int eventId;
 
   const EventMenuPage({super.key, required this.eventId});
 
   @override
+  ConsumerState<EventMenuPage> createState() => _EventMenuPageState();
+}
+
+class _EventMenuPageState extends ConsumerState<EventMenuPage> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  bool _isProfileOpen = false;
+
+  List<Map<String, dynamic>> _sponsors = [];
+  bool _isLoadingSponsors = true;
+
+  // For endless scrolling carousel
+  late ScrollController _sponsorScrollController;
+  Timer? _sponsorScrollTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _sponsorScrollController = ScrollController();
+    _fetchSponsors();
+  }
+
+  @override
+  void dispose() {
+    _sponsorScrollTimer?.cancel();
+    _sponsorScrollController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchSponsors() async {
+    try {
+      final siteId = ref.read(siteContextProvider);
+      // Use query param for site_id instead of header for better compatibility
+      final uri = siteId != null
+          ? Uri.parse(
+              '${AppConfig.tourismApiBaseUrl}/sponsors/?site_id=$siteId',
+            )
+          : Uri.parse('${AppConfig.tourismApiBaseUrl}/sponsors/');
+      final response = await http.get(uri);
+      if (response.statusCode == 200) {
+        final List data = jsonDecode(response.body);
+        setState(() {
+          _sponsors = data.cast<Map<String, dynamic>>();
+          _isLoadingSponsors = false;
+        });
+        // Start auto-scroll after data loads
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _startAutoScroll();
+        });
+      } else {
+        debugPrint('Sponsors fetch failed: ${response.statusCode}');
+        setState(() => _isLoadingSponsors = false);
+      }
+    } catch (e) {
+      debugPrint('Error fetching sponsors: $e');
+      setState(() => _isLoadingSponsors = false);
+    }
+  }
+
+  void _startAutoScroll() {
+    if (_sponsors.isEmpty) return;
+
+    _sponsorScrollTimer = Timer.periodic(const Duration(milliseconds: 30), (
+      timer,
+    ) {
+      if (_sponsorScrollController.hasClients) {
+        final maxScroll = _sponsorScrollController.position.maxScrollExtent;
+        final currentScroll = _sponsorScrollController.offset;
+
+        if (currentScroll >= maxScroll) {
+          _sponsorScrollController.jumpTo(0);
+        } else {
+          _sponsorScrollController.jumpTo(currentScroll + 1);
+        }
+      }
+    });
+  }
+
+  void _toggleProfile() {
+    setState(() {
+      _isProfileOpen = !_isProfileOpen;
+    });
+  }
+
+  void _closeProfile() {
+    if (_isProfileOpen) {
+      setState(() {
+        _isProfileOpen = false;
+      });
+    }
+  }
+
+  void _onExitEvent() {
+    ref.read(siteContextProvider.notifier).clearSite();
+    context.go('/');
+  }
+
+  Color _getTierColor(String? tier) {
+    switch (tier?.toLowerCase()) {
+      case 'premier':
+      case 'diamond':
+        return const Color(0xFFB9F2FF);
+      case 'platinum':
+        return const Color(0xFFE5E4E2);
+      case 'gold':
+        return const Color(0xFFFFD700);
+      case 'silver':
+        return const Color(0xFFC0C0C0);
+      case 'bronze':
+        return const Color(0xFFCD7F32);
+      case 'general':
+      default:
+        return Colors.blue;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // Menu Items Data
+    final l10n = AppLocalizations.of(context)!;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+
+    // Menu Items (including exit event as last item)
     final menuItems = [
       {
-        'icon': Icons.calendar_today,
-        'label': 'Agenda',
-        'route': '/events/$eventId/agenda',
+        'icon': 'agenda.png',
+        'label': l10n.agenda,
+        'route': '/events/${widget.eventId}/agenda',
       },
       {
-        'icon': Icons.mic,
-        'label': 'Speakers',
-        'route': '/events/$eventId/speakers',
+        'icon': 'speakers.png',
+        'label': l10n.speakers,
+        'route': '/events/${widget.eventId}/speakers',
       },
       {
-        'icon': Icons.groups,
-        'label': 'Participants',
-        'route': '/events/$eventId/participants',
+        'icon': 'participants.png',
+        'label': l10n.participants,
+        'route': '/events/${widget.eventId}/participants',
       },
       {
-        'icon': Icons.handshake,
-        'label': 'Meetings',
-        'route': '/events/$eventId/meetings',
+        'icon': 'meetings.png',
+        'label': l10n.meetings,
+        'route': '/events/${widget.eventId}/meetings',
       },
       {
-        'icon': Icons.newspaper,
-        'label': 'News',
-        'route': '/events/$eventId/news',
+        'icon': 'news.png',
+        'label': l10n.news,
+        'route': '/events/${widget.eventId}/news',
       },
       {
-        'icon': Icons.app_registration,
-        'label': 'Registration',
-        'route': '/events/$eventId/registration',
-      }, // Maybe different flow
-      {
-        'icon': Icons.flight,
-        'label': 'Flights',
-        'route': '/events/$eventId/flights',
+        'icon': 'registration.png',
+        'label': l10n.registration,
+        'route': '/events/${widget.eventId}/registration',
       },
       {
-        'icon': Icons.hotel,
-        'label': 'Accommodation',
-        'route': '/events/$eventId/accommodation',
+        'icon': 'my_participants.png',
+        'label': l10n.myParticipants,
+        'route': '/events/${widget.eventId}/my-participants',
       },
       {
-        'icon': Icons.directions_car,
-        'label': 'Transfer',
-        'route': '/events/$eventId/transfer',
+        'icon': 'flights.png',
+        'label': l10n.flights,
+        'route': '/events/${widget.eventId}/flights',
       },
       {
-        'icon': Icons.support_agent,
-        'label': 'Hotline',
-        'route': '/events/$eventId/hotline',
+        'icon': 'accommodation.png',
+        'label': l10n.accommodation,
+        'route': '/events/${widget.eventId}/accommodation',
       },
       {
-        'icon': Icons.feedback,
-        'label': 'Feedback',
-        'route': '/events/$eventId/feedback',
+        'icon': 'transfer.png',
+        'label': l10n.transfer,
+        'route': '/events/${widget.eventId}/transfer',
       },
       {
-        'icon': Icons.help_outline,
-        'label': 'FAQ',
-        'route': '/events/$eventId/faq',
+        'icon': 'hotline.png',
+        'label': l10n.hotline,
+        'route': '/events/${widget.eventId}/hotline',
       },
       {
-        'icon': Icons.contact_mail,
-        'label': 'Contact Us',
-        'route': '/events/$eventId/contact',
+        'icon': 'feedback.png',
+        'label': l10n.feedback,
+        'route': '/events/${widget.eventId}/feedback',
       },
+      {
+        'icon': 'faq.png',
+        'label': l10n.faq,
+        'route': '/events/${widget.eventId}/faq',
+      },
+      {
+        'icon': 'contact_us.png',
+        'label': l10n.contactUs,
+        'route': '/events/${widget.eventId}/contact',
+      },
+      {'icon': 'exit', 'label': l10n.exitEvent, 'route': null, 'isExit': true},
     ];
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF1F1F6),
-      appBar: AppBar(
-        title: Text(
-          'Event Menu',
-          style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-        ),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        elevation: 0,
-      ),
-      body: SingleChildScrollView(
-        child: Column(
+      key: _scaffoldKey,
+      backgroundColor: const Color(0xFF3C4494),
+      endDrawer: const NotificationDrawer(),
+      body: GestureDetector(
+        onTap: _closeProfile,
+        behavior: HitTestBehavior.translucent,
+        child: Stack(
           children: [
-            // 1. Sponsors Carousel (Placeholder)
-            Container(
-              height: 150,
-              width: double.infinity,
-              color: Colors.white,
-              margin: const EdgeInsets.only(bottom: 20),
-              child: PageView(
-                children: [
-                  _buildSponsorSlide("Sponsor 1"),
-                  _buildSponsorSlide("Sponsor 2"),
-                  _buildSponsorSlide("Sponsor 3"),
-                ],
-              ),
-            ),
-
-            // 2. Grid Menu
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                  maxCrossAxisExtent: 150,
-                  mainAxisSpacing: 20,
-                  crossAxisSpacing: 20,
-                  childAspectRatio: 1.0,
-                ),
-                itemCount: menuItems.length,
-                itemBuilder: (context, index) {
-                  final item = menuItems[index];
-                  return Material(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(10),
-                    elevation: 2,
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(10),
-                      onTap: () {
-                        if (item['route'] != null) {
-                          context.push(item['route'] as String);
-                        }
-                      },
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            item['icon'] as IconData,
-                            size: 40,
-                            color: const Color(0xFF3C4494),
+            Column(
+              children: [
+                // 1. Header with Logo + Title + AppBar Icons
+                Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isMobile ? 20 : 40,
+                    vertical: 20,
+                  ),
+                  child: Row(
+                    children: [
+                      // Logo
+                      Container(
+                        width: isMobile ? 60 : 80,
+                        height: isMobile ? 60 : 80,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.asset(
+                            'assets/event_menu/logo.png',
+                            fit: BoxFit.cover,
+                            errorBuilder: (c, e, s) => const Icon(
+                              Icons.event,
+                              color: Colors.white,
+                              size: 40,
+                            ),
                           ),
-                          const SizedBox(height: 10),
-                          Text(
-                            item['label'] as String,
-                            textAlign: TextAlign.center,
-                            style: GoogleFonts.inter(
-                              fontWeight: FontWeight.w500,
-                              fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(width: 15),
+                      // Title in 2 lines
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              l10n.eventMenuLine1,
+                              style: GoogleFonts.montserrat(
+                                fontWeight: FontWeight.w600,
+                                fontSize: isMobile ? 20 : 28,
+                                color: const Color(0xFFF1F1F6),
+                              ),
+                            ),
+                            Text(
+                              l10n.eventMenuLine2,
+                              style: GoogleFonts.montserrat(
+                                fontWeight: FontWeight.w600,
+                                fontSize: isMobile ? 20 : 28,
+                                color: const Color(0xFFF1F1F6),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // AppBar Icons (Notifications, Profile)
+                      Row(
+                        children: [
+                          Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(50),
+                              onTap: () {
+                                _closeProfile();
+                                _scaffoldKey.currentState?.openEndDrawer();
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.all(8.0),
+                                child: SvgPicture.asset(
+                                  'assets/event_calendar/bell.svg',
+                                  width: 28,
+                                  height: 28,
+                                  colorFilter: const ColorFilter.mode(
+                                    Colors.white,
+                                    BlendMode.srcIn,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(50),
+                              onTap: _toggleProfile,
+                              child: Padding(
+                                padding: const EdgeInsets.all(8.0),
+                                child: SvgPicture.asset(
+                                  'assets/event_calendar/user.svg',
+                                  width: 28,
+                                  height: 28,
+                                  colorFilter: const ColorFilter.mode(
+                                    Colors.white,
+                                    BlendMode.srcIn,
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
                         ],
                       ),
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 40),
-          ],
-        ),
-      ),
-    );
-  }
+                    ],
+                  ),
+                ),
 
-  Widget _buildSponsorSlide(String text) {
-    return Container(
-      alignment: Alignment.center,
-      child: Text(
-        text,
-        style: GoogleFonts.inter(
-          fontSize: 24,
-          fontWeight: FontWeight.bold,
-          color: Colors.grey,
+                // 2. Main Content
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isMobile ? 0 : 40,
+                    ),
+                    child: Column(
+                      children: [
+                        // Sponsors Carousel (endless scrolling)
+                        if (_isLoadingSponsors)
+                          const SizedBox(
+                            height: 70,
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                              ),
+                            ),
+                          )
+                        else if (_sponsors.isNotEmpty)
+                          SizedBox(
+                            height: 70,
+                            child: ListView.builder(
+                              controller: _sponsorScrollController,
+                              scrollDirection: Axis.horizontal,
+                              // Duplicate list for endless effect
+                              itemCount: _sponsors.length * 100,
+                              itemBuilder: (context, index) {
+                                final s = _sponsors[index % _sponsors.length];
+                                final tier = s['tier'] as String? ?? 'general';
+                                final tierColor = _getTierColor(tier);
+                                final logoUrl = s['logo'] as String?;
+
+                                return Container(
+                                  width: 150,
+                                  margin: const EdgeInsets.only(right: 15),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF262B60),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: tierColor.withOpacity(0.5),
+                                    ),
+                                  ),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      if (logoUrl != null && logoUrl.isNotEmpty)
+                                        Image.network(
+                                          logoUrl,
+                                          width: 40,
+                                          height: 30,
+                                          fit: BoxFit.contain,
+                                          errorBuilder: (c, e, s) => Icon(
+                                            Icons.business,
+                                            color: tierColor,
+                                            size: 24,
+                                          ),
+                                        )
+                                      else
+                                        Icon(
+                                          Icons.business,
+                                          color: tierColor,
+                                          size: 24,
+                                        ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        tier.toUpperCase(),
+                                        style: GoogleFonts.roboto(
+                                          color: tierColor,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 10,
+                                        ),
+                                      ),
+                                      Text(
+                                        s['name'] ?? '',
+                                        style: GoogleFonts.roboto(
+                                          color: Colors.white70,
+                                          fontSize: 10,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                          )
+                        else
+                          const SizedBox(height: 70),
+
+                        const SizedBox(height: 25),
+
+                        // Grid (responsive: 2 columns mobile, 5 columns desktop)
+                        Center(
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxWidth: isMobile ? double.infinity : 900,
+                            ),
+                            child: GridView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              gridDelegate:
+                                  SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: isMobile ? 3 : 5,
+                                    mainAxisSpacing: isMobile ? 4 : 15,
+                                    crossAxisSpacing: isMobile ? 4 : 15,
+                                    childAspectRatio: isMobile ? 0.85 : 1.0,
+                                  ),
+                              itemCount: menuItems.length,
+                              itemBuilder: (context, index) {
+                                final item = menuItems[index];
+                                final isExit = item['isExit'] == true;
+                                final iconName = item['icon'] as String;
+
+                                return Material(
+                                  color: Colors.transparent,
+                                  child: InkWell(
+                                    onTap: () {
+                                      if (isExit) {
+                                        _onExitEvent();
+                                      } else if (item['route'] != null) {
+                                        context.push(item['route'] as String);
+                                      }
+                                    },
+                                    borderRadius: BorderRadius.circular(12),
+                                    splashColor: Colors.white24,
+                                    highlightColor: Colors.white10,
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: isExit
+                                            ? Colors.orange.withOpacity(0.15)
+                                            : Colors.transparent,
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: isExit
+                                              ? Colors.orange.withOpacity(0.3)
+                                              : Colors.white.withOpacity(0.1),
+                                        ),
+                                      ),
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          if (isExit)
+                                            const Icon(
+                                              Icons.exit_to_app,
+                                              color: Colors.orange,
+                                              size: 32,
+                                            )
+                                          else
+                                            Image.asset(
+                                              'assets/event_menu/$iconName',
+                                              width: isMobile ? 48 : 48,
+                                              height: isMobile ? 48 : 48,
+                                              errorBuilder: (c, e, s) =>
+                                                  const Icon(
+                                                    Icons.image,
+                                                    color: Colors.white54,
+                                                    size: 24,
+                                                  ),
+                                            ),
+                                          SizedBox(height: isMobile ? 4 : 8),
+                                          Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 4.0,
+                                            ),
+                                            child: Text(
+                                              item['label'] as String,
+                                              textAlign: TextAlign.center,
+                                              style: GoogleFonts.roboto(
+                                                fontSize: isMobile ? 10 : 14,
+                                                fontWeight: FontWeight.w500,
+                                                color: isExit
+                                                    ? Colors.orange
+                                                    : const Color(0xFFF1F1F6),
+                                              ),
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 30),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            // Profile Dropdown Overlay
+            if (_isProfileOpen)
+              Positioned(
+                top: 100,
+                right: isMobile ? 20 : 65,
+                child: ProfileDropdown(onLogout: _onExitEvent),
+              ),
+          ],
         ),
       ),
     );

@@ -52,6 +52,22 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   @override
+  void dispose() {
+    _nameController.dispose();
+    _surnameController.dispose();
+    _emailController.dispose();
+    _mobileController.dispose();
+    _countryController.dispose();
+    _cityController.dispose();
+    _companyNameController.dispose();
+    _websiteController.dispose();
+    _instagramController.dispose();
+    _whatsappController.dispose();
+    _facebookController.dispose();
+    super.dispose();
+  }
+
+  @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     final user = context.read<AuthService>().currentUser;
@@ -71,12 +87,15 @@ class _ProfilePageState extends State<ProfilePage> {
       // Assuming 'social_links' is a list of objects {network, handle}
       if (user['social_links'] != null) {
         for (var link in user['social_links']) {
-          if (link['network'] == 'INSTAGRAM')
+          if (link['network'] == 'INSTAGRAM') {
             _instagramController.text = link['handle'];
-          if (link['network'] == 'WHATSAPP')
+          }
+          if (link['network'] == 'WHATSAPP') {
             _whatsappController.text = link['handle'];
-          if (link['network'] == 'FACEBOOK')
+          }
+          if (link['network'] == 'FACEBOOK') {
             _facebookController.text = link['handle'];
+          }
         }
       }
     }
@@ -163,7 +182,7 @@ class _ProfilePageState extends State<ProfilePage> {
             borderRadius: BorderRadius.circular(10),
             color: Colors.grey[300],
             image: const DecorationImage(
-              image: AssetImage('profile_placeholder.png'),
+              image: AssetImage('assets/profile_placeholder.png'),
               fit: BoxFit.cover,
             ),
           ),

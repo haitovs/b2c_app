@@ -1,24 +1,27 @@
+import 'package:b2c_app/core/router.dart';
+import 'package:b2c_app/features/auth/services/auth_service.dart';
+import 'package:b2c_app/features/events/services/event_service.dart';
 import 'package:b2c_app/l10n/generated/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart' as provider;
 import 'package:provider/provider.dart';
-
-import 'core/router.dart';
-import 'features/auth/services/auth_service.dart';
-import 'features/events/services/event_service.dart';
 
 void main() {
   runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => AuthService()..tryAutoLogin()),
-        ProxyProvider<AuthService, EventService>(
-          update: (context, auth, previous) => EventService(auth),
-        ),
-      ],
-      child: const B2CApp(),
+    ProviderScope(
+      child: MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => AuthService()..tryAutoLogin()),
+          ProxyProvider<AuthService, EventService>(
+            update: (context, auth, previous) => EventService(auth),
+          ),
+        ],
+        child: const B2CApp(),
+      ),
     ),
   );
 }
@@ -31,17 +34,20 @@ class B2CApp extends StatefulWidget {
 }
 
 class _B2CAppState extends State<B2CApp> {
-  late final GoRouter _router;
+  GoRouter? _router;
 
   @override
-  void initState() {
-    super.initState();
-    final authService = context.read<AuthService>();
-    _router = createRouter(authService);
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Initialize router only once
+    _router ??= createRouter(context.read<AuthService>());
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_router == null) {
+      return const SizedBox.shrink(); // Should never happen
+    }
     return MaterialApp.router(
       debugShowCheckedModeBanner: false,
       title: 'B2C App',
@@ -50,7 +56,7 @@ class _B2CAppState extends State<B2CApp> {
         useMaterial3: true,
         textTheme: GoogleFonts.interTextTheme(),
       ),
-      routerConfig: _router,
+      routerConfig: _router!,
       localizationsDelegates: const [
         AppLocalizations.delegate,
         GlobalMaterialLocalizations.delegate,

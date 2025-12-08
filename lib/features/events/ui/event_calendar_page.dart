@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../core/widgets/custom_app_bar.dart';
+import '../../auth/services/auth_service.dart';
 import '../../events/services/event_service.dart';
 import '../../notifications/ui/notification_drawer.dart';
 import 'widgets/event_card.dart';
@@ -21,6 +22,7 @@ class _EventCalendarPageState extends State<EventCalendarPage> {
 
   // Search Controller
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
 
   bool _isProfileOpen = false;
 
@@ -38,14 +40,17 @@ class _EventCalendarPageState extends State<EventCalendarPage> {
     }
   }
 
-  void _logout() {
-    // Implement logout logic
-    print("Logout pressed");
+  void _logout() async {
+    await context.read<AuthService>().logout();
+    if (mounted) {
+      context.go('/login');
+    }
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -79,76 +84,13 @@ class _EventCalendarPageState extends State<EventCalendarPage> {
               top: navbarTopPadding,
               left: isMobile ? 20 : 40,
               right: isMobile ? 20 : 40,
-              child: SizedBox(
-                height: navbarHeight,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    // Logo
-                    Container(
-                      width: isMobile ? 120 : 160,
-                      height: isMobile ? 40 : 50,
-                      alignment: Alignment.centerLeft,
-                      child: Image.asset(
-                        'assets/logo.png',
-                        fit: BoxFit.contain,
-                        errorBuilder: (context, error, stackTrace) =>
-                            const Icon(Icons.error, color: Colors.white),
-                      ),
-                    ),
-
-                    // Icons
-                    Row(
-                      children: [
-                        // Bell
-                        Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(50),
-                            onTap: () {
-                              _closeProfile();
-                              _scaffoldKey.currentState?.openEndDrawer();
-                            },
-                            child: Padding(
-                              padding: const EdgeInsets.all(5.0),
-                              child: SvgPicture.asset(
-                                'assets/event_calendar/bell.svg',
-                                width: isMobile ? 24 : 28,
-                                height: isMobile ? 24 : 28,
-                                colorFilter: const ColorFilter.mode(
-                                  Colors.white,
-                                  BlendMode.srcIn,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        SizedBox(width: isMobile ? 15 : 25),
-                        // User
-                        Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(50),
-                            onTap: _toggleProfile,
-                            child: Padding(
-                              padding: const EdgeInsets.all(5.0),
-                              child: SvgPicture.asset(
-                                'assets/event_calendar/user.svg',
-                                width: isMobile ? 24 : 28,
-                                height: isMobile ? 24 : 28,
-                                colorFilter: const ColorFilter.mode(
-                                  Colors.white,
-                                  BlendMode.srcIn,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+              child: CustomAppBar(
+                onProfileTap: _toggleProfile,
+                onNotificationTap: () {
+                  _closeProfile();
+                  _scaffoldKey.currentState?.openEndDrawer();
+                },
+                isMobile: isMobile,
               ),
             ),
 
@@ -163,8 +105,10 @@ class _EventCalendarPageState extends State<EventCalendarPage> {
                   height: searchBarHeight,
                   constraints: BoxConstraints(maxWidth: screenWidth * 0.92),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF1F1F6).withOpacity(0.3),
-                    borderRadius: BorderRadius.circular(5),
+                    color: const Color(
+                      0xFFF1F1F6,
+                    ).withValues(alpha: 0.2), // Slightly more transparent
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   alignment: Alignment.center,
                   child: TextField(
@@ -229,44 +173,76 @@ class _EventCalendarPageState extends State<EventCalendarPage> {
                     }
 
                     final events = snapshot.data!;
-                    return SingleChildScrollView(
-                      physics: const BouncingScrollPhysics(),
-                      padding: const EdgeInsets.only(bottom: 50),
-                      child: Column(
-                        children: events.map((event) {
-                          return Column(
-                            children: [
-                              EventCard(
-                                title: event['title'] ?? 'No Title',
-                                date: event['date_str'] ?? '',
-                                location: event['location'] ?? '',
-                                imageUrl:
-                                    event['image_url'] ??
-                                    "assets/event_calendar/event1.png",
-                                eventStartTime:
-                                    DateTime.tryParse(
-                                      event['start_time'] ?? '',
-                                    ) ??
-                                    DateTime.now(),
-                                onTap: () {
-                                  // Navigate to Event Menu
-                                  final id =
-                                      event['id']; // Make sure backend sends 'id'
-                                  if (id != null) {
-                                    context.go('/events/$id/menu');
-                                  } else {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text("Event ID missing"),
-                                      ),
-                                    );
-                                  }
-                                },
-                              ),
-                              const SizedBox(height: 25),
-                            ],
-                          );
-                        }).toList(),
+
+                    // We need a ScrollController for the Scrollbar to work
+                    // Create a ScrollController (make sure to dispose if stateful, or use PrimaryScrollController)
+                    // Since specific styling is needed, we should provide an explicit controller.
+                    // However, creating it inside buider causes re-creation.
+                    // Ideally, we move `_scrollController` to State class.
+                    // For now, let's use PrimaryScrollController if possible or just use a local one for structure,
+                    // BUT: The bug states "Scrollbar attempted to use PrimaryScrollController...".
+                    // Best fix: Add 'controller' to State, pass it to both Scrollbar and SingleChildScrollView.
+
+                    return Theme(
+                      data: ThemeData(
+                        scrollbarTheme: ScrollbarThemeData(
+                          thumbColor: WidgetStateProperty.all(
+                            const Color(0xFFF1F1F6).withValues(alpha: 0.2),
+                          ),
+                          trackColor: WidgetStateProperty.all(
+                            Colors.transparent,
+                          ),
+                          radius: const Radius.circular(12),
+                          thickness: WidgetStateProperty.all(isMobile ? 4 : 8),
+                        ),
+                      ),
+                      child: Scrollbar(
+                        controller: _scrollController, // <--- ASSIGNED HERE
+                        thumbVisibility: true,
+                        thickness: isMobile ? 4 : 8,
+                        radius: const Radius.circular(12),
+                        child: SingleChildScrollView(
+                          controller: _scrollController, // <--- ASSIGNED HERE
+                          physics: const BouncingScrollPhysics(),
+                          padding: const EdgeInsets.only(bottom: 50, right: 10),
+                          child: Column(
+                            children: events.map((event) {
+                              return Column(
+                                children: [
+                                  EventCard(
+                                    title: event['title'] ?? 'No Title',
+                                    date: event['date_str'] ?? '',
+                                    location: event['location'] ?? '',
+                                    imageUrl:
+                                        event['image_url'] ??
+                                        "assets/event_calendar/event1.png",
+                                    logoUrl: event['logo_url'],
+                                    eventStartTime:
+                                        DateTime.tryParse(
+                                          event['start_time'] ?? '',
+                                        ) ??
+                                        DateTime.now(),
+                                    onTap: () {
+                                      final id = event['id'];
+                                      if (id != null) {
+                                        context.go('/events/$id');
+                                      } else {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text("Event ID missing"),
+                                          ),
+                                        );
+                                      }
+                                    },
+                                  ),
+                                  const SizedBox(height: 25),
+                                ],
+                              );
+                            }).toList(),
+                          ),
+                        ),
                       ),
                     );
                   },

@@ -17,6 +17,11 @@ GoRouter createRouter(AuthService authService) {
     initialLocation: '/',
     refreshListenable: authService,
     redirect: (context, state) {
+      // Wait for auth to initialize before redirecting
+      if (!authService.isInitialized) {
+        return null; // Stay on current route until auth is ready
+      }
+
       final isAuthenticated = authService.isAuthenticated;
       final isLoggingIn = state.uri.toString() == '/login';
       final isRegistering = state.uri.toString() == '/register';

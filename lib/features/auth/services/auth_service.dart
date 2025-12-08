@@ -4,15 +4,18 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/config/app_config.dart';
+
 class AuthService extends ChangeNotifier {
-  // Replace with actual backend URL
-  final String baseUrl = 'http://localhost:8000/api/v1';
+  final String baseUrl = '${AppConfig.b2cApiBaseUrl}/api/v1';
 
   Map<String, dynamic>? _currentUser;
   String? _token;
+  bool _isInitialized = false; // Tracks if auth check has completed
 
   Map<String, dynamic>? get currentUser => _currentUser;
   bool get isAuthenticated => _token != null;
+  bool get isInitialized => _isInitialized;
 
   Future<String?> getToken() async {
     if (_token != null) return _token;
@@ -86,6 +89,8 @@ class AuthService extends ChangeNotifier {
         await logout();
       }
     }
+    _isInitialized = true;
+    notifyListeners();
   }
 
   Future<void> logout() async {

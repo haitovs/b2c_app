@@ -525,6 +525,84 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Confirm Password'**
   String get confirmPasswordPlaceholder;
+
+  /// No description provided for @eventNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Event not found'**
+  String get eventNotFound;
+
+  /// No description provided for @speakerBreadcrumb.
+  ///
+  /// In en, this message translates to:
+  /// **'Speaker'**
+  String get speakerBreadcrumb;
+
+  /// No description provided for @keyThemesTurkmenistanChina.
+  ///
+  /// In en, this message translates to:
+  /// **'Key Themes of the Turkmenistan–China Forum:'**
+  String get keyThemesTurkmenistanChina;
+
+  /// No description provided for @participantInstructions.
+  ///
+  /// In en, this message translates to:
+  /// **'To access the mobile application, please click the button below. If you do not find yourself in the list of participants, please complete your registration on the official website. Your personal ID will be sent to the email address you provided.'**
+  String get participantInstructions;
+
+  /// No description provided for @eventMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Event Menu'**
+  String get eventMenu;
+
+  /// No description provided for @silverSponsor.
+  ///
+  /// In en, this message translates to:
+  /// **'Silver Sponsor'**
+  String get silverSponsor;
+
+  /// No description provided for @bronzeSponsor.
+  ///
+  /// In en, this message translates to:
+  /// **'Bronze Sponsor'**
+  String get bronzeSponsor;
+
+  /// No description provided for @partner.
+  ///
+  /// In en, this message translates to:
+  /// **'Partner'**
+  String get partner;
+
+  /// No description provided for @mediaPartner.
+  ///
+  /// In en, this message translates to:
+  /// **'Media Partner'**
+  String get mediaPartner;
+
+  /// No description provided for @annualExpoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Annual Expo CMR forum for international guests'**
+  String get annualExpoTitle;
+
+  /// No description provided for @eventMenuLine1.
+  ///
+  /// In en, this message translates to:
+  /// **'Annual Expo CMR forum for'**
+  String get eventMenuLine1;
+
+  /// No description provided for @eventMenuLine2.
+  ///
+  /// In en, this message translates to:
+  /// **'international guests'**
+  String get eventMenuLine2;
+
+  /// No description provided for @exitEvent.
+  ///
+  /// In en, this message translates to:
+  /// **'Exit Event'**
+  String get exitEvent;
 }
 
 class _AppLocalizationsDelegate

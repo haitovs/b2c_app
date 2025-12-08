@@ -33,6 +33,20 @@ class _EventCardState extends State<EventCard> {
   @override
   void initState() {
     super.initState();
+    _initTimer();
+  }
+
+  @override
+  void didUpdateWidget(EventCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Recalculate timer if eventStartTime changed
+    if (oldWidget.eventStartTime != widget.eventStartTime) {
+      _timer?.cancel();
+      _initTimer();
+    }
+  }
+
+  void _initTimer() {
     _calculateTimeLeft();
     if (_timeLeft > Duration.zero) {
       _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -78,7 +92,7 @@ class _EventCardState extends State<EventCard> {
           height: isMobile ? null : 242,
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(5),
+            borderRadius: BorderRadius.circular(12),
           ),
           child: isMobile ? _buildMobileLayout() : _buildDesktopLayout(),
         );
@@ -86,161 +100,164 @@ class _EventCardState extends State<EventCard> {
     );
   }
 
-  Widget _buildDesktopLayout() {
-    return Stack(
+  Widget _buildInfoRow(IconData icon, String text) {
+    return Row(
       children: [
-        Row(
-          children: [
-            // 1. Details Section (Left)
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 15,
+        Icon(
+          icon,
+          size: 20,
+          color: const Color(0xFF5460CD), // Primary Blue/Purple color
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontFamily: 'Roboto',
+              fontSize: 18,
+              color: Color(0xFF151938), // Dark text
+              fontWeight: FontWeight.w400,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDesktopLayout() {
+    return Row(
+      children: [
+        // 1. Details Section (Left) - Flex 4
+        Expanded(
+          flex: 4,
+          child: Container(
+            padding: const EdgeInsets.only(
+              left: 30,
+              right: 15,
+              top: 30,
+              bottom: 30,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Row(
+                  children: [
+                    // Logo Container
+                    Container(
+                      width: 50,
+                      height: 50,
+                      margin: const EdgeInsets.only(right: 15),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.1),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      padding: const EdgeInsets.all(5),
+                      child: widget.logoUrl != null
+                          ? Image.network(
+                              widget.logoUrl!,
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, __, ___) => Container(),
+                            )
+                          : Container(),
+                    ),
+                    Expanded(
+                      child: Text(
+                        widget.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontFamily: 'Montserrat',
+                          fontWeight: FontWeight.w600,
+                          fontSize: 22,
+                          color: Color(0xFF151938),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                const SizedBox(height: 20),
+                _buildInfoRow(Icons.calendar_today_outlined, widget.date),
+                const SizedBox(height: 10),
+                _buildInfoRow(Icons.location_on_outlined, widget.location),
+              ],
+            ),
+          ),
+        ),
+
+        // 2. Image Section (Center) - Flex 3
+        Expanded(
+          flex: 3,
+          child: SizedBox(
+            height: double.infinity,
+            child: Image.network(
+              widget.imageUrl,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(color: Colors.grey[300]),
+            ),
+          ),
+        ),
+
+        // 3. Timer Section (Right) - Flex 4
+        Expanded(
+          flex: 4,
+          child: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0xFF5460CD), Color(0xFF352675)],
+              ),
+              borderRadius: BorderRadius.only(
+                topRight: Radius.circular(12),
+                bottomRight: Radius.circular(12),
+              ),
+            ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 50,
-                          height: 50,
-                          margin: const EdgeInsets.only(right: 15),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          clipBehavior: Clip.antiAlias,
-                          child: widget.logoUrl != null
-                              ? Image.network(
-                                  widget.logoUrl!,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) =>
-                                      Container(color: Colors.blue[100]),
-                                )
-                              : Container(color: Colors.blue[100]),
-                        ),
-                        Expanded(
-                          child: Text(
-                            widget.title,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontFamily: 'Montserrat',
-                              fontWeight: FontWeight.w500,
-                              fontSize: 22,
-                              color: Color(0xFF151938),
-                            ),
-                          ),
-                        ),
-                      ],
+                    const Text(
+                      "Starting in:",
+                      style: TextStyle(
+                        fontFamily: 'Montserrat',
+                        fontWeight: FontWeight.w600,
+                        fontSize: 22,
+                        color: Colors.white,
+                      ),
                     ),
                     const SizedBox(height: 15),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.calendar_today_outlined,
-                          size: 18,
-                          color: Colors.black,
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 15,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.5),
+                          width: 1,
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            widget.date,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontFamily: 'Roboto',
-                              fontSize: 20,
-                              color: Colors.black,
-                            ),
-                          ),
-                        ),
-                      ],
+                      ),
+                      child: _buildTimerDisplay(isMobile: false),
                     ),
-                    const SizedBox(height: 5),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.location_on_outlined,
-                          size: 18,
-                          color: Colors.black,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            widget.location,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontFamily: 'Roboto',
-                              fontSize: 20,
-                              color: Colors.black,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                    const SizedBox(height: 20),
+                    _buildLearnMore(isMobile: false),
                   ],
-                ),
-              ),
+                );
+              },
             ),
-
-            // 2. Image Section (Center)
-            Container(
-              width: 400,
-              height: double.infinity,
-              decoration: BoxDecoration(color: Colors.grey[200]),
-              alignment: Alignment.center,
-              child: Image.network(
-                widget.imageUrl,
-                fit: BoxFit.cover,
-                width: 400,
-                height: double.infinity,
-                errorBuilder: (context, error, stackTrace) =>
-                    Text("No Image", style: TextStyle(color: Colors.grey[600])),
-              ),
-            ),
-
-            // 3. Timer Section (Right)
-            Container(
-              width: 380,
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Color(0xFF5460CD),
-                    Color(0xFF3A49D0),
-                    Color(0xFF1C045F),
-                  ],
-                ),
-                borderRadius: BorderRadius.only(
-                  topRight: Radius.circular(5),
-                  bottomRight: Radius.circular(5),
-                ),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text(
-                    "Starting in:",
-                    style: TextStyle(
-                      fontFamily: 'Montserrat',
-                      fontWeight: FontWeight.w600,
-                      fontSize: 28,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  _buildTimerDisplay(isMobile: false),
-                  const SizedBox(height: 30),
-                  _buildLearnMore(isMobile: false),
-                ],
-              ),
-            ),
-          ],
+          ),
         ),
       ],
     );
@@ -249,31 +266,15 @@ class _EventCardState extends State<EventCard> {
   Widget _buildMobileLayout() {
     return Column(
       children: [
-        // 1. Image (Top)
+        // 1. Details (Top) - Title and Info
         Container(
-          height: 200,
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: Colors.grey[200],
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(5),
-              topRight: Radius.circular(5),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(12),
+              topRight: Radius.circular(12),
             ),
           ),
-          alignment: Alignment.center,
-          clipBehavior: Clip.antiAlias,
-          child: Image.network(
-            widget.imageUrl,
-            fit: BoxFit.cover,
-            width: double.infinity,
-            height: 200,
-            errorBuilder: (context, error, stackTrace) =>
-                Text("No Image", style: TextStyle(color: Colors.grey[600])),
-          ),
-        ),
-
-        // 2. Details (Middle)
-        Padding(
           padding: const EdgeInsets.all(20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -281,28 +282,35 @@ class _EventCardState extends State<EventCard> {
               Row(
                 children: [
                   Container(
-                    width: 40,
-                    height: 40,
+                    width: 50,
+                    height: 50,
                     margin: const EdgeInsets.only(right: 15),
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(8),
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.1),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
-                    clipBehavior: Clip.antiAlias,
+                    padding: const EdgeInsets.all(5),
                     child: widget.logoUrl != null
                         ? Image.network(
                             widget.logoUrl!,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) =>
-                                Container(color: Colors.blue[100]),
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, __, ___) => Container(),
                           )
-                        : Container(color: Colors.blue[100]),
+                        : Container(),
                   ),
                   Expanded(
                     child: Text(
                       widget.title,
                       style: const TextStyle(
                         fontFamily: 'Montserrat',
-                        fontWeight: FontWeight.w500,
+                        fontWeight: FontWeight.w600,
                         fontSize: 20,
                         color: Color(0xFF151938),
                       ),
@@ -310,57 +318,39 @@ class _EventCardState extends State<EventCard> {
                   ),
                 ],
               ),
-              const SizedBox(height: 15),
-              Row(
-                children: [
-                  const Icon(
-                    Icons.calendar_today,
-                    size: 16,
-                    color: Colors.grey,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    widget.date,
-                    style: const TextStyle(
-                      fontFamily: 'Roboto',
-                      fontSize: 16,
-                      color: Colors.black,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 5),
-              Row(
-                children: [
-                  const Icon(Icons.location_on, size: 16, color: Colors.grey),
-                  const SizedBox(width: 8),
-                  Text(
-                    widget.location,
-                    style: const TextStyle(
-                      fontFamily: 'Roboto',
-                      fontSize: 16,
-                      color: Colors.black,
-                    ),
-                  ),
-                ],
-              ),
+              const SizedBox(height: 20),
+              _buildInfoRow(Icons.calendar_today_outlined, widget.date),
+              const SizedBox(height: 10),
+              _buildInfoRow(Icons.location_on_outlined, widget.location),
             ],
+          ),
+        ),
+
+        // 2. Image (Middle)
+        Container(
+          height: 200,
+          width: double.infinity,
+          color: Colors.white,
+          child: Image.network(
+            widget.imageUrl,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => Container(color: Colors.grey[300]),
           ),
         ),
 
         // 3. Timer (Bottom)
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 20),
+          padding: const EdgeInsets.symmetric(vertical: 25, horizontal: 20),
           decoration: const BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [Color(0xFF5460CD), Color(0xFF3A49D0), Color(0xFF1C045F)],
+              colors: [Color(0xFF5460CD), Color(0xFF352675)],
             ),
             borderRadius: BorderRadius.only(
-              bottomLeft: Radius.circular(5),
-              bottomRight: Radius.circular(5),
+              bottomLeft: Radius.circular(12),
+              bottomRight: Radius.circular(12),
             ),
           ),
           child: Column(
@@ -370,14 +360,30 @@ class _EventCardState extends State<EventCard> {
                 style: TextStyle(
                   fontFamily: 'Montserrat',
                   fontWeight: FontWeight.w600,
-                  fontSize: 20,
+                  fontSize: 22,
                   color: Colors.white,
                 ),
               ),
               const SizedBox(height: 15),
-              _buildTimerDisplay(isMobile: true),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 15,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.5),
+                    width: 1,
+                  ),
+                ),
+                child: _buildTimerDisplay(isMobile: true),
+              ),
               const SizedBox(height: 20),
-              _buildLearnMore(isMobile: true),
+              Align(
+                alignment: Alignment.centerRight,
+                child: _buildLearnMore(isMobile: true),
+              ),
             ],
           ),
         ),
@@ -386,29 +392,18 @@ class _EventCardState extends State<EventCard> {
   }
 
   Widget _buildTimerDisplay({required bool isMobile}) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 10),
-      padding: EdgeInsets.symmetric(
-        vertical: isMobile ? 15 : 10,
-        horizontal: isMobile ? 10 : 0,
-      ),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(5),
-        border: Border.all(color: Colors.white),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        mainAxisSize: MainAxisSize.min, // shrink wrap on mobile
-        children: [
-          _buildTimeUnit(_timeLeft.inDays, "Days", isMobile),
-          _buildSeparator(isMobile),
-          _buildTimeUnit(_timeLeft.inHours % 24, "Hours", isMobile),
-          _buildSeparator(isMobile),
-          _buildTimeUnit(_timeLeft.inMinutes % 60, "Min", isMobile),
-          _buildSeparator(isMobile),
-          _buildTimeUnit(_timeLeft.inSeconds % 60, "Sec", isMobile),
-        ],
-      ),
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _buildTimeUnit(_timeLeft.inDays, "Days", isMobile),
+        _buildSeparator(isMobile),
+        _buildTimeUnit(_timeLeft.inHours % 24, "Hours", isMobile),
+        _buildSeparator(isMobile),
+        _buildTimeUnit(_timeLeft.inMinutes % 60, "Minutes", isMobile),
+        _buildSeparator(isMobile),
+        _buildTimeUnit(_timeLeft.inSeconds % 60, "Second", isMobile),
+      ],
     );
   }
 
@@ -416,22 +411,19 @@ class _EventCardState extends State<EventCard> {
     return InkWell(
       onTap: widget.onTap,
       child: Row(
-        mainAxisAlignment: isMobile
-            ? MainAxisAlignment.center
-            : MainAxisAlignment.end,
-        children: [
+        mainAxisSize: MainAxisSize.min,
+        children: const [
           Text(
             "Learn More",
             style: TextStyle(
               fontFamily: 'Roboto',
               fontWeight: FontWeight.w500,
-              fontSize: isMobile ? 16 : 16,
+              fontSize: 16,
               color: Colors.white,
             ),
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: 8),
           Icon(Icons.arrow_forward, color: Colors.white, size: 20),
-          if (!isMobile) const SizedBox(width: 20),
         ],
       ),
     );
@@ -443,9 +435,9 @@ class _EventCardState extends State<EventCard> {
         Text(
           value.toString().padLeft(2, '0'),
           style: TextStyle(
-            fontFamily: 'Inter',
+            fontFamily: 'Montserrat',
             fontWeight: FontWeight.w600,
-            fontSize: isMobile ? 24 : 28,
+            fontSize: isMobile ? 24 : 36,
             color: Colors.white,
           ),
         ),
@@ -453,9 +445,9 @@ class _EventCardState extends State<EventCard> {
           label,
           style: const TextStyle(
             fontFamily: 'Montserrat',
-            fontWeight: FontWeight.w500,
+            fontWeight: FontWeight.w400,
             fontSize: 10,
-            color: Color.fromRGBO(255, 255, 255, 0.8),
+            color: Color.fromRGBO(255, 255, 255, 0.9),
           ),
         ),
       ],
@@ -464,15 +456,15 @@ class _EventCardState extends State<EventCard> {
 
   Widget _buildSeparator(bool isMobile) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 3),
-      height: isMobile ? 30 : 35,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      height: isMobile ? 30 : 40,
       alignment: Alignment.topCenter,
       child: Text(
         ":",
         style: TextStyle(
-          fontFamily: 'Inter',
+          fontFamily: 'Montserrat',
           fontWeight: FontWeight.w600,
-          fontSize: isMobile ? 24 : 28,
+          fontSize: isMobile ? 24 : 36,
           color: Colors.white,
         ),
       ),
