@@ -8,6 +8,7 @@ import '../features/events/ui/agenda_page.dart';
 import '../features/events/ui/event_calendar_page.dart';
 import '../features/events/ui/event_details_page.dart';
 import '../features/events/ui/event_menu_page.dart';
+import '../features/events/ui/speaker_detail_page.dart';
 import '../features/events/ui/speaker_list_page.dart';
 import '../features/networking/ui/meeting_list_page.dart';
 import '../features/networking/ui/meeting_request_page.dart';
@@ -67,6 +68,21 @@ GoRouter createRouter(AuthService authService) {
             path: 'speakers',
             builder: (context, state) =>
                 SpeakerListPage(eventId: state.pathParameters['id']!),
+            routes: [
+              GoRoute(
+                path: ':speakerId',
+                builder: (context, state) {
+                  final eventId = state.pathParameters['id']!;
+                  final speakerId = state.pathParameters['speakerId']!;
+                  final speakerData = state.extra as Map<String, dynamic>?;
+                  return SpeakerDetailPage(
+                    eventId: eventId,
+                    speakerId: speakerId,
+                    speakerData: speakerData,
+                  );
+                },
+              ),
+            ],
           ),
         ],
       ),
