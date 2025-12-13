@@ -8,7 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/config/app_config.dart';
-import '../../../core/providers/site_context_provider.dart';
+import '../../../core/services/event_context_service.dart';
 import '../../../core/widgets/custom_app_bar.dart';
 import '../../notifications/ui/notification_drawer.dart';
 import 'widgets/profile_dropdown.dart';
@@ -49,7 +49,8 @@ class _SpeakerDetailPageState extends ConsumerState<SpeakerDetailPage> {
 
   Future<void> _fetchSpeaker() async {
     try {
-      final siteId = ref.read(siteContextProvider);
+      // Use EventContextService for site_id
+      final siteId = eventContextService.siteId;
       final uri = siteId != null
           ? Uri.parse(
               '${AppConfig.tourismApiBaseUrl}/speakers/${widget.speakerId}?site_id=$siteId',

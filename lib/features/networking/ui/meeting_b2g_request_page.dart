@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,24 +15,25 @@ import '../../events/ui/widgets/profile_dropdown.dart';
 import '../../notifications/ui/notification_drawer.dart';
 import '../services/meeting_service.dart';
 
-/// B2B Meeting Request Page - for creating a new meeting request
-class MeetingRequestPage extends ConsumerStatefulWidget {
+/// B2G Meeting Request Page - for creating a meeting with government entities
+class MeetingB2GRequestPage extends ConsumerStatefulWidget {
   final String eventId;
-  final String participantId;
-  final Map<String, dynamic>? participantData;
+  final String govEntityId;
+  final Map<String, dynamic>? govEntityData;
 
-  const MeetingRequestPage({
+  const MeetingB2GRequestPage({
     super.key,
     required this.eventId,
-    required this.participantId,
-    this.participantData,
+    required this.govEntityId,
+    this.govEntityData,
   });
 
   @override
-  ConsumerState<MeetingRequestPage> createState() => _MeetingRequestPageState();
+  ConsumerState<MeetingB2GRequestPage> createState() =>
+      _MeetingB2GRequestPageState();
 }
 
-class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
+class _MeetingB2GRequestPageState extends ConsumerState<MeetingB2GRequestPage> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   bool _isProfileOpen = false;
@@ -47,7 +47,7 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
     TextEditingController(),
   ];
 
-  // Meeting with list (dynamic) - positions
+  // Meeting with list (dynamic) - officials/positions
   final List<TextEditingController> _meetingWithControllers = [
     TextEditingController(),
   ];
@@ -60,54 +60,32 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
   List<Map<String, dynamic>> _agendaDays = [];
   Map<String, dynamic>? _selectedDay;
 
-  // Time pickers
-  TimeOfDay _startTime = TimeOfDay(hour: 9, minute: 0);
-  TimeOfDay _endTime = TimeOfDay(hour: 10, minute: 0);
-
-  // Attachment image
-  Uint8List? _attachmentImage;
-  String? _attachmentImageName;
-
   // Data
-  Map<String, dynamic>? _participant;
+  Map<String, dynamic>? _govEntity;
   bool _isLoading = true;
   bool _isSubmitting = false;
 
   @override
   void initState() {
     super.initState();
-    _initializeAndFetch();
-  }
-
-  Future<void> _initializeAndFetch() async {
-    // Ensure the event context is loaded for this event
-    final eventId = int.tryParse(widget.eventId);
-    if (eventId != null) {
-      await eventContextService.ensureEventContext(eventId);
-    }
     _fetchData();
   }
 
   Future<void> _fetchData() async {
-    if (widget.participantData != null) {
-      _participant = widget.participantData;
+    if (widget.govEntityData != null) {
+      _govEntity = widget.govEntityData;
     } else {
-      await _fetchParticipant();
+      await _fetchGovEntity();
     }
     await _fetchAgendaDays();
     setState(() => _isLoading = false);
   }
 
   Future<void> _fetchAgendaDays() async {
-    // Use EventContextService for site_id (already initialized at app startup)
+    // Use eventContextService for correct Tourism site_id
     final tourismSiteId = eventContextService.siteId;
-
     if (tourismSiteId == null) {
-      debugPrint('Warning: No Tourism site_id available, using fallback days');
-      _agendaDays = _getFallbackDays();
-      if (_agendaDays.isNotEmpty) {
-        _selectedDay = _agendaDays.first;
-      }
+      debugPrint('Warning: No Tourism site_id available');
       return;
     }
 
@@ -123,51 +101,10 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
         if (_agendaDays.isNotEmpty) {
           _selectedDay = _agendaDays.first;
         }
-      } else {
-        debugPrint('Failed to fetch agenda days: ${response.statusCode}');
-        _agendaDays = _getFallbackDays();
-        if (_agendaDays.isNotEmpty) {
-          _selectedDay = _agendaDays.first;
-        }
       }
     } catch (e) {
       debugPrint('Error fetching agenda days: $e');
-      _agendaDays = _getFallbackDays();
-      if (_agendaDays.isNotEmpty) {
-        _selectedDay = _agendaDays.first;
-      }
     }
-  }
-
-  List<Map<String, dynamic>> _getFallbackDays() {
-    // Generate 3 days starting from tomorrow
-    final now = DateTime.now();
-    final List<Map<String, dynamic>> days = [];
-    for (int i = 1; i <= 3; i++) {
-      final date = now.add(Duration(days: i));
-      days.add({
-        'id': i,
-        'date':
-            '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}',
-        'day_number': date.day,
-        'day_name': _getDayName(date.weekday),
-      });
-    }
-    return days;
-  }
-
-  String _getDayName(int weekday) {
-    const names = [
-      '',
-      'Monday',
-      'Tuesday',
-      'Wednesday',
-      'Thursday',
-      'Friday',
-      'Saturday',
-      'Sunday',
-    ];
-    return names[weekday];
   }
 
   @override
@@ -197,48 +134,41 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
     }
   }
 
-  Future<void> _fetchParticipant() async {
+  Future<void> _fetchGovEntity() async {
     try {
-      final siteId = eventContextService.siteId;
-      var uriString =
-          '${AppConfig.tourismApiBaseUrl}/participants/${widget.participantId}';
-      if (siteId != null) {
-        uriString += '?site_id=$siteId';
-      }
+      final authService = legacy_provider.Provider.of<AuthService>(
+        context,
+        listen: false,
+      );
+      final token = await authService.getToken();
 
-      final response = await http.get(Uri.parse(uriString));
+      // Fetch from B2C backend
+      final response = await http.get(
+        Uri.parse('${AppConfig.b2cApiBaseUrl}/api/v1/meetings/gov-entities'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
       if (response.statusCode == 200) {
+        final List data = jsonDecode(response.body);
+        // Find the specific gov entity
+        final entity = data.firstWhere(
+          (e) => e['id'].toString() == widget.govEntityId,
+          orElse: () => null,
+        );
         setState(() {
-          _participant = jsonDecode(response.body);
+          _govEntity = entity;
           _isLoading = false;
         });
       } else {
         setState(() => _isLoading = false);
       }
     } catch (e) {
-      debugPrint('Error fetching participant: $e');
+      debugPrint('Error fetching gov entity: $e');
       setState(() => _isLoading = false);
     }
-  }
-
-  Future<void> _pickImage() async {
-    // TODO: Install image_picker package and implement
-    // For now, show a snackbar message
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Image upload will be available soon'),
-          backgroundColor: Colors.blue,
-        ),
-      );
-    }
-  }
-
-  void _removeImage() {
-    setState(() {
-      _attachmentImage = null;
-      _attachmentImageName = null;
-    });
   }
 
   void _addAttendee() {
@@ -302,30 +232,19 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
           .where((t) => t.isNotEmpty)
           .join(', ');
 
-      // Calculate start and end time from selected day and time pickers
+      // Calculate start and end time from selected day
       final dayDate = _selectedDay!['date'] as String;
-      final startTime = DateTime.parse(
-        '${dayDate}T${_startTime.hour.toString().padLeft(2, '0')}:${_startTime.minute.toString().padLeft(2, '0')}:00',
-      );
-      final endTime = DateTime.parse(
-        '${dayDate}T${_endTime.hour.toString().padLeft(2, '0')}:${_endTime.minute.toString().padLeft(2, '0')}:00',
-      );
+      final startTime = DateTime.parse('${dayDate}T09:00:00');
+      final endTime = DateTime.parse('${dayDate}T10:00:00');
 
-      // Get the target user ID - use route param (which is the B2C user UUID)
-      // Or fallback to participant data 'id' field
-      String? targetUserId = widget.participantId;
-      if (targetUserId.isEmpty && _participant != null) {
-        targetUserId = _participant!['id']?.toString();
-      }
-
-      // Make API call to create meeting
+      // Make API call to create B2G meeting
       await meetingService.createMeeting(
-        type: MeetingType.B2B,
+        type: MeetingType.B2G,
         subject: _subjectController.text.trim(),
         startTime: startTime,
         endTime: endTime,
-        location: 'Ashgabat, TKM', // Default location
-        targetUserId: targetUserId,
+        location: 'Ashgabat, TKM',
+        targetGovEntityId: int.tryParse(widget.govEntityId),
         attendeesText: attendeesText.isEmpty ? null : attendeesText,
       );
 
@@ -357,7 +276,7 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
   String _buildImageUrl(String? imagePath) {
     if (imagePath == null || imagePath.isEmpty) return '';
     if (imagePath.startsWith('http')) return imagePath;
-    return '${AppConfig.tourismApiBaseUrl}$imagePath';
+    return '${AppConfig.b2cApiBaseUrl}$imagePath';
   }
 
   @override
@@ -378,10 +297,8 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
             SafeArea(
               child: Column(
                 children: [
-                  // Header
                   _buildHeader(isMobile, horizontalMargin),
                   SizedBox(height: isMobile ? 10 : 20),
-                  // Content
                   Expanded(
                     child: Container(
                       margin: EdgeInsets.symmetric(
@@ -404,7 +321,6 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
                 ],
               ),
             ),
-            // Profile dropdown overlay
             if (_isProfileOpen)
               Positioned(
                 top: 100,
@@ -426,7 +342,6 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
       ),
       child: Row(
         children: [
-          // Back button
           IconButton(
             icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
             onPressed: () => context.pop(),
@@ -434,12 +349,11 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
             constraints: const BoxConstraints(),
           ),
           SizedBox(width: isMobile ? 4 : 8),
-          // Title - use Flexible to prevent overflow
           Flexible(
             child: Text(
-              'Meeting Request',
+              'Meeting',
               style: GoogleFonts.montserrat(
-                fontSize: isMobile ? 20 : 28,
+                fontSize: isMobile ? 24 : 40,
                 fontWeight: FontWeight.w600,
                 color: const Color(0xFFF1F1F6),
               ),
@@ -447,14 +361,12 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
             ),
           ),
           const Spacer(),
-          // Notification & Profile icons
           CustomAppBar(
             onNotificationTap: () {
               _scaffoldKey.currentState?.openEndDrawer();
             },
             onProfileTap: _toggleProfile,
             isMobile: isMobile,
-            showLogo: false,
           ),
         ],
       ),
@@ -462,13 +374,13 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
   }
 
   Widget _buildFormContent() {
-    final participant = _participant;
-    if (participant == null) {
-      return const Center(child: Text('Participant not found'));
+    final entity = _govEntity;
+    if (entity == null) {
+      return const Center(child: Text('Government entity not found'));
     }
 
-    final name = participant['name'] ?? 'Unknown Company';
-    final logo = participant['logo'];
+    final name = entity['name'] ?? 'Unknown Entity';
+    final logo = entity['logo_url'];
     final logoUrl = _buildImageUrl(logo);
 
     return Form(
@@ -478,19 +390,15 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
           final isWide = constraints.maxWidth > 700;
 
           if (isWide) {
-            // Desktop layout: image on left, form on right
             return Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Left side - Participant image in white card
                 _buildImageCard(logoUrl, name),
                 const SizedBox(width: 39),
-                // Right side - Form in white card
                 Expanded(child: _buildFormCard()),
               ],
             );
           } else {
-            // Mobile layout: image on top, form below
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -539,7 +447,6 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header row with title and save button
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -555,14 +462,12 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
             ],
           ),
           const SizedBox(height: 25),
-          // Form fields in two columns
           LayoutBuilder(
             builder: (context, constraints) {
               if (constraints.maxWidth > 500) {
                 return Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Left column
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -572,13 +477,10 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
                           _buildSubjectsField(),
                           const SizedBox(height: 20),
                           _buildCommentsField(),
-                          const SizedBox(height: 20),
-                          _buildAttachmentSection(),
                         ],
                       ),
                     ),
                     const SizedBox(width: 20),
-                    // Right column
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -587,8 +489,6 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
                           const SizedBox(height: 20),
                           _buildDayDropdown(),
                           const SizedBox(height: 20),
-                          _buildTimePickers(),
-                          const SizedBox(height: 20),
                           _buildLanguageDropdown(),
                         ],
                       ),
@@ -596,7 +496,6 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
                   ],
                 );
               } else {
-                // Single column for mobile
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -608,13 +507,9 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
                     const SizedBox(height: 20),
                     _buildDayDropdown(),
                     const SizedBox(height: 20),
-                    _buildTimePickers(),
-                    const SizedBox(height: 20),
                     _buildLanguageDropdown(),
                     const SizedBox(height: 20),
                     _buildCommentsField(),
-                    const SizedBox(height: 20),
-                    _buildAttachmentSection(),
                   ],
                 );
               }
@@ -638,7 +533,6 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
           ),
         ),
         const SizedBox(height: 15),
-        // Dynamic attendee fields
         ...List.generate(_attendeeControllers.length, (index) {
           return Padding(
             padding: const EdgeInsets.only(bottom: 10),
@@ -668,7 +562,6 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
           ),
         ),
         const SizedBox(height: 15),
-        // Dynamic meeting with fields
         ...List.generate(_meetingWithControllers.length, (index) {
           return Padding(
             padding: const EdgeInsets.only(bottom: 10),
@@ -717,7 +610,6 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
           ),
         ),
         const SizedBox(width: 10),
-        // Add/Remove button
         Container(
           width: 50,
           height: 50,
@@ -862,7 +754,6 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
                       color: Colors.black.withOpacity(0.4),
                     ),
                     items: _agendaDays.map((day) {
-                      // Format day label
                       String label;
                       final date = day['date'] as String?;
                       if (date != null) {
@@ -910,137 +801,6 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
     );
   }
 
-  Widget _buildTimePickers() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Meeting time:',
-          style: GoogleFonts.inter(
-            fontSize: 18,
-            fontWeight: FontWeight.w500,
-            color: Colors.black,
-          ),
-        ),
-        const SizedBox(height: 15),
-        Row(
-          children: [
-            // Start time
-            Expanded(
-              child: GestureDetector(
-                onTap: () => _selectTime(isStart: true),
-                child: Container(
-                  height: 50,
-                  decoration: BoxDecoration(
-                    border: Border.all(color: const Color(0xFFB7B7B7)),
-                    borderRadius: BorderRadius.circular(5),
-                  ),
-                  child: Row(
-                    children: [
-                      const SizedBox(width: 15),
-                      Icon(
-                        Icons.access_time,
-                        color: Colors.black.withValues(alpha: 0.5),
-                        size: 20,
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        _formatTimeOfDay(_startTime),
-                        style: GoogleFonts.roboto(
-                          fontSize: 18,
-                          color: Colors.black.withValues(alpha: 0.7),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Text(
-                'to',
-                style: GoogleFonts.inter(fontSize: 16, color: Colors.grey),
-              ),
-            ),
-            // End time
-            Expanded(
-              child: GestureDetector(
-                onTap: () => _selectTime(isStart: false),
-                child: Container(
-                  height: 50,
-                  decoration: BoxDecoration(
-                    border: Border.all(color: const Color(0xFFB7B7B7)),
-                    borderRadius: BorderRadius.circular(5),
-                  ),
-                  child: Row(
-                    children: [
-                      const SizedBox(width: 15),
-                      Icon(
-                        Icons.access_time,
-                        color: Colors.black.withValues(alpha: 0.5),
-                        size: 20,
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        _formatTimeOfDay(_endTime),
-                        style: GoogleFonts.roboto(
-                          fontSize: 18,
-                          color: Colors.black.withValues(alpha: 0.7),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Future<void> _selectTime({required bool isStart}) async {
-    final TimeOfDay? picked = await showTimePicker(
-      context: context,
-      initialTime: isStart ? _startTime : _endTime,
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(primary: Color(0xFF3C4494)),
-          ),
-          child: child!,
-        );
-      },
-    );
-    if (picked != null) {
-      setState(() {
-        if (isStart) {
-          _startTime = picked;
-          // If start time is after end time, adjust end time
-          if (_timeToMinutes(_startTime) >= _timeToMinutes(_endTime)) {
-            _endTime = TimeOfDay(
-              hour: (_startTime.hour + 1) % 24,
-              minute: _startTime.minute,
-            );
-          }
-        } else {
-          _endTime = picked;
-        }
-      });
-    }
-  }
-
-  int _timeToMinutes(TimeOfDay time) {
-    return time.hour * 60 + time.minute;
-  }
-
-  String _formatTimeOfDay(TimeOfDay time) {
-    final hour = time.hour.toString().padLeft(2, '0');
-    final minute = time.minute.toString().padLeft(2, '0');
-    return '$hour:$minute';
-  }
-
   Widget _buildCommentsField() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1079,114 +839,6 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
     );
   }
 
-  Widget _buildAttachmentSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Attachment:',
-          style: GoogleFonts.inter(
-            fontSize: 18,
-            fontWeight: FontWeight.w500,
-            color: Colors.black,
-          ),
-        ),
-        const SizedBox(height: 15),
-        Container(
-          height: 120,
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: const Color(0xFFB7B7B7),
-              style: BorderStyle.solid,
-            ),
-            borderRadius: BorderRadius.circular(5),
-          ),
-          child: _attachmentImage != null
-              ? Stack(
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: Image.memory(
-                        _attachmentImage!,
-                        width: double.infinity,
-                        height: double.infinity,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                    Positioned(
-                      top: 8,
-                      right: 8,
-                      child: GestureDetector(
-                        onTap: _removeImage,
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: const BoxDecoration(
-                            color: Colors.red,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.close,
-                            color: Colors.white,
-                            size: 16,
-                          ),
-                        ),
-                      ),
-                    ),
-                    if (_attachmentImageName != null)
-                      Positioned(
-                        bottom: 8,
-                        left: 8,
-                        right: 8,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.black54,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            _attachmentImageName!,
-                            style: GoogleFonts.roboto(
-                              color: Colors.white,
-                              fontSize: 12,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ),
-                  ],
-                )
-              : InkWell(
-                  onTap: _pickImage,
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.cloud_upload_outlined,
-                          size: 40,
-                          color: Colors.grey[400],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Click to upload image',
-                          style: GoogleFonts.roboto(
-                            color: Colors.grey[500],
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildSaveButton() {
     return OutlinedButton(
       onPressed: _isSubmitting ? null : _submitRequest,
@@ -1220,7 +872,7 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(Icons.business, size: 48, color: Colors.grey[400]),
+        Icon(Icons.account_balance, size: 48, color: Colors.grey[400]),
         const SizedBox(height: 8),
         Padding(
           padding: const EdgeInsets.all(8.0),

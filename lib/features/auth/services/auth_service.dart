@@ -24,6 +24,8 @@ class AuthService extends ChangeNotifier {
   }
 
   /// Returns null on success, or an error message string on failure.
+  /// Note: Token is always persisted to SharedPreferences for web compatibility.
+  /// The rememberMe parameter is reserved for future use (e.g., extended token expiry).
   Future<String?> login(
     String username,
     String password, {
@@ -40,10 +42,13 @@ class AuthService extends ChangeNotifier {
         final data = jsonDecode(response.body);
         _token = data['access_token'];
 
-        if (rememberMe) {
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('auth_token', _token!);
-        }
+        // Always persist token to SharedPreferences for session restoration
+        // This is essential for Flutter Web where page refresh loses in-memory state
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('auth_token', _token!);
+
+        // Store rememberMe preference for potential future use
+        await prefs.setBool('remember_me', rememberMe);
 
         // Fetch user details
         await _fetchCurrentUser();

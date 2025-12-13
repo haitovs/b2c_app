@@ -10,7 +10,7 @@ import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/config/app_config.dart';
-import '../../../../core/providers/site_context_provider.dart';
+import '../../../../core/services/event_context_service.dart';
 import '../../../../l10n/generated/app_localizations.dart';
 import '../../notifications/ui/notification_drawer.dart';
 import 'widgets/profile_dropdown.dart';
@@ -39,6 +39,13 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
   void initState() {
     super.initState();
     _sponsorScrollController = ScrollController();
+    _initializeAndFetch();
+  }
+
+  Future<void> _initializeAndFetch() async {
+    // Ensure the event context is loaded for this event
+    // This handles direct navigation and page refreshes
+    await eventContextService.ensureEventContext(widget.eventId);
     _fetchSponsors();
   }
 
@@ -51,7 +58,8 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
 
   Future<void> _fetchSponsors() async {
     try {
-      final siteId = ref.read(siteContextProvider);
+      // Use EventContextService for site_id
+      final siteId = eventContextService.siteId;
       // Use query param for site_id instead of header for better compatibility
       final uri = siteId != null
           ? Uri.parse(
@@ -59,6 +67,8 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
             )
           : Uri.parse('${AppConfig.tourismApiBaseUrl}/sponsors/');
       final response = await http.get(uri);
+      if (!mounted) return; // Check if widget is still mounted
+
       if (response.statusCode == 200) {
         final List data = jsonDecode(response.body);
         setState(() {
@@ -67,15 +77,13 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
         });
         // Start auto-scroll after data loads
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          _startAutoScroll();
+          if (mounted) _startAutoScroll();
         });
       } else {
-        debugPrint('Sponsors fetch failed: ${response.statusCode}');
         setState(() => _isLoadingSponsors = false);
       }
     } catch (e) {
-      debugPrint('Error fetching sponsors: $e');
-      setState(() => _isLoadingSponsors = false);
+      if (mounted) setState(() => _isLoadingSponsors = false);
     }
   }
 
@@ -113,7 +121,7 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
   }
 
   void _onExitEvent() {
-    ref.read(siteContextProvider.notifier).clearSite();
+    eventContextService.clearContext();
     context.go('/');
   }
 
@@ -489,7 +497,8 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
                                         if (isExit) {
                                           _onExitEvent();
                                         } else if (item['route'] != null) {
-                                          context.push(item['route'] as String);
+                                          // Use go() instead of push() for proper URL update on web
+                                          context.go(item['route'] as String);
                                         }
                                       },
                                       borderRadius: BorderRadius.circular(12),
@@ -541,7 +550,7 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
                                                 item['label'] as String,
                                                 textAlign: TextAlign.center,
                                                 style: GoogleFonts.roboto(
-                                                  fontSize: isMobile ? 12 : 16,
+                                                  fontSize: isMobile ? 14 : 18,
                                                   fontWeight: FontWeight.w500,
                                                   color: isExit
                                                       ? Colors.orange

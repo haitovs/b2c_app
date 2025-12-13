@@ -7,7 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 
 import '../../../core/config/app_config.dart';
-import '../../../core/providers/site_context_provider.dart';
+import '../../../core/services/event_context_service.dart';
 import '../../../core/widgets/custom_app_bar.dart';
 import '../../notifications/ui/notification_drawer.dart';
 import 'widgets/profile_dropdown.dart';
@@ -34,6 +34,15 @@ class _SpeakerListPageState extends ConsumerState<SpeakerListPage> {
   @override
   void initState() {
     super.initState();
+    _initializeAndFetch();
+  }
+
+  Future<void> _initializeAndFetch() async {
+    // Ensure the event context is loaded for this event
+    final eventId = int.tryParse(widget.eventId);
+    if (eventId != null) {
+      await eventContextService.ensureEventContext(eventId);
+    }
     _fetchSpeakers();
   }
 
@@ -45,7 +54,8 @@ class _SpeakerListPageState extends ConsumerState<SpeakerListPage> {
 
   Future<void> _fetchSpeakers() async {
     try {
-      final siteId = ref.read(siteContextProvider);
+      // Use EventContextService for site_id
+      final siteId = eventContextService.siteId;
       final uri = siteId != null
           ? Uri.parse(
               '${AppConfig.tourismApiBaseUrl}/speakers/?site_id=$siteId',

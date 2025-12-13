@@ -7,7 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 
 import '../../../../core/config/app_config.dart';
-import '../../../../core/providers/site_context_provider.dart';
+import '../../../../core/services/event_context_service.dart';
 import '../../../../core/widgets/custom_app_bar.dart';
 import '../../notifications/ui/notification_drawer.dart';
 import 'widgets/profile_dropdown.dart';
@@ -51,13 +51,23 @@ class _AgendaPageState extends ConsumerState<AgendaPage> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _fetchAgendaDays();
+      _initializeAndFetch();
     });
+  }
+
+  Future<void> _initializeAndFetch() async {
+    // Ensure the event context is loaded for this event
+    final eventId = int.tryParse(widget.eventId);
+    if (eventId != null) {
+      await eventContextService.ensureEventContext(eventId);
+    }
+    _fetchAgendaDays();
   }
 
   Future<void> _fetchAgendaDays() async {
     try {
-      final siteId = ref.read(siteContextProvider);
+      // Use EventContextService for site_id
+      final siteId = eventContextService.siteId;
       final uri = siteId != null
           ? Uri.parse(
               '${AppConfig.tourismApiBaseUrl}/agenda/days?site_id=$siteId',
@@ -99,7 +109,8 @@ class _AgendaPageState extends ConsumerState<AgendaPage> {
     setState(() => _isLoadingEpisodes = true);
 
     try {
-      final siteId = ref.read(siteContextProvider);
+      // Use EventContextService for site_id
+      final siteId = eventContextService.siteId;
       final uri = siteId != null
           ? Uri.parse(
               '${AppConfig.tourismApiBaseUrl}/agenda/day/$dayId/episodes?site_id=$siteId',

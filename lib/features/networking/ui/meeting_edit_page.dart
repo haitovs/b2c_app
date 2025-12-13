@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -14,26 +15,26 @@ import '../../../core/widgets/custom_app_bar.dart';
 import '../../auth/services/auth_service.dart';
 import '../../events/ui/widgets/profile_dropdown.dart';
 import '../../notifications/ui/notification_drawer.dart';
-import '../services/meeting_service.dart';
 
-/// B2B Meeting Request Page - for creating a new meeting request
-class MeetingRequestPage extends ConsumerStatefulWidget {
+/// Meeting Edit Page - for editing an existing meeting (only if PENDING)
+/// Layout matches the MeetingRequestPage (image card + form card)
+class MeetingEditPage extends ConsumerStatefulWidget {
   final String eventId;
-  final String participantId;
-  final Map<String, dynamic>? participantData;
+  final String meetingId;
+  final Map<String, dynamic>? meetingData;
 
-  const MeetingRequestPage({
+  const MeetingEditPage({
     super.key,
     required this.eventId,
-    required this.participantId,
-    this.participantData,
+    required this.meetingId,
+    this.meetingData,
   });
 
   @override
-  ConsumerState<MeetingRequestPage> createState() => _MeetingRequestPageState();
+  ConsumerState<MeetingEditPage> createState() => _MeetingEditPageState();
 }
 
-class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
+class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   bool _isProfileOpen = false;
@@ -43,35 +44,35 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
   final TextEditingController _commentsController = TextEditingController();
 
   // Attendee list (dynamic)
-  final List<TextEditingController> _attendeeControllers = [
-    TextEditingController(),
-  ];
+  List<TextEditingController> _attendeeControllers = [];
 
-  // Meeting with list (dynamic) - positions
-  final List<TextEditingController> _meetingWithControllers = [
-    TextEditingController(),
-  ];
+  // Meeting with list (dynamic)
+  List<TextEditingController> _meetingWithControllers = [];
 
   // Language dropdown
-  String _selectedLanguage = 'EN';
-  final List<String> _languages = ['EN', 'RU', 'TK'];
+  final List<String> _languages = [
+    'English',
+    'German',
+    'French',
+    'Spanish',
+    'Russian',
+    'Chinese',
+  ];
+  String _selectedLanguage = 'English';
 
   // Agenda days dropdown
   List<Map<String, dynamic>> _agendaDays = [];
   Map<String, dynamic>? _selectedDay;
 
-  // Time pickers
-  TimeOfDay _startTime = TimeOfDay(hour: 9, minute: 0);
-  TimeOfDay _endTime = TimeOfDay(hour: 10, minute: 0);
-
-  // Attachment image
+  // Attachment
   Uint8List? _attachmentImage;
   String? _attachmentImageName;
 
   // Data
-  Map<String, dynamic>? _participant;
+  Map<String, dynamic>? _meeting;
   bool _isLoading = true;
-  bool _isSubmitting = false;
+  bool _isSaving = false;
+  bool _canEdit = false;
 
   @override
   void initState() {
@@ -80,165 +81,168 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
   }
 
   Future<void> _initializeAndFetch() async {
-    // Ensure the event context is loaded for this event
     final eventId = int.tryParse(widget.eventId);
     if (eventId != null) {
       await eventContextService.ensureEventContext(eventId);
     }
-    _fetchData();
+    await _fetchMeetingData();
   }
 
-  Future<void> _fetchData() async {
-    if (widget.participantData != null) {
-      _participant = widget.participantData;
-    } else {
-      await _fetchParticipant();
-    }
-    await _fetchAgendaDays();
-    setState(() => _isLoading = false);
-  }
-
-  Future<void> _fetchAgendaDays() async {
-    // Use EventContextService for site_id (already initialized at app startup)
-    final tourismSiteId = eventContextService.siteId;
-
-    if (tourismSiteId == null) {
-      debugPrint('Warning: No Tourism site_id available, using fallback days');
-      _agendaDays = _getFallbackDays();
-      if (_agendaDays.isNotEmpty) {
-        _selectedDay = _agendaDays.first;
-      }
-      return;
-    }
+  Future<void> _fetchMeetingData() async {
+    setState(() => _isLoading = true);
 
     try {
-      final response = await http.get(
-        Uri.parse(
-          '${AppConfig.tourismApiBaseUrl}/agenda/days?site_id=$tourismSiteId',
-        ),
+      final authService = legacy_provider.Provider.of<AuthService>(
+        context,
+        listen: false,
       );
+      final token = await authService.getToken();
+
+      // Get meeting data - either from extra or fetch from API
+      if (widget.meetingData != null) {
+        _meeting = widget.meetingData;
+      } else {
+        // Fetch meeting from API
+        final response = await http.get(
+          Uri.parse(
+            '${AppConfig.b2cApiBaseUrl}/api/v1/meetings/${widget.meetingId}',
+          ),
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        );
+        if (response.statusCode == 200) {
+          _meeting = jsonDecode(response.body);
+        }
+      }
+
+      if (_meeting != null) {
+        // Check if editable (only PENDING status)
+        final status = _meeting!['status']?.toString().toUpperCase() ?? '';
+        _canEdit = status == 'PENDING';
+
+        // Pre-fill form fields
+        _subjectController.text = _meeting!['subject'] ?? '';
+
+        // Pre-fill attendees from attendees_text
+        final attendeesText = _meeting!['attendees_text'] as String? ?? '';
+        final attendeeNames = attendeesText.isEmpty
+            ? <String>[]
+            : attendeesText
+                  .split(',')
+                  .map((s) => s.trim())
+                  .where((s) => s.isNotEmpty)
+                  .toList();
+        _attendeeControllers = attendeeNames.isEmpty
+            ? [TextEditingController()]
+            : attendeeNames
+                  .map((name) => TextEditingController(text: name))
+                  .toList();
+
+        // Initialize meeting with
+        _meetingWithControllers = [TextEditingController()];
+
+        // Fetch agenda days
+        await _fetchAgendaDays(token);
+
+        // Try to match the selected day from meeting start_time
+        final startTime = _meeting!['start_time'];
+        if (startTime != null && _agendaDays.isNotEmpty) {
+          try {
+            final meetingDate = DateTime.parse(startTime).toLocal();
+            final meetingDateStr =
+                '${meetingDate.year}-${meetingDate.month.toString().padLeft(2, '0')}-${meetingDate.day.toString().padLeft(2, '0')}';
+            _selectedDay = _agendaDays.firstWhere(
+              (d) => d['date'] == meetingDateStr,
+              orElse: () => _agendaDays.first,
+            );
+          } catch (e) {
+            _selectedDay = _agendaDays.isNotEmpty ? _agendaDays.first : null;
+          }
+        } else if (_agendaDays.isNotEmpty) {
+          _selectedDay = _agendaDays.first;
+        }
+      }
+
+      setState(() => _isLoading = false);
+    } catch (e) {
+      debugPrint('Error fetching meeting: $e');
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _fetchAgendaDays(String? token) async {
+    try {
+      final siteId = eventContextService.siteId;
+
+      if (siteId == null) {
+        _agendaDays = _getMockDays();
+        return;
+      }
+
+      final response = await http.get(
+        Uri.parse('${AppConfig.tourismApiBaseUrl}/agenda/?site_id=$siteId'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
       if (response.statusCode == 200) {
         final List data = jsonDecode(response.body);
-        _agendaDays = data.cast<Map<String, dynamic>>();
-        if (_agendaDays.isNotEmpty) {
-          _selectedDay = _agendaDays.first;
-        }
-      } else {
-        debugPrint('Failed to fetch agenda days: ${response.statusCode}');
-        _agendaDays = _getFallbackDays();
-        if (_agendaDays.isNotEmpty) {
-          _selectedDay = _agendaDays.first;
-        }
+        _agendaDays = data
+            .map((item) {
+              return {
+                'id': item['id'],
+                'date': item['date'],
+                'label': item['date'],
+              };
+            })
+            .toList()
+            .cast<Map<String, dynamic>>();
+      }
+
+      if (_agendaDays.isEmpty) {
+        _agendaDays = _getMockDays();
       }
     } catch (e) {
-      debugPrint('Error fetching agenda days: $e');
-      _agendaDays = _getFallbackDays();
-      if (_agendaDays.isNotEmpty) {
-        _selectedDay = _agendaDays.first;
-      }
+      _agendaDays = _getMockDays();
     }
   }
 
-  List<Map<String, dynamic>> _getFallbackDays() {
-    // Generate 3 days starting from tomorrow
+  List<Map<String, dynamic>> _getMockDays() {
     final now = DateTime.now();
-    final List<Map<String, dynamic>> days = [];
-    for (int i = 1; i <= 3; i++) {
-      final date = now.add(Duration(days: i));
-      days.add({
-        'id': i,
+    return List.generate(5, (i) {
+      final day = now.add(Duration(days: i));
+      return {
+        'id': i + 1,
         'date':
-            '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}',
-        'day_number': date.day,
-        'day_name': _getDayName(date.weekday),
-      });
-    }
-    return days;
-  }
-
-  String _getDayName(int weekday) {
-    const names = [
-      '',
-      'Monday',
-      'Tuesday',
-      'Wednesday',
-      'Thursday',
-      'Friday',
-      'Saturday',
-      'Sunday',
-    ];
-    return names[weekday];
+            '${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}',
+        'label':
+            '${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}',
+      };
+    });
   }
 
   @override
   void dispose() {
     _subjectController.dispose();
     _commentsController.dispose();
-    for (var controller in _attendeeControllers) {
-      controller.dispose();
+    for (var c in _attendeeControllers) {
+      c.dispose();
     }
-    for (var controller in _meetingWithControllers) {
-      controller.dispose();
+    for (var c in _meetingWithControllers) {
+      c.dispose();
     }
     super.dispose();
   }
 
   void _toggleProfile() {
-    setState(() {
-      _isProfileOpen = !_isProfileOpen;
-    });
+    setState(() => _isProfileOpen = !_isProfileOpen);
   }
 
   void _closeProfile() {
     if (_isProfileOpen) {
-      setState(() {
-        _isProfileOpen = false;
-      });
+      setState(() => _isProfileOpen = false);
     }
-  }
-
-  Future<void> _fetchParticipant() async {
-    try {
-      final siteId = eventContextService.siteId;
-      var uriString =
-          '${AppConfig.tourismApiBaseUrl}/participants/${widget.participantId}';
-      if (siteId != null) {
-        uriString += '?site_id=$siteId';
-      }
-
-      final response = await http.get(Uri.parse(uriString));
-      if (response.statusCode == 200) {
-        setState(() {
-          _participant = jsonDecode(response.body);
-          _isLoading = false;
-        });
-      } else {
-        setState(() => _isLoading = false);
-      }
-    } catch (e) {
-      debugPrint('Error fetching participant: $e');
-      setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _pickImage() async {
-    // TODO: Install image_picker package and implement
-    // For now, show a snackbar message
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Image upload will be available soon'),
-          backgroundColor: Colors.blue,
-        ),
-      );
-    }
-  }
-
-  void _removeImage() {
-    setState(() {
-      _attachmentImage = null;
-      _attachmentImageName = null;
-    });
   }
 
   void _addAttendee() {
@@ -271,30 +275,47 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
     }
   }
 
-  Future<void> _submitRequest() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    // Validate day selection
-    if (_selectedDay == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select a day for the meeting'),
-          backgroundColor: Colors.orange,
-        ),
+  Future<void> _pickImage() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        withData: true,
       );
+      if (result != null && result.files.isNotEmpty) {
+        setState(() {
+          _attachmentImage = result.files.first.bytes;
+          _attachmentImageName = result.files.first.name;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error picking image: $e');
+    }
+  }
+
+  void _removeImage() {
+    setState(() {
+      _attachmentImage = null;
+      _attachmentImageName = null;
+    });
+  }
+
+  Future<void> _saveMeeting() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (_selectedDay == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please select a day')));
       return;
     }
 
-    setState(() => _isSubmitting = true);
+    setState(() => _isSaving = true);
 
     try {
-      // Get auth service for token
       final authService = legacy_provider.Provider.of<AuthService>(
         context,
         listen: false,
       );
-
-      final meetingService = MeetingService(authService);
+      final token = await authService.getToken();
 
       // Collect attendees as comma-separated text
       final attendeesText = _attendeeControllers
@@ -302,62 +323,62 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
           .where((t) => t.isNotEmpty)
           .join(', ');
 
-      // Calculate start and end time from selected day and time pickers
+      // Calculate start and end time from selected day
       final dayDate = _selectedDay!['date'] as String;
-      final startTime = DateTime.parse(
-        '${dayDate}T${_startTime.hour.toString().padLeft(2, '0')}:${_startTime.minute.toString().padLeft(2, '0')}:00',
-      );
-      final endTime = DateTime.parse(
-        '${dayDate}T${_endTime.hour.toString().padLeft(2, '0')}:${_endTime.minute.toString().padLeft(2, '0')}:00',
-      );
+      final startTime = DateTime.parse('${dayDate}T09:00:00');
+      final endTime = DateTime.parse('${dayDate}T10:00:00');
 
-      // Get the target user ID - use route param (which is the B2C user UUID)
-      // Or fallback to participant data 'id' field
-      String? targetUserId = widget.participantId;
-      if (targetUserId.isEmpty && _participant != null) {
-        targetUserId = _participant!['id']?.toString();
-      }
+      final body = {
+        'subject': _subjectController.text.trim(),
+        'start_time': startTime.toIso8601String(),
+        'end_time': endTime.toIso8601String(),
+        'attendees_text': attendeesText.isEmpty ? null : attendeesText,
+      };
 
-      // Make API call to create meeting
-      await meetingService.createMeeting(
-        type: MeetingType.B2B,
-        subject: _subjectController.text.trim(),
-        startTime: startTime,
-        endTime: endTime,
-        location: 'Ashgabat, TKM', // Default location
-        targetUserId: targetUserId,
-        attendeesText: attendeesText.isEmpty ? null : attendeesText,
+      final response = await http.put(
+        Uri.parse(
+          '${AppConfig.b2cApiBaseUrl}/api/v1/meetings/${widget.meetingId}',
+        ),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(body),
       );
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Meeting request sent successfully!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        context.pop();
+      if (response.statusCode == 200) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Meeting updated successfully!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          context.pop(true); // Return true to indicate success
+        }
+      } else {
+        throw Exception('Failed to update meeting: ${response.body}');
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to send request: $e'),
+            content: Text('Failed to update meeting: $e'),
             backgroundColor: Colors.red,
           ),
         );
       }
     } finally {
       if (mounted) {
-        setState(() => _isSubmitting = false);
+        setState(() => _isSaving = false);
       }
     }
   }
 
-  String _buildImageUrl(String? imagePath) {
-    if (imagePath == null || imagePath.isEmpty) return '';
-    if (imagePath.startsWith('http')) return imagePath;
-    return '${AppConfig.tourismApiBaseUrl}$imagePath';
+  String _buildImageUrl(String? path) {
+    if (path == null || path.isEmpty) return '';
+    if (path.startsWith('http')) return path;
+    return '${AppConfig.b2cApiBaseUrl}$path';
   }
 
   @override
@@ -378,10 +399,8 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
             SafeArea(
               child: Column(
                 children: [
-                  // Header
                   _buildHeader(isMobile, horizontalMargin),
                   SizedBox(height: isMobile ? 10 : 20),
-                  // Content
                   Expanded(
                     child: Container(
                       margin: EdgeInsets.symmetric(
@@ -404,7 +423,6 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
                 ],
               ),
             ),
-            // Profile dropdown overlay
             if (_isProfileOpen)
               Positioned(
                 top: 100,
@@ -426,7 +444,6 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
       ),
       child: Row(
         children: [
-          // Back button
           IconButton(
             icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
             onPressed: () => context.pop(),
@@ -434,10 +451,9 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
             constraints: const BoxConstraints(),
           ),
           SizedBox(width: isMobile ? 4 : 8),
-          // Title - use Flexible to prevent overflow
           Flexible(
             child: Text(
-              'Meeting Request',
+              'Edit Meeting',
               style: GoogleFonts.montserrat(
                 fontSize: isMobile ? 20 : 28,
                 fontWeight: FontWeight.w600,
@@ -447,7 +463,6 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
             ),
           ),
           const Spacer(),
-          // Notification & Profile icons
           CustomAppBar(
             onNotificationTap: () {
               _scaffoldKey.currentState?.openEndDrawer();
@@ -462,14 +477,49 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
   }
 
   Widget _buildFormContent() {
-    final participant = _participant;
-    if (participant == null) {
-      return const Center(child: Text('Participant not found'));
+    if (_meeting == null) {
+      return const Center(child: Text('Meeting not found'));
     }
 
-    final name = participant['name'] ?? 'Unknown Company';
-    final logo = participant['logo'];
-    final logoUrl = _buildImageUrl(logo);
+    if (!_canEdit) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.lock_outline, size: 64, color: Colors.grey[400]),
+            const SizedBox(height: 16),
+            Text(
+              'This meeting cannot be edited',
+              style: GoogleFonts.inter(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[600],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Only pending meetings can be modified',
+              style: GoogleFonts.inter(fontSize: 14, color: Colors.grey[500]),
+            ),
+            const SizedBox(height: 24),
+            OutlinedButton.icon(
+              onPressed: () => context.pop(),
+              icon: const Icon(Icons.arrow_back),
+              label: const Text('Go Back'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Get target user info for display
+    final targetUser = _meeting!['target_user'] as Map<String, dynamic>?;
+    final firstName = targetUser?['first_name'] ?? '';
+    final lastName = targetUser?['last_name'] ?? '';
+    final fullName = '$firstName $lastName'.trim();
+    final displayName = fullName.isNotEmpty ? fullName : 'Meeting Participant';
+    final companyName = targetUser?['company_name'] ?? '';
+    final photoUrl = _buildImageUrl(targetUser?['photo_url']);
 
     return Form(
       key: _formKey,
@@ -483,7 +533,7 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Left side - Participant image in white card
-                _buildImageCard(logoUrl, name),
+                _buildImageCard(photoUrl, displayName, companyName),
                 const SizedBox(width: 39),
                 // Right side - Form in white card
                 Expanded(child: _buildFormCard()),
@@ -494,7 +544,7 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _buildImageCard(logoUrl, name),
+                _buildImageCard(photoUrl, displayName, companyName),
                 const SizedBox(height: 30),
                 _buildFormCard(),
               ],
@@ -505,7 +555,7 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
     );
   }
 
-  Widget _buildImageCard(String logoUrl, String name) {
+  Widget _buildImageCard(String imageUrl, String name, String company) {
     return Container(
       width: 300,
       height: 351,
@@ -513,18 +563,61 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(15),
       ),
-      child: Center(
-        child: logoUrl.isNotEmpty
-            ? Padding(
-                padding: const EdgeInsets.all(20),
-                child: Image.network(
-                  logoUrl,
-                  fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) =>
-                      _buildImagePlaceholder(name),
-                ),
-              )
-            : _buildImagePlaceholder(name),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Photo
+          Container(
+            width: 200,
+            height: 200,
+            decoration: BoxDecoration(
+              color: Colors.grey[200],
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: imageUrl.isNotEmpty
+                  ? Image.network(
+                      imageUrl,
+                      fit: BoxFit.cover,
+                      width: 200,
+                      height: 200,
+                      errorBuilder: (context, error, stackTrace) =>
+                          _buildImagePlaceholder(name),
+                    )
+                  : _buildImagePlaceholder(name),
+            ),
+          ),
+          const SizedBox(height: 20),
+          // Name
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Text(
+              name,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.black,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          if (company.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Text(
+                company,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.inter(fontSize: 14, color: Colors.grey[600]),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -587,8 +680,6 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
                           const SizedBox(height: 20),
                           _buildDayDropdown(),
                           const SizedBox(height: 20),
-                          _buildTimePickers(),
-                          const SizedBox(height: 20),
                           _buildLanguageDropdown(),
                         ],
                       ),
@@ -607,8 +698,6 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
                     _buildSubjectsField(),
                     const SizedBox(height: 20),
                     _buildDayDropdown(),
-                    const SizedBox(height: 20),
-                    _buildTimePickers(),
                     const SizedBox(height: 20),
                     _buildLanguageDropdown(),
                     const SizedBox(height: 20),
@@ -708,7 +797,7 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
                 hintText: hintText,
                 hintStyle: GoogleFonts.roboto(
                   fontSize: 18,
-                  color: Colors.black.withOpacity(0.7),
+                  color: Colors.black.withValues(alpha: 0.7),
                 ),
                 border: InputBorder.none,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 15),
@@ -763,7 +852,7 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
               hintText: 'Enter subject...',
               hintStyle: GoogleFonts.roboto(
                 fontSize: 18,
-                color: Colors.black.withOpacity(0.7),
+                color: Colors.black.withValues(alpha: 0.7),
               ),
               border: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(horizontal: 15),
@@ -800,7 +889,7 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
               padding: const EdgeInsets.symmetric(horizontal: 15),
               icon: Icon(
                 Icons.keyboard_arrow_down,
-                color: Colors.black.withOpacity(0.4),
+                color: Colors.black.withValues(alpha: 0.4),
               ),
               items: _languages.map((lang) {
                 return DropdownMenuItem(
@@ -809,7 +898,7 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
                     lang,
                     style: GoogleFonts.roboto(
                       fontSize: 18,
-                      color: Colors.black.withOpacity(0.7),
+                      color: Colors.black.withValues(alpha: 0.7),
                     ),
                   ),
                 );
@@ -859,7 +948,7 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
                     padding: const EdgeInsets.symmetric(horizontal: 15),
                     icon: Icon(
                       Icons.keyboard_arrow_down,
-                      color: Colors.black.withOpacity(0.4),
+                      color: Colors.black.withValues(alpha: 0.4),
                     ),
                     items: _agendaDays.map((day) {
                       // Format day label
@@ -893,7 +982,7 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
                           label,
                           style: GoogleFonts.roboto(
                             fontSize: 18,
-                            color: Colors.black.withOpacity(0.7),
+                            color: Colors.black.withValues(alpha: 0.7),
                           ),
                         ),
                       );
@@ -908,137 +997,6 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
         ),
       ],
     );
-  }
-
-  Widget _buildTimePickers() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Meeting time:',
-          style: GoogleFonts.inter(
-            fontSize: 18,
-            fontWeight: FontWeight.w500,
-            color: Colors.black,
-          ),
-        ),
-        const SizedBox(height: 15),
-        Row(
-          children: [
-            // Start time
-            Expanded(
-              child: GestureDetector(
-                onTap: () => _selectTime(isStart: true),
-                child: Container(
-                  height: 50,
-                  decoration: BoxDecoration(
-                    border: Border.all(color: const Color(0xFFB7B7B7)),
-                    borderRadius: BorderRadius.circular(5),
-                  ),
-                  child: Row(
-                    children: [
-                      const SizedBox(width: 15),
-                      Icon(
-                        Icons.access_time,
-                        color: Colors.black.withValues(alpha: 0.5),
-                        size: 20,
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        _formatTimeOfDay(_startTime),
-                        style: GoogleFonts.roboto(
-                          fontSize: 18,
-                          color: Colors.black.withValues(alpha: 0.7),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Text(
-                'to',
-                style: GoogleFonts.inter(fontSize: 16, color: Colors.grey),
-              ),
-            ),
-            // End time
-            Expanded(
-              child: GestureDetector(
-                onTap: () => _selectTime(isStart: false),
-                child: Container(
-                  height: 50,
-                  decoration: BoxDecoration(
-                    border: Border.all(color: const Color(0xFFB7B7B7)),
-                    borderRadius: BorderRadius.circular(5),
-                  ),
-                  child: Row(
-                    children: [
-                      const SizedBox(width: 15),
-                      Icon(
-                        Icons.access_time,
-                        color: Colors.black.withValues(alpha: 0.5),
-                        size: 20,
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        _formatTimeOfDay(_endTime),
-                        style: GoogleFonts.roboto(
-                          fontSize: 18,
-                          color: Colors.black.withValues(alpha: 0.7),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Future<void> _selectTime({required bool isStart}) async {
-    final TimeOfDay? picked = await showTimePicker(
-      context: context,
-      initialTime: isStart ? _startTime : _endTime,
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(primary: Color(0xFF3C4494)),
-          ),
-          child: child!,
-        );
-      },
-    );
-    if (picked != null) {
-      setState(() {
-        if (isStart) {
-          _startTime = picked;
-          // If start time is after end time, adjust end time
-          if (_timeToMinutes(_startTime) >= _timeToMinutes(_endTime)) {
-            _endTime = TimeOfDay(
-              hour: (_startTime.hour + 1) % 24,
-              minute: _startTime.minute,
-            );
-          }
-        } else {
-          _endTime = picked;
-        }
-      });
-    }
-  }
-
-  int _timeToMinutes(TimeOfDay time) {
-    return time.hour * 60 + time.minute;
-  }
-
-  String _formatTimeOfDay(TimeOfDay time) {
-    final hour = time.hour.toString().padLeft(2, '0');
-    final minute = time.minute.toString().padLeft(2, '0');
-    return '$hour:$minute';
   }
 
   Widget _buildCommentsField() {
@@ -1068,7 +1026,7 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
               hintText: 'Enter comments...',
               hintStyle: GoogleFonts.roboto(
                 fontSize: 18,
-                color: Colors.black.withOpacity(0.7),
+                color: Colors.black.withValues(alpha: 0.7),
               ),
               border: InputBorder.none,
               contentPadding: const EdgeInsets.all(15),
@@ -1189,14 +1147,14 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
 
   Widget _buildSaveButton() {
     return OutlinedButton(
-      onPressed: _isSubmitting ? null : _submitRequest,
+      onPressed: _isSaving ? null : _saveMeeting,
       style: OutlinedButton.styleFrom(
         foregroundColor: const Color(0xFF008000),
         side: const BorderSide(color: Color(0xFF008000)),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
       ),
-      child: _isSubmitting
+      child: _isSaving
           ? const SizedBox(
               width: 16,
               height: 16,
@@ -1217,24 +1175,28 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
   }
 
   Widget _buildImagePlaceholder(String name) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Icon(Icons.business, size: 48, color: Colors.grey[400]),
-        const SizedBox(height: 8),
-        Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Text(
-            name,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[600],
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ],
+    final initials = name
+        .split(' ')
+        .take(2)
+        .map((e) => e.isNotEmpty ? e[0].toUpperCase() : '')
+        .join();
+
+    return Container(
+      width: 200,
+      height: 200,
+      color: const Color(0xFF3C4494).withValues(alpha: 0.2),
+      child: Center(
+        child: initials.isNotEmpty
+            ? Text(
+                initials,
+                style: GoogleFonts.inter(
+                  fontSize: 48,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF3C4494),
+                ),
+              )
+            : Icon(Icons.person, size: 60, color: Colors.grey[400]),
+      ),
     );
   }
 }

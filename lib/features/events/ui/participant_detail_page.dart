@@ -7,7 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 
 import '../../../core/config/app_config.dart';
-import '../../../core/providers/site_context_provider.dart';
+import '../../../core/services/event_context_service.dart';
 import '../../../core/widgets/custom_app_bar.dart';
 import '../../notifications/ui/notification_drawer.dart';
 import 'widgets/profile_dropdown.dart';
@@ -49,7 +49,7 @@ class _ParticipantDetailPageState extends ConsumerState<ParticipantDetailPage> {
 
   Future<void> _fetchParticipant() async {
     try {
-      final siteId = ref.read(siteContextProvider);
+      final siteId = eventContextService.siteId;
       final uri = siteId != null
           ? Uri.parse(
               '${AppConfig.tourismApiBaseUrl}/participants/${widget.participantId}?site_id=$siteId',

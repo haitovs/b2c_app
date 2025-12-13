@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart' as p;
 
-import '../../../../core/providers/site_context_provider.dart';
+import '../../../../core/services/event_context_service.dart';
 import '../../../../core/widgets/custom_app_bar.dart';
 import '../../../../l10n/generated/app_localizations.dart';
 import '../../notifications/ui/notification_drawer.dart';
@@ -85,18 +85,25 @@ class _EventDetailsPageState extends ConsumerState<EventDetailsPage> {
   }
 
   void _onOpenTap() {
-    if (_event != null && _event!.containsKey('tourism_site_id')) {
-      ref
-          .read(siteContextProvider.notifier)
-          .setSiteId(_event!['tourism_site_id']);
+    // Save event context using EventContextService
+    final eventId = int.tryParse(widget.id);
+    if (eventId != null && _event != null) {
+      final tourismSiteId = _event!['tourism_site_id'] as int?;
+      eventContextService.setEventContext(
+        eventId: eventId,
+        tourismSiteId: tourismSiteId,
+      );
     }
-    context.push('/events/${widget.id}/menu');
+
+    // Use go() for proper URL update on web
+    context.go('/events/${widget.id}/menu');
   }
 
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 600;
+    // Show mobile layout on medium screens too (up to 900px)
+    final isMobile = screenWidth < 900;
     final horizontalPadding = isMobile ? 20.0 : 50.0;
 
     if (_isLoading) {

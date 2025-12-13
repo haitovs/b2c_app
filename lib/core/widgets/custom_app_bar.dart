@@ -5,16 +5,68 @@ class CustomAppBar extends StatelessWidget {
   final VoidCallback onProfileTap;
   final VoidCallback onNotificationTap;
   final bool isMobile;
+  final bool showLogo;
 
   const CustomAppBar({
     super.key,
     required this.onProfileTap,
     required this.onNotificationTap,
     this.isMobile = false,
+    this.showLogo = true,
   });
 
   @override
   Widget build(BuildContext context) {
+    // If no logo, just return the icons
+    if (!showLogo) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Bell
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(50),
+              onTap: onNotificationTap,
+              child: Padding(
+                padding: const EdgeInsets.all(5.0),
+                child: SvgPicture.asset(
+                  'assets/event_calendar/bell.svg',
+                  width: isMobile ? 24 : 28,
+                  height: isMobile ? 24 : 28,
+                  colorFilter: const ColorFilter.mode(
+                    Colors.white,
+                    BlendMode.srcIn,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          SizedBox(width: isMobile ? 15 : 25),
+          // User
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(50),
+              onTap: onProfileTap,
+              child: Padding(
+                padding: const EdgeInsets.all(5.0),
+                child: SvgPicture.asset(
+                  'assets/event_calendar/user.svg',
+                  width: isMobile ? 24 : 28,
+                  height: isMobile ? 24 : 28,
+                  colorFilter: const ColorFilter.mode(
+                    Colors.white,
+                    BlendMode.srcIn,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
     final double navbarHeight = isMobile ? 60.0 : 70.0;
 
     return SizedBox(
