@@ -16,6 +16,7 @@ class AuthService extends ChangeNotifier {
   Map<String, dynamic>? get currentUser => _currentUser;
   bool get isAuthenticated => _token != null;
   bool get isInitialized => _isInitialized;
+  bool get hasAgreedTerms => _currentUser?['has_agreed_terms'] ?? false;
 
   Future<String?> getToken() async {
     if (_token != null) return _token;
@@ -118,7 +119,7 @@ class AuthService extends ChangeNotifier {
   }) async {
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/auth/register'),
+        Uri.parse('$baseUrl/auth/signup'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'email': email,

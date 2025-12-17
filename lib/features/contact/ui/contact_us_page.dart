@@ -5,10 +5,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
+import 'package:provider/provider.dart' as legacy_provider;
 
 import '../../../core/config/app_config.dart';
 import '../../../core/widgets/custom_app_bar.dart';
+import '../../auth/services/auth_service.dart';
 import '../../events/ui/widgets/profile_dropdown.dart';
+import '../../notifications/services/notification_service.dart';
 import '../../notifications/ui/notification_drawer.dart';
 
 /// Contact Us Page - displays contact form and contact information
@@ -31,6 +34,34 @@ class _ContactUsPageState extends ConsumerState<ContactUsPage> {
   final TextEditingController _surnameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _messageController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNotificationCount();
+  }
+
+  int _unreadNotificationCount = 0;
+
+  Future<void> _loadNotificationCount() async {
+    try {
+      final authService = legacy_provider.Provider.of<AuthService>(
+        context,
+        listen: false,
+      );
+      final notificationService = NotificationService(authService);
+      final notifications = await notificationService.getNotifications();
+      if (mounted) {
+        setState(() {
+          _unreadNotificationCount = notifications
+              .where((n) => !n.isRead)
+              .length;
+        });
+      }
+    } catch (e) {
+      // Silently fail
+    }
+  }
 
   @override
   void dispose() {
@@ -188,7 +219,7 @@ class _ContactUsPageState extends ConsumerState<ContactUsPage> {
         // Back button
         IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
-          onPressed: () => context.pop(),
+          onPressed: () => context.go('/events/${widget.eventId}/menu'),
         ),
         const SizedBox(width: 8),
         // Title
@@ -207,6 +238,7 @@ class _ContactUsPageState extends ConsumerState<ContactUsPage> {
             _scaffoldKey.currentState?.openEndDrawer();
           },
           onProfileTap: _toggleProfile,
+          unreadNotificationCount: _unreadNotificationCount,
         ),
       ],
     );

@@ -80,10 +80,10 @@ class _MeetingNotRegisteredPageState extends State<MeetingNotRegisteredPage> {
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
       child: Row(
         children: [
-          // Menu button
+          // Back button
           IconButton(
-            icon: const Icon(Icons.menu, color: Colors.white, size: 28),
-            onPressed: () => context.pop(),
+            icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
+            onPressed: () => context.go('/events/${widget.eventId}/menu'),
           ),
           const SizedBox(width: 8),
           // Title

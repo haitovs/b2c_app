@@ -7,11 +7,13 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/config/app_config.dart';
 import '../../../../core/services/event_context_service.dart';
 import '../../../../l10n/generated/app_localizations.dart';
+import '../../auth/services/auth_service.dart';
 import '../../notifications/ui/notification_drawer.dart';
 import 'widgets/profile_dropdown.dart';
 
@@ -161,16 +163,19 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
         'icon': 'speakers.png',
         'label': l10n.speakers,
         'route': '/events/${widget.eventId}/speakers',
+        'requiresAgreement': true,
       },
       {
         'icon': 'participants.png',
         'label': l10n.participants,
         'route': '/events/${widget.eventId}/participants',
+        'requiresAgreement': true,
       },
       {
         'icon': 'meetings.png',
         'label': l10n.meetings,
         'route': '/events/${widget.eventId}/meetings',
+        'requiresAgreement': true,
       },
       {
         'icon': 'news.png',
@@ -181,26 +186,31 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
         'icon': 'registration.png',
         'label': l10n.registration,
         'route': '/events/${widget.eventId}/registration',
+        'requiresAgreement': true,
       },
       {
         'icon': 'my_participants.png',
         'label': l10n.myParticipants,
         'route': '/events/${widget.eventId}/my-participants',
+        'requiresAgreement': true,
       },
       {
         'icon': 'flights.png',
         'label': l10n.flights,
         'route': '/events/${widget.eventId}/flights',
+        'requiresAgreement': true,
       },
       {
         'icon': 'accommodation.png',
         'label': l10n.accommodation,
         'route': '/events/${widget.eventId}/accommodation',
+        'requiresAgreement': true,
       },
       {
         'icon': 'transfer.png',
         'label': l10n.transfer,
         'route': '/events/${widget.eventId}/transfer',
+        'requiresAgreement': true,
       },
       {
         'icon': 'hotline.png',
@@ -497,6 +507,44 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
                                         if (isExit) {
                                           _onExitEvent();
                                         } else if (item['route'] != null) {
+                                          // Check if menu item requires agreement
+                                          final requiresAgreement =
+                                              item['requiresAgreement'] == true;
+                                          final hasAgreed = context
+                                              .read<AuthService>()
+                                              .hasAgreedTerms;
+
+                                          if (requiresAgreement && !hasAgreed) {
+                                            // Show dialog to guide user to agreement
+                                            showDialog(
+                                              context: context,
+                                              builder: (ctx) => AlertDialog(
+                                                title: const Text(
+                                                  'Agreement Required',
+                                                ),
+                                                content: const Text(
+                                                  'Please complete the Participation Agreement Process in your Profile before accessing this feature.',
+                                                ),
+                                                actions: [
+                                                  TextButton(
+                                                    onPressed: () =>
+                                                        Navigator.pop(ctx),
+                                                    child: const Text('Cancel'),
+                                                  ),
+                                                  ElevatedButton(
+                                                    onPressed: () {
+                                                      Navigator.pop(ctx);
+                                                      context.go('/profile');
+                                                    },
+                                                    child: const Text(
+                                                      'Go to Profile',
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            );
+                                            return;
+                                          }
                                           // Use go() instead of push() for proper URL update on web
                                           context.go(item['route'] as String);
                                         }

@@ -177,44 +177,25 @@ class _ParticipantDetailPageState extends ConsumerState<ParticipantDetailPage> {
     return Row(
       children: [
         // Back button
-        Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () {
-              if (context.canPop()) {
-                context.pop();
-              } else {
-                context.go('/events/${widget.eventId}/participants');
-              }
-            },
-            borderRadius: BorderRadius.circular(25),
-            child: Container(
-              width: isMobile ? 36 : 50,
-              height: isMobile ? 36 : 50,
-              alignment: Alignment.center,
-              child: const Icon(
-                Icons.arrow_back,
-                color: Color(0xFFF1F1F6),
-                size: 28,
-              ),
-            ),
+        IconButton(
+          icon: Icon(
+            Icons.arrow_back,
+            color: Colors.white,
+            size: isMobile ? 24 : 28,
           ),
+          onPressed: () => context.go('/events/${widget.eventId}/participants'),
         ),
-
-        const SizedBox(width: 16),
-
+        const SizedBox(width: 8),
         // Title
         Text(
           'Participant',
           style: GoogleFonts.montserrat(
-            fontSize: isMobile ? 28 : 40,
+            fontSize: isMobile ? 24 : 28,
             fontWeight: FontWeight.w600,
-            color: const Color(0xFFF1F1F6),
+            color: Colors.white,
           ),
         ),
-
         const Spacer(),
-
         // Custom App Bar with notifications and profile
         CustomAppBar(
           onProfileTap: _toggleProfile,

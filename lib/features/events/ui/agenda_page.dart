@@ -5,10 +5,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
+import 'package:provider/provider.dart' as legacy_provider;
 
 import '../../../../core/config/app_config.dart';
 import '../../../../core/services/event_context_service.dart';
 import '../../../../core/widgets/custom_app_bar.dart';
+import '../../auth/services/auth_service.dart';
+import '../../notifications/services/notification_service.dart';
 import '../../notifications/ui/notification_drawer.dart';
 import 'widgets/profile_dropdown.dart';
 
@@ -25,7 +28,7 @@ class _AgendaPageState extends ConsumerState<AgendaPage> {
   bool _isProfileOpen = false;
 
   // Tab state
-  bool _isProgramSelected = true;
+  final bool _isProgramSelected = true;
   int _selectedDayIndex = 0;
   // String _selectedFilter = 'All'; // Commented out - filters hidden for now
   String _searchQuery = '';
@@ -52,7 +55,30 @@ class _AgendaPageState extends ConsumerState<AgendaPage> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeAndFetch();
+      _loadNotificationCount();
     });
+  }
+
+  int _unreadNotificationCount = 0;
+
+  Future<void> _loadNotificationCount() async {
+    try {
+      final authService = legacy_provider.Provider.of<AuthService>(
+        context,
+        listen: false,
+      );
+      final notificationService = NotificationService(authService);
+      final notifications = await notificationService.getNotifications();
+      if (mounted) {
+        setState(() {
+          _unreadNotificationCount = notifications
+              .where((n) => !n.isRead)
+              .length;
+        });
+      }
+    } catch (e) {
+      // Silently fail
+    }
   }
 
   Future<void> _initializeAndFetch() async {
@@ -475,141 +501,39 @@ class _AgendaPageState extends ConsumerState<AgendaPage> {
   }
 
   Widget _buildHeader(bool isMobile) {
-    return isMobile
-        ? Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  _buildMenuButton(isMobile),
-                  const SizedBox(width: 10),
-                  Text(
-                    'Agenda',
-                    style: GoogleFonts.montserrat(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w600,
-                      color: const Color(0xFFF1F1F6),
-                    ),
-                  ),
-                  const Spacer(),
-                  CustomAppBar(
-                    onProfileTap: _toggleProfile,
-                    onNotificationTap: () {
-                      _closeProfile();
-                      _scaffoldKey.currentState?.openEndDrawer();
-                    },
-                    isMobile: isMobile,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Center(child: _buildToggle(isMobile)),
-            ],
-          )
-        : Row(
-            children: [
-              _buildMenuButton(isMobile),
-              const SizedBox(width: 20),
-              Text(
-                'Agenda',
-                style: GoogleFonts.montserrat(
-                  fontSize: 40,
-                  fontWeight: FontWeight.w600,
-                  color: const Color(0xFFF1F1F6),
-                ),
-              ),
-              const Spacer(),
-              _buildToggle(isMobile),
-              const SizedBox(width: 30),
-              CustomAppBar(
-                onProfileTap: _toggleProfile,
-                onNotificationTap: () {
-                  _closeProfile();
-                  _scaffoldKey.currentState?.openEndDrawer();
-                },
-                isMobile: isMobile,
-              ),
-            ],
-          );
-  }
-
-  Widget _buildMenuButton(bool isMobile) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(25),
-        onTap: () {
-          if (context.canPop()) {
-            context.pop();
-          } else {
-            context.go('/events/${widget.eventId}/menu');
-          }
-        },
-        child: Container(
-          width: isMobile ? 36 : 50,
-          height: isMobile ? 36 : 50,
-          alignment: Alignment.center,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(width: 20, height: 2.5, color: const Color(0xFFF1F1F6)),
-              const SizedBox(height: 4),
-              Container(width: 20, height: 2.5, color: const Color(0xFFF1F1F6)),
-              const SizedBox(height: 4),
-              Container(width: 20, height: 2.5, color: const Color(0xFFF1F1F6)),
-            ],
+    return Row(
+      children: [
+        // Back button
+        IconButton(
+          icon: Icon(
+            Icons.arrow_back,
+            color: Colors.white,
+            size: isMobile ? 24 : 28,
           ),
+          onPressed: () => context.go('/events/${widget.eventId}/menu'),
         ),
-      ),
-    );
-  }
-
-  Widget _buildToggle(bool isMobile) {
-    return Container(
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.white, width: 2),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _buildToggleButton('Program', _isProgramSelected, () {
-            setState(() => _isProgramSelected = true);
-          }, isMobile),
-          _buildToggleButton('Favourite', !_isProgramSelected, () {
-            setState(() => _isProgramSelected = false);
-          }, isMobile),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildToggleButton(
-    String text,
-    bool isSelected,
-    VoidCallback onTap,
-    bool isMobile,
-  ) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.symmetric(
-          horizontal: isMobile ? 16 : 53,
-          vertical: isMobile ? 10 : 17,
-        ),
-        decoration: BoxDecoration(
-          color: isSelected ? Colors.white : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Text(
-          text,
-          style: GoogleFonts.roboto(
-            fontSize: isMobile ? 14 : 26,
+        const SizedBox(width: 8),
+        // Title
+        Text(
+          'Agenda',
+          style: GoogleFonts.montserrat(
+            fontSize: isMobile ? 24 : 28,
             fontWeight: FontWeight.w600,
-            color: isSelected ? Colors.black : Colors.white,
+            color: Colors.white,
           ),
         ),
-      ),
+        const Spacer(),
+        // Custom App Bar with notifications and profile
+        CustomAppBar(
+          onProfileTap: _toggleProfile,
+          onNotificationTap: () {
+            _closeProfile();
+            _scaffoldKey.currentState?.openEndDrawer();
+          },
+          isMobile: isMobile,
+          unreadNotificationCount: _unreadNotificationCount,
+        ),
+      ],
     );
   }
 

@@ -220,7 +220,7 @@ class _LoginPageState extends State<LoginPage> {
                 child: MouseRegion(
                   cursor: SystemMouseCursors.click,
                   child: GestureDetector(
-                    onTap: () => context.push('/register'),
+                    onTap: () => context.push('/signup'),
                     child: _HoverText(
                       text: AppLocalizations.of(context)!.dontHaveAccount,
                       baseStyle: AppTextStyles.dontHaveAccount,

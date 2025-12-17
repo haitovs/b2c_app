@@ -9,6 +9,7 @@ import '../features/events/ui/agenda_page.dart';
 import '../features/events/ui/event_calendar_page.dart';
 import '../features/events/ui/event_details_page.dart';
 import '../features/events/ui/event_menu_page.dart';
+import '../features/events/ui/event_registration_page.dart';
 import '../features/events/ui/participant_detail_page.dart';
 import '../features/events/ui/participant_list_page.dart';
 import '../features/events/ui/speaker_detail_page.dart';
@@ -37,13 +38,13 @@ GoRouter createRouter(AuthService authService) {
       final isAuthenticated = authService.isAuthenticated;
       final location = state.uri.toString();
       final isLoggingIn = location == '/login';
-      final isRegistering = location == '/register';
+      final isSigningUp = location == '/signup';
 
-      if (!isAuthenticated && !isLoggingIn && !isRegistering) {
+      if (!isAuthenticated && !isLoggingIn && !isSigningUp) {
         return '/login';
       }
 
-      if (isAuthenticated && (isLoggingIn || isRegistering)) {
+      if (isAuthenticated && (isLoggingIn || isSigningUp)) {
         return '/';
       }
 
@@ -52,7 +53,7 @@ GoRouter createRouter(AuthService authService) {
     routes: [
       GoRoute(path: '/login', builder: (context, state) => const LoginPage()),
       GoRoute(
-        path: '/register',
+        path: '/signup',
         builder: (context, state) => const RegistrationPage(),
       ),
       GoRoute(
@@ -225,6 +226,14 @@ GoRouter createRouter(AuthService authService) {
             path: 'faq',
             builder: (context, state) =>
                 FAQPage(eventId: state.pathParameters['id']!),
+          ),
+          // Registration route
+          GoRoute(
+            path: 'registration',
+            builder: (context, state) {
+              final idStr = state.pathParameters['id']!;
+              return EventRegistrationPage(eventId: int.tryParse(idStr) ?? 0);
+            },
           ),
         ],
       ),

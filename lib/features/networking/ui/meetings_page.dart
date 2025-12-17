@@ -12,6 +12,7 @@ import '../../../core/services/event_context_service.dart';
 import '../../../core/widgets/custom_app_bar.dart';
 import '../../auth/services/auth_service.dart';
 import '../../events/ui/widgets/profile_dropdown.dart';
+import '../../notifications/services/notification_service.dart';
 import '../../notifications/ui/notification_drawer.dart';
 import 'widgets/delete_confirmation_dialog.dart';
 
@@ -49,10 +50,34 @@ class _MeetingsPageState extends ConsumerState<MeetingsPage> {
   List<Map<String, dynamic>> _filteredMeetings = [];
   bool _isLoading = true;
 
+  // Notification count
+  int _unreadNotificationCount = 0;
+
   @override
   void initState() {
     super.initState();
     _initializeAndFetch();
+    _loadNotificationCount();
+  }
+
+  Future<void> _loadNotificationCount() async {
+    try {
+      final authService = legacy_provider.Provider.of<AuthService>(
+        context,
+        listen: false,
+      );
+      final notificationService = NotificationService(authService);
+      final notifications = await notificationService.getNotifications();
+      if (mounted) {
+        setState(() {
+          _unreadNotificationCount = notifications
+              .where((n) => !n.isRead)
+              .length;
+        });
+      }
+    } catch (e) {
+      // Silently fail - notification count is not critical
+    }
   }
 
   Future<void> _initializeAndFetch() async {
@@ -288,19 +313,57 @@ class _MeetingsPageState extends ConsumerState<MeetingsPage> {
     final confirmed = await showDeleteConfirmationDialog(context);
     if (!confirmed) return;
 
-    // TODO: Implement actual API call
-    setState(() {
-      _meetings.removeWhere((m) => m['id'] == meetingId);
-      _applyFilters();
-    });
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Meeting deleted'),
-          backgroundColor: Colors.green,
-        ),
+    try {
+      final authService = legacy_provider.Provider.of<AuthService>(
+        context,
+        listen: false,
       );
+      final token = await authService.getToken();
+
+      // Call API to update status to CANCELLED
+      final response = await http.patch(
+        Uri.parse(
+          '${AppConfig.b2cApiBaseUrl}/api/v1/meetings/$meetingId/status?status_in=CANCELLED',
+        ),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        // Refresh the meeting list to get updated data
+        await _fetchData();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Meeting cancelled successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        debugPrint('Failed to cancel meeting: ${response.statusCode}');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to cancel meeting: ${response.body}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error cancelling meeting: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Error cancelling meeting'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -413,7 +476,7 @@ class _MeetingsPageState extends ConsumerState<MeetingsPage> {
           // Menu/Back button
           IconButton(
             icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
-            onPressed: () => context.pop(),
+            onPressed: () => context.go('/events/${widget.eventId}/menu'),
           ),
           const SizedBox(width: 8),
           // Title
@@ -432,6 +495,7 @@ class _MeetingsPageState extends ConsumerState<MeetingsPage> {
               _scaffoldKey.currentState?.openEndDrawer();
             },
             onProfileTap: _toggleProfile,
+            unreadNotificationCount: _unreadNotificationCount,
           ),
         ],
       ),
@@ -600,30 +664,6 @@ class _MeetingsPageState extends ConsumerState<MeetingsPage> {
             fontSize: 16,
             fontWeight: FontWeight.w500,
             color: Colors.white,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNewMeetingButton() {
-    return GestureDetector(
-      onTap: () {
-        // Navigate to new meeting (participant selection) page
-        context.push('/events/${widget.eventId}/meetings/new');
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Text(
-          'New Meeting',
-          style: GoogleFonts.roboto(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Colors.black,
           ),
         ),
       ),
@@ -1426,8 +1466,111 @@ class _MeetingsPageState extends ConsumerState<MeetingsPage> {
 
   Widget _buildPopupMenu(Map<String, dynamic> meeting) {
     final isSender = meeting['is_sender'] ?? true;
-    final status = meeting['status'] ?? 'PENDING';
+    final status = (meeting['status'] ?? 'PENDING').toString().toUpperCase();
     final isPending = status == 'PENDING';
+    final isConfirmed = status == 'CONFIRMED';
+
+    // Build menu items based on role and status
+    final items = <PopupMenuItem<String>>[];
+
+    if (isSender) {
+      // SENDER can:
+      // - Edit if PENDING
+      // - Cancel if PENDING or CONFIRMED
+      // - Nothing if CANCELLED or DECLINED
+      if (isPending) {
+        items.add(
+          PopupMenuItem(
+            value: 'edit',
+            child: Row(
+              children: [
+                Icon(
+                  Icons.edit_outlined,
+                  size: 18,
+                  color: const Color(0xFF3C4494),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  'Edit',
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+      if (isPending || isConfirmed) {
+        items.add(
+          PopupMenuItem(
+            value: 'delete',
+            child: Row(
+              children: [
+                const Icon(Icons.cancel_outlined, size: 18, color: Colors.red),
+                const SizedBox(width: 10),
+                Text(
+                  'Cancel',
+                  style: GoogleFonts.inter(
+                    fontWeight: FontWeight.w500,
+                    color: Colors.red,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+    } else {
+      // RECIPIENT can:
+      // - Accept/Decline if PENDING
+      // - Nothing after accepting/declining/cancelled
+      if (isPending) {
+        items.add(
+          PopupMenuItem(
+            value: 'accept',
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.check_circle_outline,
+                  size: 18,
+                  color: Colors.green,
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  'Accept',
+                  style: GoogleFonts.inter(
+                    fontWeight: FontWeight.w500,
+                    color: Colors.green,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+        items.add(
+          PopupMenuItem(
+            value: 'decline',
+            child: Row(
+              children: [
+                const Icon(Icons.cancel_outlined, size: 18, color: Colors.red),
+                const SizedBox(width: 10),
+                Text(
+                  'Decline',
+                  style: GoogleFonts.inter(
+                    fontWeight: FontWeight.w500,
+                    color: Colors.red,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+    }
+
+    // If no actions available, show a disabled/hidden button
+    if (items.isEmpty) {
+      return const SizedBox.shrink();
+    }
 
     return Container(
       decoration: BoxDecoration(
@@ -1459,106 +1602,7 @@ class _MeetingsPageState extends ConsumerState<MeetingsPage> {
               break;
           }
         },
-        itemBuilder: (context) {
-          final items = <PopupMenuItem<String>>[];
-
-          if (isSender) {
-            // SENDER: Edit (if pending), Delete
-            if (isPending) {
-              items.add(
-                PopupMenuItem(
-                  value: 'edit',
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.edit_outlined,
-                        size: 18,
-                        color: const Color(0xFF3C4494),
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        'Edit',
-                        style: GoogleFonts.inter(fontWeight: FontWeight.w500),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }
-            items.add(
-              PopupMenuItem(
-                value: 'delete',
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.delete_outline,
-                      size: 18,
-                      color: Colors.red,
-                    ),
-                    const SizedBox(width: 10),
-                    Text(
-                      'Cancel',
-                      style: GoogleFonts.inter(
-                        fontWeight: FontWeight.w500,
-                        color: Colors.red,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          } else {
-            // RECIPIENT: Accept (if pending), Decline (if pending)
-            if (isPending) {
-              items.add(
-                PopupMenuItem(
-                  value: 'accept',
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.check_circle_outline,
-                        size: 18,
-                        color: Colors.green,
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        'Accept',
-                        style: GoogleFonts.inter(
-                          fontWeight: FontWeight.w500,
-                          color: Colors.green,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-              items.add(
-                PopupMenuItem(
-                  value: 'decline',
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.cancel_outlined,
-                        size: 18,
-                        color: Colors.red,
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        'Decline',
-                        style: GoogleFonts.inter(
-                          fontWeight: FontWeight.w500,
-                          color: Colors.red,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }
-          }
-
-          return items;
-        },
+        itemBuilder: (context) => items,
       ),
     );
   }
@@ -1571,6 +1615,8 @@ class _MeetingsPageState extends ConsumerState<MeetingsPage> {
         return const Color(0xFFED873F);
       case 'DECLINED':
         return const Color(0xFFC60404);
+      case 'CANCELLED':
+        return const Color(0xFF6B7280);
       default:
         return Colors.grey;
     }
@@ -1584,6 +1630,8 @@ class _MeetingsPageState extends ConsumerState<MeetingsPage> {
         return 'Pending';
       case 'DECLINED':
         return 'Declined';
+      case 'CANCELLED':
+        return 'Cancelled';
       default:
         return status;
     }

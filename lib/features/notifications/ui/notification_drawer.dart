@@ -1,7 +1,10 @@
 import 'package:b2c_app/l10n/generated/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
+import 'package:provider/provider.dart' as legacy_provider;
 
+import '../../auth/services/auth_service.dart';
 import '../services/notification_service.dart';
 
 class NotificationDrawer extends StatefulWidget {
@@ -14,15 +17,28 @@ class NotificationDrawer extends StatefulWidget {
 class _NotificationDrawerState extends State<NotificationDrawer>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  final _notificationService = NotificationService();
-  List<dynamic> _notifications = [];
+  late NotificationService _notificationService;
   bool _isLoading = true;
+  bool _initialized = false;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    _loadNotifications();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initialized) {
+      _initialized = true;
+      final authService = legacy_provider.Provider.of<AuthService>(
+        context,
+        listen: false,
+      );
+      _notificationService = NotificationService(authService);
+      _loadNotifications();
+    }
   }
 
   @override
@@ -32,95 +48,97 @@ class _NotificationDrawerState extends State<NotificationDrawer>
   }
 
   Future<void> _loadNotifications() async {
-    await Future.delayed(const Duration(milliseconds: 300));
-    setState(() {
-      _notifications = [
-        {
-          "id": 1,
-          "title": "New event registration",
-          "subtitle": "Diana Myradova registered for Tech Summit 2024",
-          "time": "2 min ago",
-          "is_read": false,
-          "type": "event",
-          "icon": Icons.event,
-          "color": const Color(0xFF4CAF50),
-        },
-        {
-          "id": 2,
-          "title": "Meeting reminder",
-          "subtitle": "Your meeting with sponsors starts in 30 minutes",
-          "time": "12 min ago",
-          "is_read": false,
-          "type": "reminder",
-          "icon": Icons.access_time,
-          "color": const Color(0xFFFF9800),
-        },
-        {
-          "id": 3,
-          "title": "New message received",
-          "subtitle": "Myrad Rahmanov sent you a message about the conference",
-          "time": "45 min ago",
-          "is_read": false,
-          "type": "message",
-          "icon": Icons.message,
-          "color": const Color(0xFF2196F3),
-        },
-        {
-          "id": 4,
-          "title": "File shared with you",
-          "subtitle": "Conference agenda has been updated",
-          "time": "1 hour ago",
-          "is_read": true,
-          "type": "file",
-          "file_name": "Conference_Agenda_2024.pdf",
-          "file_size": "2.4 MB",
-          "icon": Icons.attach_file,
-          "color": const Color(0xFF9C27B0),
-        },
-        {
-          "id": 5,
-          "title": "Schedule updated",
-          "subtitle": "The keynote speech has been rescheduled to 2:00 PM",
-          "time": "2 hours ago",
-          "is_read": true,
-          "type": "schedule",
-          "icon": Icons.calendar_today,
-          "color": const Color(0xFF607D8B),
-        },
-        {
-          "id": 6,
-          "title": "New speaker added",
-          "subtitle": "John Smith has been added as a keynote speaker",
-          "time": "3 hours ago",
-          "is_read": true,
-          "type": "speaker",
-          "icon": Icons.person_add,
-          "color": const Color(0xFF00BCD4),
-        },
-      ];
-      _isLoading = false;
-    });
+    setState(() => _isLoading = true);
+    await _notificationService.getNotifications();
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
   }
 
-  int get _unreadCount =>
-      _notifications.where((n) => !n['is_read']).toList().length;
+  int get _unreadCount => _notificationService.unreadCount;
 
-  void _markAsRead(int id) {
-    setState(() {
-      for (var n in _notifications) {
-        if (n['id'] == id) {
-          n['is_read'] = true;
-        }
-      }
-    });
+  List<NotificationItem> get _notifications =>
+      _notificationService.notifications;
+
+  void _markAsRead(int id) async {
+    await _notificationService.markAsRead(id);
+    if (mounted) setState(() {});
   }
 
-  void _markAllAsRead() {
-    setState(() {
-      for (var n in _notifications) {
-        n['is_read'] = true;
-      }
-    });
+  void _markAllAsRead() async {
+    await _notificationService.markAllAsRead();
+    if (mounted) setState(() {});
+  }
+
+  /// Get icon and color based on notification type
+  IconData _getIconForType(String? type) {
+    switch (type?.toUpperCase()) {
+      case 'MEETING_REQUEST':
+      case 'MEETING_ACCEPTED':
+      case 'MEETING_DECLINED':
+      case 'MEETING_CANCELLED':
+      case 'MEETING_MODIFIED':
+        return Icons.handshake;
+      case 'TICKET_RESPONSE':
+        return Icons.support_agent;
+      case 'ROLE_CHANGED':
+        return Icons.verified_user;
+      case 'ACCOUNT_VERIFIED':
+        return Icons.verified;
+      case 'EVENT_ANNOUNCEMENT':
+        return Icons.campaign;
+      case 'AGENDA_CHANGE':
+        return Icons.calendar_today;
+      case 'ADMIN_BROADCAST':
+        return Icons.notifications_active;
+      default:
+        return Icons.notifications;
+    }
+  }
+
+  Color _getColorForType(String? type) {
+    switch (type?.toUpperCase()) {
+      case 'MEETING_REQUEST':
+        return const Color(0xFF2196F3);
+      case 'MEETING_ACCEPTED':
+        return const Color(0xFF4CAF50);
+      case 'MEETING_DECLINED':
+      case 'MEETING_CANCELLED':
+        return const Color(0xFFF44336);
+      case 'MEETING_MODIFIED':
+        return const Color(0xFFFF9800);
+      case 'TICKET_RESPONSE':
+        return const Color(0xFF9C27B0);
+      case 'ROLE_CHANGED':
+        return const Color(0xFF00BCD4);
+      case 'ACCOUNT_VERIFIED':
+        return const Color(0xFF4CAF50);
+      case 'EVENT_ANNOUNCEMENT':
+        return const Color(0xFF3C4494);
+      case 'AGENDA_CHANGE':
+        return const Color(0xFF607D8B);
+      case 'ADMIN_BROADCAST':
+        return const Color(0xFFFF5722);
+      default:
+        return const Color(0xFF3C4494);
+    }
+  }
+
+  String _formatTime(DateTime dateTime) {
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+
+    if (difference.inMinutes < 1) {
+      return 'Just now';
+    } else if (difference.inMinutes < 60) {
+      return '${difference.inMinutes} min ago';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours} hour${difference.inHours > 1 ? 's' : ''} ago';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays} day${difference.inDays > 1 ? 's' : ''} ago';
+    } else {
+      return DateFormat('MMM d').format(dateTime);
+    }
   }
 
   @override
@@ -175,9 +193,11 @@ class _NotificationDrawerState extends State<NotificationDrawer>
                         children: [
                           _buildNotificationList(_notifications),
                           _buildNotificationList(
-                            _notifications.where((n) => !n['is_read']).toList(),
+                            _notifications.where((n) => !n.isRead).toList(),
                           ),
-                          _buildNotificationList([]),
+                          _buildNotificationList(
+                            [],
+                          ), // Mentions - future feature
                         ],
                       ),
               ),
@@ -282,6 +302,28 @@ class _NotificationDrawerState extends State<NotificationDrawer>
                   ],
                 ),
               ),
+              // Refresh button
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: _loadNotifications,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.refresh,
+                      color: Colors.grey[700],
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
               // Close button
               Material(
                 color: Colors.transparent,
@@ -407,7 +449,7 @@ class _NotificationDrawerState extends State<NotificationDrawer>
     );
   }
 
-  Widget _buildNotificationList(List<dynamic> items) {
+  Widget _buildNotificationList(List<NotificationItem> items) {
     if (items.isEmpty) {
       return Center(
         child: Column(
@@ -450,11 +492,14 @@ class _NotificationDrawerState extends State<NotificationDrawer>
       padding: const EdgeInsets.symmetric(horizontal: 16),
       itemBuilder: (context, index) {
         final item = items[index];
-        final isUnread = !item['is_read'];
+        final isUnread = !item.isRead;
+        final icon = _getIconForType(item.relatedEntityType);
+        final color = _getColorForType(item.relatedEntityType);
 
         return GestureDetector(
           onTap: () {
-            _markAsRead(item['id']);
+            _markAsRead(item.id);
+            // TODO: Navigate to related entity if available
           },
           child: Container(
             margin: const EdgeInsets.only(bottom: 12),
@@ -483,14 +528,10 @@ class _NotificationDrawerState extends State<NotificationDrawer>
                     width: 46,
                     height: 46,
                     decoration: BoxDecoration(
-                      color: (item['color'] as Color).withValues(alpha: 0.15),
+                      color: color.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Icon(
-                      item['icon'] as IconData,
-                      color: item['color'] as Color,
-                      size: 22,
-                    ),
+                    child: Icon(icon, color: color, size: 22),
                   ),
                   const SizedBox(width: 14),
 
@@ -503,7 +544,7 @@ class _NotificationDrawerState extends State<NotificationDrawer>
                           children: [
                             Expanded(
                               child: Text(
-                                item['title'],
+                                item.title,
                                 style: GoogleFonts.inter(
                                   fontWeight: isUnread
                                       ? FontWeight.w600
@@ -526,7 +567,7 @@ class _NotificationDrawerState extends State<NotificationDrawer>
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          item['subtitle'] ?? '',
+                          item.body,
                           style: GoogleFonts.inter(
                             fontWeight: FontWeight.w400,
                             fontSize: 13,
@@ -535,80 +576,9 @@ class _NotificationDrawerState extends State<NotificationDrawer>
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
-
-                        // File attachment if present
-                        if (item['type'] == 'file' &&
-                            item['file_name'] != null) ...[
-                          const SizedBox(height: 12),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 10,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.grey.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: Colors.grey.withValues(alpha: 0.15),
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 36,
-                                  height: 36,
-                                  decoration: BoxDecoration(
-                                    color: const Color(
-                                      0xFFE53935,
-                                    ).withValues(alpha: 0.15),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: const Icon(
-                                    Icons.picture_as_pdf,
-                                    color: Color(0xFFE53935),
-                                    size: 20,
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        item['file_name'],
-                                        style: GoogleFonts.inter(
-                                          fontWeight: FontWeight.w500,
-                                          fontSize: 12,
-                                          color: const Color(0xFF1E1E1E),
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      Text(
-                                        item['file_size'],
-                                        style: GoogleFonts.inter(
-                                          fontWeight: FontWeight.w400,
-                                          fontSize: 11,
-                                          color: Colors.grey[500],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                Icon(
-                                  Icons.download_rounded,
-                                  color: Colors.grey[600],
-                                  size: 20,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-
                         const SizedBox(height: 8),
                         Text(
-                          item['time'],
+                          _formatTime(item.createdAt),
                           style: GoogleFonts.inter(
                             fontWeight: FontWeight.w400,
                             fontSize: 11,
@@ -641,7 +611,8 @@ class _NotificationDrawerState extends State<NotificationDrawer>
         borderRadius: BorderRadius.circular(14),
         child: InkWell(
           onTap: () {
-            // TODO: Navigate to all notifications
+            Navigator.pop(context);
+            // Could navigate to a full notifications page in the future
           },
           borderRadius: BorderRadius.circular(14),
           child: Container(
@@ -650,15 +621,13 @@ class _NotificationDrawerState extends State<NotificationDrawer>
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  'View all notifications',
+                  'Close',
                   style: GoogleFonts.inter(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: Colors.white,
                   ),
                 ),
-                const SizedBox(width: 8),
-                const Icon(Icons.arrow_forward, color: Colors.white, size: 18),
               ],
             ),
           ),
