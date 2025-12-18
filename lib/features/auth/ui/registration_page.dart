@@ -604,7 +604,7 @@ class _HoverContainerState extends State<_HoverContainer> {
         decoration: BoxDecoration(
           // Darken slightly on hover or use specific color if requested
           color: _isHovering
-              ? AppColors.buttonBackground.withOpacity(0.9)
+              ? AppColors.buttonBackground.withValues(alpha: 0.9)
               : AppColors.buttonBackground,
           borderRadius: BorderRadius.circular(45),
         ),

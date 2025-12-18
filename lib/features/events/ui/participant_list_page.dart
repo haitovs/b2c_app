@@ -229,10 +229,12 @@ class _ParticipantListPageState extends ConsumerState<ParticipantListPage> {
       endDrawer: const NotificationDrawer(),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
-          // TODO: Navigate to add participant page
+          // Participants are imported from Tourism backend
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Add participant functionality coming soon'),
+              content: Text(
+                'Participants are managed in the Tourism admin panel',
+              ),
             ),
           );
         },

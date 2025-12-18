@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart' as legacy_provider;
 
 import '../../../../core/widgets/custom_app_bar.dart';
+import '../../auth/services/auth_service.dart';
 import '../../notifications/ui/notification_drawer.dart';
 import 'widgets/profile_dropdown.dart';
 
@@ -145,6 +147,33 @@ class _EventRegistrationPageState extends ConsumerState<EventRegistrationPage> {
   bool _showConfirmation = false;
 
   @override
+  void initState() {
+    super.initState();
+    _prefillUserData();
+  }
+
+  /// Pre-fill form with current user's profile data
+  void _prefillUserData() {
+    // Get current user from AuthService
+    final authService = legacy_provider.Provider.of<AuthService>(
+      context,
+      listen: false,
+    );
+    final user = authService.currentUser;
+
+    if (user != null) {
+      _nameController.text = user['first_name'] ?? '';
+      _surnameController.text = user['last_name'] ?? '';
+      _emailController.text = user['email'] ?? '';
+      _mobileController.text = user['phone'] ?? '';
+      _countryController.text = user['country'] ?? '';
+      _cityController.text = user['city'] ?? '';
+      _companyNameController.text = user['company_name'] ?? '';
+      _companyWebsiteController.text = user['website'] ?? '';
+    }
+  }
+
+  @override
   void dispose() {
     _nameController.dispose();
     _surnameController.dispose();
@@ -166,9 +195,33 @@ class _EventRegistrationPageState extends ConsumerState<EventRegistrationPage> {
   }
 
   void _onNextPressed() {
-    // TODO: Validate and save Phase 1 data, navigate to Phase 2
+    // Calculate total delegates from package quantities
+    int totalDelegates = 0;
+    for (final entry in _packageQuantities.entries) {
+      totalDelegates += entry.value;
+    }
+
+    if (totalDelegates == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select at least one delegate package'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    // Navigate to Phase 2 - Delegate Details
+    setState(() {
+      _totalDelegates = totalDelegates;
+      _currentDelegateIndex = 0;
+      _showDelegateDetails = true;
+    });
+
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Saving contact information...')),
+      SnackBar(
+        content: Text('Please fill details for $totalDelegates delegate(s)'),
+      ),
     );
   }
 
@@ -386,7 +439,7 @@ class _EventRegistrationPageState extends ConsumerState<EventRegistrationPage> {
                   : 25,
               color: isActive
                   ? const Color(0xFF3C4494)
-                  : Colors.white.withOpacity(0.7),
+                  : Colors.white.withValues(alpha: 0.7),
             ),
           ),
         );
@@ -1396,7 +1449,7 @@ class _EventRegistrationPageState extends ConsumerState<EventRegistrationPage> {
                   style: GoogleFonts.inter(
                     fontWeight: FontWeight.w600,
                     fontSize: 20,
-                    color: Colors.black.withOpacity(0.5),
+                    color: Colors.black.withValues(alpha: 0.5),
                     decoration: TextDecoration.underline,
                   ),
                 ),
@@ -1564,7 +1617,7 @@ class _EventRegistrationPageState extends ConsumerState<EventRegistrationPage> {
               hintStyle: GoogleFonts.inter(
                 fontWeight: FontWeight.w400,
                 fontSize: 16,
-                color: Colors.black.withOpacity(0.5),
+                color: Colors.black.withValues(alpha: 0.5),
               ),
             ),
           ),
@@ -1640,7 +1693,7 @@ class _EventRegistrationPageState extends ConsumerState<EventRegistrationPage> {
                     hintStyle: GoogleFonts.inter(
                       fontWeight: FontWeight.w400,
                       fontSize: 16,
-                      color: Colors.black.withOpacity(0.5),
+                      color: Colors.black.withValues(alpha: 0.5),
                     ),
                   ),
                 ),

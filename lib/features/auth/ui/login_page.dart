@@ -393,7 +393,7 @@ class _HoverContainerState extends State<_HoverContainer> {
         height: 50, // 50 for login
         decoration: BoxDecoration(
           color: _isHovering
-              ? AppColors.buttonBackground.withOpacity(0.9)
+              ? AppColors.buttonBackground.withValues(alpha: 0.9)
               : AppColors.buttonBackground,
           borderRadius: BorderRadius.circular(45),
         ),

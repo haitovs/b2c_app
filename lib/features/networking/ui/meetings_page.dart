@@ -115,18 +115,28 @@ class _MeetingsPageState extends ConsumerState<MeetingsPage> {
       );
       final token = await authService.getToken();
 
-      // Fetch meetings from B2C backend
+      // Fetch meetings from B2C backend - filtered by event_id
+      final eventId = widget.eventId;
+      debugPrint('Fetching meetings for event_id=$eventId');
       final meetingsResponse = await http.get(
-        Uri.parse('${AppConfig.b2cApiBaseUrl}/api/v1/meetings'),
+        Uri.parse(
+          '${AppConfig.b2cApiBaseUrl}/api/v1/meetings?event_id=$eventId',
+        ),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
         },
       );
 
+      debugPrint('Meetings response status: ${meetingsResponse.statusCode}');
+      debugPrint('Meetings response body: ${meetingsResponse.body}');
+
       if (meetingsResponse.statusCode == 200) {
         final List data = jsonDecode(meetingsResponse.body);
+        debugPrint('Parsed ${data.length} meetings from response');
         _meetings = data.cast<Map<String, dynamic>>();
+      } else {
+        debugPrint('Failed to fetch meetings: ${meetingsResponse.statusCode}');
       }
 
       // Use EventContextService for site_id (already initialized at app startup)
@@ -263,7 +273,7 @@ class _MeetingsPageState extends ConsumerState<MeetingsPage> {
       }).toList();
     }
 
-    // Filter by selected day
+    // Filter by selected day from agenda
     if (_agendaDays.isNotEmpty && _selectedDayIndex < _agendaDays.length) {
       final selectedDay = _agendaDays[_selectedDayIndex];
       final dayDate = selectedDay['date'] as String?;
@@ -310,14 +320,16 @@ class _MeetingsPageState extends ConsumerState<MeetingsPage> {
   }
 
   Future<void> _deleteMeeting(String meetingId) async {
+    // Capture context-dependent values before async gap
+    final authService = legacy_provider.Provider.of<AuthService>(
+      context,
+      listen: false,
+    );
+
     final confirmed = await showDeleteConfirmationDialog(context);
     if (!confirmed) return;
 
     try {
-      final authService = legacy_provider.Provider.of<AuthService>(
-        context,
-        listen: false,
-      );
       final token = await authService.getToken();
 
       // Call API to update status to CANCELLED
@@ -580,12 +592,16 @@ class _MeetingsPageState extends ConsumerState<MeetingsPage> {
       margin: const EdgeInsets.symmetric(horizontal: 20),
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.3),
+        color: Colors.white.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
         children: [
-          Icon(Icons.search, color: Colors.white.withOpacity(0.8), size: 28),
+          Icon(
+            Icons.search,
+            color: Colors.white.withValues(alpha: 0.8),
+            size: 28,
+          ),
           const SizedBox(width: 16),
           Expanded(
             child: TextField(
@@ -594,7 +610,7 @@ class _MeetingsPageState extends ConsumerState<MeetingsPage> {
               decoration: InputDecoration(
                 hintText: 'Search by event name',
                 hintStyle: GoogleFonts.roboto(
-                  color: Colors.white.withOpacity(0.6),
+                  color: Colors.white.withValues(alpha: 0.6),
                   fontSize: 16,
                 ),
                 border: InputBorder.none,
@@ -635,7 +651,14 @@ class _MeetingsPageState extends ConsumerState<MeetingsPage> {
 
   Widget _buildNewMeetingFAB() {
     return FloatingActionButton.extended(
-      onPressed: () => context.push('/events/${widget.eventId}/meetings/new'),
+      onPressed: () async {
+        final type = _isB2B ? 'b2b' : 'b2g';
+        await context.push('/events/${widget.eventId}/meetings/new?type=$type');
+        // Always refresh data when returning from create meeting flow
+        if (mounted) {
+          _fetchData();
+        }
+      },
       backgroundColor: const Color(0xFF151A4A),
       icon: const Icon(Icons.add, color: Colors.white),
       label: Text(
@@ -724,7 +747,7 @@ class _MeetingsPageState extends ConsumerState<MeetingsPage> {
                 boxShadow: isSelected
                     ? [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.25),
+                          color: Colors.black.withValues(alpha: 0.25),
                           blurRadius: 4,
                           offset: const Offset(0, 4),
                         ),
@@ -800,20 +823,27 @@ class _MeetingsPageState extends ConsumerState<MeetingsPage> {
             Icon(
               Icons.event_busy,
               size: 64,
-              color: Colors.white.withOpacity(0.5),
+              color: Colors.white.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 16),
             Text(
               'No meetings found',
               style: GoogleFonts.roboto(
                 fontSize: 18,
-                color: Colors.white.withOpacity(0.7),
+                color: Colors.white.withValues(alpha: 0.7),
               ),
             ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
-              onPressed: () {
-                context.push('/events/${widget.eventId}/meetings/new');
+              onPressed: () async {
+                final type = _isB2B ? 'b2b' : 'b2g';
+                await context.push(
+                  '/events/${widget.eventId}/meetings/new?type=$type',
+                );
+                // Always refresh when returning
+                if (mounted) {
+                  _fetchData();
+                }
               },
               icon: const Icon(Icons.add),
               label: const Text('Create New Meeting'),

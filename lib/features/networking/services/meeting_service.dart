@@ -6,10 +6,10 @@ import '../../../core/config/app_config.dart';
 import '../../auth/services/auth_service.dart';
 
 /// Meeting types matching the B2C backend enum
-enum MeetingType { B2B, B2G, SPEAKER }
+enum MeetingType { b2b, b2g }
 
 /// Meeting status matching the B2C backend enum
-enum MeetingStatus { PENDING, CONFIRMED, DECLINED, CANCELLED }
+enum MeetingStatus { pending, confirmed, declined, cancelled }
 
 /// Service for managing meetings via the B2C backend
 class MeetingService {
@@ -57,6 +57,7 @@ class MeetingService {
 
   /// Create a new meeting request
   Future<Map<String, dynamic>> createMeeting({
+    required int eventId,
     required MeetingType type,
     required String subject,
     required DateTime startTime,
@@ -70,7 +71,8 @@ class MeetingService {
     final token = await authService.getToken();
 
     final body = {
-      'type': type.name,
+      'event_id': eventId,
+      'type': type.name.toUpperCase(),
       'subject': subject,
       'start_time': startTime.toIso8601String(),
       'end_time': endTime.toIso8601String(),
@@ -139,7 +141,9 @@ class MeetingService {
     final token = await authService.getToken();
 
     final response = await http.patch(
-      Uri.parse('$baseUrl/$meetingId/status?status_in=${status.name}'),
+      Uri.parse(
+        '$baseUrl/$meetingId/status?status_in=${status.name.toUpperCase()}',
+      ),
       headers: {
         'Authorization': 'Bearer $token',
         'Content-Type': 'application/json',
@@ -214,9 +218,8 @@ class MeetingService {
       }
       return false;
     } catch (e) {
-      // For now, return true to allow testing
-      // TODO: Implement proper registration check
-      return true;
+      // API endpoint not available or error - assume not registered
+      return false;
     }
   }
 }

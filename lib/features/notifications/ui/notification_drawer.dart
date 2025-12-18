@@ -1,5 +1,6 @@
 import 'package:b2c_app/l10n/generated/app_localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart' as legacy_provider;
@@ -68,6 +69,35 @@ class _NotificationDrawerState extends State<NotificationDrawer>
   void _markAllAsRead() async {
     await _notificationService.markAllAsRead();
     if (mounted) setState(() {});
+  }
+
+  void _navigateToEntity(String? entityType, String? entityId) {
+    if (entityType == null) return;
+
+    // Close the drawer first
+    Navigator.of(context).pop();
+
+    // Get current event ID - default to 1 if not set
+    final eventId = '1'; // Uses default event for now
+
+    // Navigate based on entity type
+    switch (entityType.toUpperCase()) {
+      case 'MEETING':
+      case 'MEETING_REQUEST':
+      case 'MEETING_ACCEPTED':
+      case 'MEETING_DECLINED':
+      case 'MEETING_CANCELLED':
+      case 'MEETING_MODIFIED':
+        GoRouter.of(context).push('/events/$eventId/meetings');
+        break;
+      case 'TICKET':
+      case 'TICKET_RESPONSE':
+        GoRouter.of(context).push('/events/$eventId/contact-us');
+        break;
+      default:
+        // Unknown type - just close drawer
+        break;
+    }
   }
 
   /// Get icon and color based on notification type
@@ -499,7 +529,8 @@ class _NotificationDrawerState extends State<NotificationDrawer>
         return GestureDetector(
           onTap: () {
             _markAsRead(item.id);
-            // TODO: Navigate to related entity if available
+            // Navigate to related entity based on type
+            _navigateToEntity(item.relatedEntityType, item.relatedEntityId);
           },
           child: Container(
             margin: const EdgeInsets.only(bottom: 12),

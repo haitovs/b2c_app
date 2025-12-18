@@ -222,12 +222,11 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
   }
 
   Future<void> _pickImage() async {
-    // TODO: Install image_picker package and implement
-    // For now, show a snackbar message
+    // Image attachments not supported for meetings
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Image upload will be available soon'),
+          content: Text('Image attachments are not available for meetings'),
           backgroundColor: Colors.blue,
         ),
       );
@@ -320,7 +319,8 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
 
       // Make API call to create meeting
       await meetingService.createMeeting(
-        type: MeetingType.B2B,
+        eventId: int.parse(widget.eventId),
+        type: MeetingType.b2b,
         subject: _subjectController.text.trim(),
         startTime: startTime,
         endTime: endTime,
@@ -336,7 +336,7 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
             backgroundColor: Colors.green,
           ),
         );
-        context.pop();
+        context.pop(true); // Return true to signal refresh needed
       }
     } catch (e) {
       if (mounted) {
@@ -419,31 +419,22 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
 
   Widget _buildHeader(bool isMobile, double horizontalPadding) {
     return Padding(
-      padding: EdgeInsets.only(
-        left: horizontalPadding,
-        right: horizontalPadding,
-        top: isMobile ? 12 : 20,
-      ),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
       child: Row(
         children: [
           // Back button
           IconButton(
             icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
             onPressed: () => context.pop(),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
           ),
-          SizedBox(width: isMobile ? 4 : 8),
-          // Title - use Flexible to prevent overflow
-          Flexible(
-            child: Text(
-              'Meeting Request',
-              style: GoogleFonts.montserrat(
-                fontSize: isMobile ? 20 : 28,
-                fontWeight: FontWeight.w600,
-                color: const Color(0xFFF1F1F6),
-              ),
-              overflow: TextOverflow.ellipsis,
+          const SizedBox(width: 8),
+          // Title
+          Text(
+            'Meeting Request',
+            style: GoogleFonts.montserrat(
+              fontSize: 28,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
             ),
           ),
           const Spacer(),
@@ -453,8 +444,6 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
               _scaffoldKey.currentState?.openEndDrawer();
             },
             onProfileTap: _toggleProfile,
-            isMobile: isMobile,
-            showLogo: false,
           ),
         ],
       ),
@@ -708,7 +697,7 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
                 hintText: hintText,
                 hintStyle: GoogleFonts.roboto(
                   fontSize: 18,
-                  color: Colors.black.withOpacity(0.7),
+                  color: Colors.black.withValues(alpha: 0.7),
                 ),
                 border: InputBorder.none,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 15),
@@ -763,7 +752,7 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
               hintText: 'Enter subject...',
               hintStyle: GoogleFonts.roboto(
                 fontSize: 18,
-                color: Colors.black.withOpacity(0.7),
+                color: Colors.black.withValues(alpha: 0.7),
               ),
               border: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(horizontal: 15),
@@ -800,7 +789,7 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
               padding: const EdgeInsets.symmetric(horizontal: 15),
               icon: Icon(
                 Icons.keyboard_arrow_down,
-                color: Colors.black.withOpacity(0.4),
+                color: Colors.black.withValues(alpha: 0.4),
               ),
               items: _languages.map((lang) {
                 return DropdownMenuItem(
@@ -809,7 +798,7 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
                     lang,
                     style: GoogleFonts.roboto(
                       fontSize: 18,
-                      color: Colors.black.withOpacity(0.7),
+                      color: Colors.black.withValues(alpha: 0.7),
                     ),
                   ),
                 );
@@ -859,7 +848,7 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
                     padding: const EdgeInsets.symmetric(horizontal: 15),
                     icon: Icon(
                       Icons.keyboard_arrow_down,
-                      color: Colors.black.withOpacity(0.4),
+                      color: Colors.black.withValues(alpha: 0.4),
                     ),
                     items: _agendaDays.map((day) {
                       // Format day label
@@ -893,7 +882,7 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
                           label,
                           style: GoogleFonts.roboto(
                             fontSize: 18,
-                            color: Colors.black.withOpacity(0.7),
+                            color: Colors.black.withValues(alpha: 0.7),
                           ),
                         ),
                       );
@@ -1068,7 +1057,7 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
               hintText: 'Enter comments...',
               hintStyle: GoogleFonts.roboto(
                 fontSize: 18,
-                color: Colors.black.withOpacity(0.7),
+                color: Colors.black.withValues(alpha: 0.7),
               ),
               border: InputBorder.none,
               contentPadding: const EdgeInsets.all(15),

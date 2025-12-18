@@ -506,7 +506,13 @@ class _SpeakerDetailPageState extends ConsumerState<SpeakerDetailPage> {
                     // Meeting request button
                     OutlinedButton.icon(
                       onPressed: () {
-                        // TODO: Implement meeting request
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Use B2B Meetings to request meetings with participants',
+                            ),
+                          ),
+                        );
                       },
                       icon: const Icon(Icons.arrow_forward, size: 16),
                       label: const Text('Meeting request'),

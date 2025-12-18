@@ -17,8 +17,13 @@ import '../../notifications/ui/notification_drawer.dart';
 /// New Meeting Page - Grid of participants/entities to select for meeting
 class NewMeetingPage extends ConsumerStatefulWidget {
   final String eventId;
+  final bool initialIsB2G;
 
-  const NewMeetingPage({super.key, required this.eventId});
+  const NewMeetingPage({
+    super.key,
+    required this.eventId,
+    this.initialIsB2G = false, // Default to B2B
+  });
 
   @override
   ConsumerState<NewMeetingPage> createState() => _NewMeetingPageState();
@@ -28,8 +33,8 @@ class _NewMeetingPageState extends ConsumerState<NewMeetingPage> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   bool _isProfileOpen = false;
 
-  // Meeting type toggle
-  bool _isB2B = true; // true = B2B, false = B2G
+  // Meeting type toggle - initialized from widget.initialIsB2G
+  late bool _isB2B; // true = B2B, false = B2G
 
   // Filter state (will be used when filter chips are added)
   // ignore: unused_field
@@ -51,6 +56,11 @@ class _NewMeetingPageState extends ConsumerState<NewMeetingPage> {
   @override
   void initState() {
     super.initState();
+    // Initialize from widget parameter (initialIsB2G = true means _isB2B = false)
+    _isB2B = !widget.initialIsB2G;
+    debugPrint(
+      'NewMeetingPage initState: initialIsB2G=${widget.initialIsB2G}, _isB2B=$_isB2B',
+    );
     _initializeAndFetch();
   }
 
@@ -127,6 +137,10 @@ class _NewMeetingPageState extends ConsumerState<NewMeetingPage> {
       }
 
       // Note: B2G gov entities are now fetched lazily when user switches to B2G tab
+      // BUT if page opened with B2G mode, fetch them immediately
+      if (!_isB2B) {
+        await _fetchGovEntities();
+      }
 
       setState(() {
         _applyFilters();
@@ -375,12 +389,16 @@ class _NewMeetingPageState extends ConsumerState<NewMeetingPage> {
       margin: const EdgeInsets.symmetric(horizontal: 20),
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.3),
+        color: Colors.white.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
         children: [
-          Icon(Icons.search, color: Colors.white.withOpacity(0.8), size: 28),
+          Icon(
+            Icons.search,
+            color: Colors.white.withValues(alpha: 0.8),
+            size: 28,
+          ),
           const SizedBox(width: 16),
           Expanded(
             child: TextField(
@@ -389,7 +407,7 @@ class _NewMeetingPageState extends ConsumerState<NewMeetingPage> {
               decoration: InputDecoration(
                 hintText: _isB2B ? 'Search users...' : 'Search entities...',
                 hintStyle: GoogleFonts.roboto(
-                  color: Colors.white.withOpacity(0.6),
+                  color: Colors.white.withValues(alpha: 0.6),
                   fontSize: 16,
                 ),
                 border: InputBorder.none,
@@ -485,19 +503,24 @@ class _NewMeetingPageState extends ConsumerState<NewMeetingPage> {
     final itemId = item['id'];
 
     return GestureDetector(
-      onTap: () {
+      onTap: () async {
+        dynamic result;
         if (_isB2B) {
           // Navigate to B2B meeting request page
-          context.push(
+          result = await context.push(
             '/events/${widget.eventId}/meetings/new/$itemId',
             extra: item,
           );
         } else {
           // Navigate to B2G meeting request page
-          context.push(
+          result = await context.push(
             '/events/${widget.eventId}/meetings/b2g/new/$itemId',
             extra: item,
           );
+        }
+        // If meeting was created, pop back to meetings page with result
+        if (result == true && mounted) {
+          context.pop(true);
         }
       },
       child: Container(
@@ -506,7 +529,7 @@ class _NewMeetingPageState extends ConsumerState<NewMeetingPage> {
           borderRadius: BorderRadius.circular(10),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: Colors.black.withValues(alpha: 0.1),
               blurRadius: 8,
               offset: const Offset(0, 4),
             ),

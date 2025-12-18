@@ -126,8 +126,13 @@ GoRouter createRouter(AuthService authService) {
               // New meeting - participant/entity selection grid
               GoRoute(
                 path: 'new',
-                builder: (context, state) =>
-                    NewMeetingPage(eventId: state.pathParameters['id']!),
+                builder: (context, state) {
+                  final isB2G = state.uri.queryParameters['type'] == 'b2g';
+                  return NewMeetingPage(
+                    eventId: state.pathParameters['id']!,
+                    initialIsB2G: isB2G,
+                  );
+                },
               ),
               // Create B2B meeting with selected participant
               GoRoute(

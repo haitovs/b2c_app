@@ -426,7 +426,7 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
                                       color: const Color(0xFF262B60),
                                       borderRadius: BorderRadius.circular(8),
                                       border: Border.all(
-                                        color: tierColor.withOpacity(0.5),
+                                        color: tierColor.withValues(alpha: 0.5),
                                       ),
                                     ),
                                     child: Column(
@@ -555,15 +555,21 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
                                       child: Container(
                                         decoration: BoxDecoration(
                                           color: isExit
-                                              ? Colors.orange.withOpacity(0.15)
+                                              ? Colors.orange.withValues(
+                                                  alpha: 0.15,
+                                                )
                                               : Colors.transparent,
                                           borderRadius: BorderRadius.circular(
                                             12,
                                           ),
                                           border: Border.all(
                                             color: isExit
-                                                ? Colors.orange.withOpacity(0.3)
-                                                : Colors.white.withOpacity(0.1),
+                                                ? Colors.orange.withValues(
+                                                    alpha: 0.3,
+                                                  )
+                                                : Colors.white.withValues(
+                                                    alpha: 0.1,
+                                                  ),
                                           ),
                                         ),
                                         child: Column(

@@ -239,7 +239,8 @@ class _MeetingB2GRequestPageState extends ConsumerState<MeetingB2GRequestPage> {
 
       // Make API call to create B2G meeting
       await meetingService.createMeeting(
-        type: MeetingType.B2G,
+        eventId: int.parse(widget.eventId),
+        type: MeetingType.b2g,
         subject: _subjectController.text.trim(),
         startTime: startTime,
         endTime: endTime,
@@ -255,7 +256,7 @@ class _MeetingB2GRequestPageState extends ConsumerState<MeetingB2GRequestPage> {
             backgroundColor: Colors.green,
           ),
         );
-        context.pop();
+        context.pop(true); // Return true to signal refresh needed
       }
     } catch (e) {
       if (mounted) {
@@ -335,38 +336,31 @@ class _MeetingB2GRequestPageState extends ConsumerState<MeetingB2GRequestPage> {
 
   Widget _buildHeader(bool isMobile, double horizontalPadding) {
     return Padding(
-      padding: EdgeInsets.only(
-        left: horizontalPadding,
-        right: horizontalPadding,
-        top: isMobile ? 12 : 20,
-      ),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
       child: Row(
         children: [
+          // Back button
           IconButton(
             icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
             onPressed: () => context.pop(),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
           ),
-          SizedBox(width: isMobile ? 4 : 8),
-          Flexible(
-            child: Text(
-              'Meeting',
-              style: GoogleFonts.montserrat(
-                fontSize: isMobile ? 24 : 40,
-                fontWeight: FontWeight.w600,
-                color: const Color(0xFFF1F1F6),
-              ),
-              overflow: TextOverflow.ellipsis,
+          const SizedBox(width: 8),
+          // Title
+          Text(
+            'Meeting Request',
+            style: GoogleFonts.montserrat(
+              fontSize: 28,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
             ),
           ),
           const Spacer(),
+          // Notification & Profile icons
           CustomAppBar(
             onNotificationTap: () {
               _scaffoldKey.currentState?.openEndDrawer();
             },
             onProfileTap: _toggleProfile,
-            isMobile: isMobile,
           ),
         ],
       ),
@@ -601,7 +595,7 @@ class _MeetingB2GRequestPageState extends ConsumerState<MeetingB2GRequestPage> {
                 hintText: hintText,
                 hintStyle: GoogleFonts.roboto(
                   fontSize: 18,
-                  color: Colors.black.withOpacity(0.7),
+                  color: Colors.black.withValues(alpha: 0.7),
                 ),
                 border: InputBorder.none,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 15),
@@ -655,7 +649,7 @@ class _MeetingB2GRequestPageState extends ConsumerState<MeetingB2GRequestPage> {
               hintText: 'Enter subject...',
               hintStyle: GoogleFonts.roboto(
                 fontSize: 18,
-                color: Colors.black.withOpacity(0.7),
+                color: Colors.black.withValues(alpha: 0.7),
               ),
               border: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(horizontal: 15),
@@ -692,7 +686,7 @@ class _MeetingB2GRequestPageState extends ConsumerState<MeetingB2GRequestPage> {
               padding: const EdgeInsets.symmetric(horizontal: 15),
               icon: Icon(
                 Icons.keyboard_arrow_down,
-                color: Colors.black.withOpacity(0.4),
+                color: Colors.black.withValues(alpha: 0.4),
               ),
               items: _languages.map((lang) {
                 return DropdownMenuItem(
@@ -701,7 +695,7 @@ class _MeetingB2GRequestPageState extends ConsumerState<MeetingB2GRequestPage> {
                     lang,
                     style: GoogleFonts.roboto(
                       fontSize: 18,
-                      color: Colors.black.withOpacity(0.7),
+                      color: Colors.black.withValues(alpha: 0.7),
                     ),
                   ),
                 );
@@ -751,7 +745,7 @@ class _MeetingB2GRequestPageState extends ConsumerState<MeetingB2GRequestPage> {
                     padding: const EdgeInsets.symmetric(horizontal: 15),
                     icon: Icon(
                       Icons.keyboard_arrow_down,
-                      color: Colors.black.withOpacity(0.4),
+                      color: Colors.black.withValues(alpha: 0.4),
                     ),
                     items: _agendaDays.map((day) {
                       String label;
@@ -784,7 +778,7 @@ class _MeetingB2GRequestPageState extends ConsumerState<MeetingB2GRequestPage> {
                           label,
                           style: GoogleFonts.roboto(
                             fontSize: 18,
-                            color: Colors.black.withOpacity(0.7),
+                            color: Colors.black.withValues(alpha: 0.7),
                           ),
                         ),
                       );
@@ -828,7 +822,7 @@ class _MeetingB2GRequestPageState extends ConsumerState<MeetingB2GRequestPage> {
               hintText: 'Enter comments...',
               hintStyle: GoogleFonts.roboto(
                 fontSize: 18,
-                color: Colors.black.withOpacity(0.7),
+                color: Colors.black.withValues(alpha: 0.7),
               ),
               border: InputBorder.none,
               contentPadding: const EdgeInsets.all(15),

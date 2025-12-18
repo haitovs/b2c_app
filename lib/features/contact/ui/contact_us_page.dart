@@ -425,7 +425,7 @@ class _ContactUsPageState extends ConsumerState<ContactUsPage> {
             hintText: 'Enter your name',
             hintStyle: GoogleFonts.inter(
               fontSize: 14,
-              color: Colors.black.withOpacity(0.5),
+              color: Colors.black.withValues(alpha: 0.5),
             ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(5),
@@ -474,7 +474,7 @@ class _ContactUsPageState extends ConsumerState<ContactUsPage> {
             hintText: 'Enter your surname',
             hintStyle: GoogleFonts.inter(
               fontSize: 14,
-              color: Colors.black.withOpacity(0.5),
+              color: Colors.black.withValues(alpha: 0.5),
             ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(5),
@@ -524,7 +524,7 @@ class _ContactUsPageState extends ConsumerState<ContactUsPage> {
             hintText: 'Enter your email',
             hintStyle: GoogleFonts.inter(
               fontSize: 14,
-              color: Colors.black.withOpacity(0.5),
+              color: Colors.black.withValues(alpha: 0.5),
             ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(5),
@@ -577,7 +577,7 @@ class _ContactUsPageState extends ConsumerState<ContactUsPage> {
             hintText: 'Enter your message',
             hintStyle: GoogleFonts.inter(
               fontSize: 14,
-              color: Colors.black.withOpacity(0.5),
+              color: Colors.black.withValues(alpha: 0.5),
             ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(5),
@@ -646,7 +646,7 @@ class _ContactUsPageState extends ConsumerState<ContactUsPage> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF9CA4CC).withOpacity(0.5),
+        color: const Color(0xFF9CA4CC).withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
@@ -681,7 +681,7 @@ class _ContactUsPageState extends ConsumerState<ContactUsPage> {
                   style: GoogleFonts.inter(
                     fontSize: 14,
                     fontWeight: FontWeight.w400,
-                    color: Colors.black.withOpacity(0.5),
+                    color: Colors.black.withValues(alpha: 0.5),
                   ),
                 ),
               ],

@@ -283,8 +283,8 @@ class _HotlinePageState extends State<HotlinePage> {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
               color: _isConnected
-                  ? Colors.green.withOpacity(0.2)
-                  : Colors.red.withOpacity(0.2),
+                  ? Colors.green.withValues(alpha: 0.2)
+                  : Colors.red.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Row(
@@ -475,7 +475,7 @@ class _HotlinePageState extends State<HotlinePage> {
                     _formatTime(message.createdAt),
                     style: TextStyle(
                       fontSize: 11,
-                      color: Colors.white.withOpacity(0.6),
+                      color: Colors.white.withValues(alpha: 0.6),
                     ),
                   ),
                 ],
@@ -529,7 +529,7 @@ class _HotlinePageState extends State<HotlinePage> {
                       decoration: InputDecoration(
                         hintText: 'Message...',
                         hintStyle: TextStyle(
-                          color: Colors.white.withOpacity(0.4),
+                          color: Colors.white.withValues(alpha: 0.4),
                           fontFamily: 'Inter',
                           fontWeight: FontWeight.w600,
                           fontSize: 16,

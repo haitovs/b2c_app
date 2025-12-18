@@ -305,14 +305,14 @@ class _NewsPageState extends ConsumerState<NewsPage> {
         vertical: isMobile ? 10 : 14,
       ),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.3),
+        color: Colors.white.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
         children: [
           Icon(
             Icons.search,
-            color: Colors.white.withOpacity(0.8),
+            color: Colors.white.withValues(alpha: 0.8),
             size: isMobile ? 24 : 36,
           ),
           SizedBox(width: isMobile ? 12 : 20),
@@ -326,7 +326,7 @@ class _NewsPageState extends ConsumerState<NewsPage> {
               decoration: InputDecoration(
                 hintText: 'Search news...',
                 hintStyle: GoogleFonts.roboto(
-                  color: Colors.white.withOpacity(0.6),
+                  color: Colors.white.withValues(alpha: 0.6),
                   fontSize: isMobile ? 14 : 16,
                 ),
                 border: InputBorder.none,
@@ -458,7 +458,7 @@ class _NewsCardState extends State<_NewsCard> {
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(_isHovered ? 0.15 : 0.08),
+                color: Colors.black.withValues(alpha: _isHovered ? 0.15 : 0.08),
                 blurRadius: _isHovered ? 20 : 12,
                 offset: Offset(0, _isHovered ? 8 : 4),
               ),
@@ -501,7 +501,7 @@ class _NewsCardState extends State<_NewsCard> {
                               end: Alignment.bottomCenter,
                               colors: [
                                 Colors.transparent,
-                                Colors.black.withOpacity(0.3),
+                                Colors.black.withValues(alpha: 0.3),
                               ],
                             ),
                           ),

@@ -78,7 +78,7 @@ class AuthService extends ChangeNotifier {
         notifyListeners();
       }
     } catch (e) {
-      print("Error fetching user: $e");
+      // Failed to fetch user - token may be expired
     }
   }
 

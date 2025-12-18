@@ -5,12 +5,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
+import 'package:provider/provider.dart' as legacy_provider;
 
 import '../../../core/config/app_config.dart';
 import '../../../core/services/event_context_service.dart';
 import '../../../core/widgets/custom_app_bar.dart';
+import '../../auth/services/auth_service.dart';
 import '../../events/ui/widgets/profile_dropdown.dart';
 import '../../notifications/ui/notification_drawer.dart';
+import '../services/meeting_service.dart';
 
 /// Meeting Review Page - for viewing and approving/declining incoming meeting requests
 /// Used when viewing a meeting that was sent to the current user
@@ -106,8 +109,16 @@ class _MeetingReviewPageState extends ConsumerState<MeetingReviewPage> {
     setState(() => _isProcessing = true);
 
     try {
-      // TODO: Implement API call to approve meeting
-      await Future.delayed(const Duration(seconds: 1));
+      final authService = legacy_provider.Provider.of<AuthService>(
+        context,
+        listen: false,
+      );
+      final meetingService = MeetingService(authService);
+
+      await meetingService.updateMeetingStatus(
+        meetingId: widget.meetingId,
+        status: MeetingStatus.confirmed,
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -135,6 +146,12 @@ class _MeetingReviewPageState extends ConsumerState<MeetingReviewPage> {
   }
 
   Future<void> _declineMeeting() async {
+    // Capture context-dependent values before any async gap
+    final authService = legacy_provider.Provider.of<AuthService>(
+      context,
+      listen: false,
+    );
+
     // Show confirmation dialog first
     final confirm = await showDialog<bool>(
       context: context,
@@ -162,8 +179,12 @@ class _MeetingReviewPageState extends ConsumerState<MeetingReviewPage> {
     setState(() => _isProcessing = true);
 
     try {
-      // TODO: Implement API call to decline meeting
-      await Future.delayed(const Duration(seconds: 1));
+      final meetingService = MeetingService(authService);
+
+      await meetingService.updateMeetingStatus(
+        meetingId: widget.meetingId,
+        status: MeetingStatus.declined,
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -302,7 +323,7 @@ class _MeetingReviewPageState extends ConsumerState<MeetingReviewPage> {
         borderRadius: BorderRadius.circular(10),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),

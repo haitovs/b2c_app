@@ -87,7 +87,7 @@ class HotlineService {
 
       return response.statusCode == 200;
     } catch (e) {
-      print('Exception sending message: $e');
+      // Failed to send message
       return false;
     }
   }

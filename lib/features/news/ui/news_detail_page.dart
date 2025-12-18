@@ -224,7 +224,10 @@ class _NewsDetailPageState extends ConsumerState<NewsDetailPage> {
           _buildBreadcrumb(),
           const SizedBox(height: 16),
           // Divider
-          Container(height: 2, color: const Color(0xFF20306C).withOpacity(0.8)),
+          Container(
+            height: 2,
+            color: const Color(0xFF20306C).withValues(alpha: 0.8),
+          ),
           const SizedBox(height: 30),
           // Main content - two column on desktop
           isMobile ? _buildMobileLayout() : _buildDesktopLayout(),
@@ -338,7 +341,7 @@ class _NewsDetailPageState extends ConsumerState<NewsDetailPage> {
                     style: GoogleFonts.inter(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: const Color(0xFF76777F).withOpacity(0.47),
+                      color: const Color(0xFF76777F).withValues(alpha: 0.47),
                     ),
                   ),
                 ],
@@ -364,7 +367,7 @@ class _NewsDetailPageState extends ConsumerState<NewsDetailPage> {
                     style: GoogleFonts.roboto(
                       fontSize: 18,
                       fontWeight: FontWeight.w400,
-                      color: Colors.black.withOpacity(0.7),
+                      color: Colors.black.withValues(alpha: 0.7),
                       height: 1.5,
                     ),
                   ),
@@ -387,7 +390,7 @@ class _NewsDetailPageState extends ConsumerState<NewsDetailPage> {
                   style: GoogleFonts.roboto(
                     fontSize: 18,
                     fontWeight: FontWeight.w400,
-                    color: Colors.black.withOpacity(0.7),
+                    color: Colors.black.withValues(alpha: 0.7),
                     height: 1.5,
                   ),
                 )
@@ -400,7 +403,7 @@ class _NewsDetailPageState extends ConsumerState<NewsDetailPage> {
                       style: GoogleFonts.roboto(
                         fontSize: 18,
                         fontWeight: FontWeight.w400,
-                        color: Colors.black.withOpacity(0.7),
+                        color: Colors.black.withValues(alpha: 0.7),
                         height: 1.5,
                       ),
                     ),
@@ -476,7 +479,7 @@ class _NewsDetailPageState extends ConsumerState<NewsDetailPage> {
                   style: GoogleFonts.inter(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: const Color(0xFF76777F).withOpacity(0.6),
+                    color: const Color(0xFF76777F).withValues(alpha: 0.6),
                   ),
                 ),
               ],
@@ -501,7 +504,7 @@ class _NewsDetailPageState extends ConsumerState<NewsDetailPage> {
           style: GoogleFonts.roboto(
             fontSize: 16,
             fontWeight: FontWeight.w400,
-            color: Colors.black.withOpacity(0.7),
+            color: Colors.black.withValues(alpha: 0.7),
             height: 1.5,
           ),
         ),

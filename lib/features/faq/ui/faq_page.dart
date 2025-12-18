@@ -127,7 +127,7 @@ class _FAQPageState extends State<FAQPage> {
               child: Container(
                 height: 64,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF1F1F6).withOpacity(0.3),
+                  color: const Color(0xFFF1F1F6).withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Row(
@@ -150,7 +150,9 @@ class _FAQPageState extends State<FAQPage> {
                         decoration: InputDecoration(
                           hintText: 'Search questions...',
                           hintStyle: GoogleFonts.roboto(
-                            color: const Color(0xFFF1F1F6).withOpacity(0.6),
+                            color: const Color(
+                              0xFFF1F1F6,
+                            ).withValues(alpha: 0.6),
                             fontSize: 18,
                           ),
                           border: InputBorder.none,
@@ -295,7 +297,7 @@ class _FAQPageState extends State<FAQPage> {
                     vertical: isMobile ? 20 : 25,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFDCDEEB).withOpacity(0.85),
+                    color: const Color(0xFFDCDEEB).withValues(alpha: 0.85),
                     borderRadius: isExpanded
                         ? const BorderRadius.only(
                             topLeft: Radius.circular(10),
@@ -354,11 +356,15 @@ class _FAQPageState extends State<FAQPage> {
                           p: GoogleFonts.roboto(
                             fontSize: isMobile ? 16 : 20,
                             height: 1.6,
-                            color: const Color(0xFF151938).withOpacity(0.85),
+                            color: const Color(
+                              0xFF151938,
+                            ).withValues(alpha: 0.85),
                           ),
                           listBullet: GoogleFonts.roboto(
                             fontSize: isMobile ? 16 : 20,
-                            color: const Color(0xFF151938).withOpacity(0.85),
+                            color: const Color(
+                              0xFF151938,
+                            ).withValues(alpha: 0.85),
                           ),
                           a: GoogleFonts.roboto(
                             fontSize: isMobile ? 16 : 20,
@@ -368,12 +374,16 @@ class _FAQPageState extends State<FAQPage> {
                           strong: GoogleFonts.roboto(
                             fontSize: isMobile ? 16 : 20,
                             fontWeight: FontWeight.bold,
-                            color: const Color(0xFF151938).withOpacity(0.85),
+                            color: const Color(
+                              0xFF151938,
+                            ).withValues(alpha: 0.85),
                           ),
                           em: GoogleFonts.roboto(
                             fontSize: isMobile ? 16 : 20,
                             fontStyle: FontStyle.italic,
-                            color: const Color(0xFF151938).withOpacity(0.85),
+                            color: const Color(
+                              0xFF151938,
+                            ).withValues(alpha: 0.85),
                           ),
                         ),
                         onTapLink: (text, href, title) async {
