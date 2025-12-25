@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/app_theme.dart';
 import '../services/auth_service.dart';
+import 'verification_pending_page.dart';
 
 class RegistrationPage extends StatefulWidget {
   const RegistrationPage({super.key});
@@ -356,10 +357,18 @@ class _RegistrationPageState extends State<RegistrationPage> {
     if (!mounted) return;
 
     if (errorMessage == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Registration Successful")));
-      context.go('/login');
+      // Registration successful - redirect to verification page
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Registration Successful! Please check your email."),
+          backgroundColor: Colors.green,
+        ),
+      );
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => VerificationPendingPage(email: _emailController.text),
+        ),
+      );
     } else {
       // Show detailed error message
       ScaffoldMessenger.of(context).showSnackBar(

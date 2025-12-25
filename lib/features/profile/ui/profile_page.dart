@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:country_code_picker/country_code_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -11,17 +12,36 @@ import '../../../shared/widgets/legal_bottom_sheet.dart';
 import '../../auth/services/auth_service.dart';
 
 class ProfilePage extends StatefulWidget {
-  const ProfilePage({super.key});
+  final int initialTab;
+  final String? returnTo;
+  final bool highlightConfirmButton;
+
+  const ProfilePage({
+    super.key,
+    this.initialTab = 1,
+    this.returnTo,
+    this.highlightConfirmButton = false,
+  });
 
   @override
   State<ProfilePage> createState() => _ProfilePageState();
 }
 
-class _ProfilePageState extends State<ProfilePage> {
-  int _currentTab = 1; // 0 = Agreement, 1 = My Profile, 2 = Company
+class _ProfilePageState extends State<ProfilePage>
+    with SingleTickerProviderStateMixin {
+  late int _currentTab;
   bool _isEditing = false;
   bool _agreedToTerms = false;
   XFile? _selectedImage;
+  String _countryCode = '+993'; // For mobile field country selector
+
+  // Button highlight animation
+  late AnimationController _highlightController;
+  late Animation<double> _highlightAnimation;
+  bool _showHighlight = false;
+
+  // Scroll controller for auto-scroll to button
+  final ScrollController _scrollController = ScrollController();
 
   // Controllers
   late TextEditingController _nameController;
@@ -42,6 +62,52 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   void initState() {
     super.initState();
+    _currentTab = widget.initialTab.clamp(0, 2); // Ensure valid tab index
+
+    // Setup highlight animation
+    _highlightController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    );
+    _highlightAnimation = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(parent: _highlightController, curve: Curves.easeInOut),
+    );
+
+    // Start highlight animation if coming from agreement dialog
+    if (widget.highlightConfirmButton && widget.initialTab == 0) {
+      _showHighlight = true;
+      // Start animation after widget is built
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        int cycles = 0;
+        void listener(AnimationStatus status) {
+          if (status == AnimationStatus.completed ||
+              status == AnimationStatus.dismissed) {
+            cycles++;
+            if (cycles >= 4) {
+              // 2 full cycles (forward+reverse each)
+              _highlightController.removeStatusListener(listener);
+              _highlightController.stop();
+              if (mounted) setState(() => _showHighlight = false);
+            }
+          }
+        }
+
+        _highlightController.addStatusListener(listener);
+        _highlightController.repeat(reverse: true);
+
+        // Auto-scroll to checkbox area
+        Future.delayed(const Duration(milliseconds: 300), () {
+          if (mounted && _scrollController.hasClients) {
+            _scrollController.animateTo(
+              _scrollController.position.maxScrollExtent,
+              duration: const Duration(milliseconds: 600),
+              curve: Curves.easeOut,
+            );
+          }
+        });
+      });
+    }
+
     _nameController = TextEditingController();
     _surnameController = TextEditingController();
     _emailController = TextEditingController();
@@ -60,6 +126,8 @@ class _ProfilePageState extends State<ProfilePage> {
 
   @override
   void dispose() {
+    _highlightController.dispose();
+    _scrollController.dispose();
     _nameController.dispose();
     _surnameController.dispose();
     _emailController.dispose();
@@ -90,6 +158,11 @@ class _ProfilePageState extends State<ProfilePage> {
       _companyNameController.text = user['company_name'] ?? '';
       _websiteController.text = user['website'] ?? '';
 
+      // Set agreement checkbox from user's saved status
+      if (user['has_agreed_terms'] == true) {
+        _agreedToTerms = true;
+      }
+
       if (user['social_links'] != null) {
         for (var link in user['social_links']) {
           if (link['network'] == 'INSTAGRAM') {
@@ -114,6 +187,24 @@ class _ProfilePageState extends State<ProfilePage> {
         _selectedImage = image;
       });
     }
+  }
+
+  /// Builds a ripple ring that expands and fades out
+  Widget _buildRippleRing(double progress, Color color, double maxSize) {
+    final size = 24.0 + (maxSize - 24.0) * progress;
+    final opacity = (1.0 - progress).clamp(0.0, 1.0);
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        border: Border.all(
+          color: color.withValues(alpha: opacity * 0.6),
+          width: 2,
+        ),
+        borderRadius: BorderRadius.circular(size / 4),
+      ),
+    );
   }
 
   @override
@@ -142,6 +233,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     ),
                   ),
                   child: SingleChildScrollView(
+                    controller: _scrollController,
                     padding: EdgeInsets.all(isMobile ? 20 : 50),
                     child: _buildCurrentTabContent(isMobile),
                   ),
@@ -171,11 +263,13 @@ class _ProfilePageState extends State<ProfilePage> {
                 size: isMobile ? 24 : 28,
               ),
               onPressed: () {
-                // Check if we can pop, otherwise go to a default page
-                if (context.canPop()) {
+                // Use returnTo if available, otherwise go to home
+                if (widget.returnTo != null && widget.returnTo!.isNotEmpty) {
+                  context.go(widget.returnTo!);
+                } else if (context.canPop()) {
                   context.pop();
                 } else {
-                  context.go('/events');
+                  context.go('/'); // Go to home (event calendar)
                 }
               },
             ),
@@ -390,21 +484,98 @@ class _ProfilePageState extends State<ProfilePage> {
           // Checkbox row
           Row(
             children: [
-              GestureDetector(
-                onTap: () => setState(() => _agreedToTerms = !_agreedToTerms),
-                child: Container(
-                  width: 21,
-                  height: 21,
-                  decoration: BoxDecoration(
-                    border: Border.all(color: const Color(0xFFB7B7B7)),
-                    borderRadius: BorderRadius.circular(5),
-                    color: _agreedToTerms
-                        ? const Color(0xFF3C4494)
-                        : Colors.white,
-                  ),
-                  child: _agreedToTerms
-                      ? const Icon(Icons.check, size: 16, color: Colors.white)
-                      : null,
+              // Animated checkbox with ripple ring effect - fixed size to prevent layout shift
+              SizedBox(
+                width: 40,
+                height: 40,
+                child: AnimatedBuilder(
+                  animation: _highlightAnimation,
+                  builder: (context, _) {
+                    // Elastic bounce effect
+                    final bounce = _showHighlight
+                        ? 1.0 +
+                              0.1 *
+                                  Curves.elasticOut.transform(
+                                    (_highlightAnimation.value * 2).clamp(
+                                      0.0,
+                                      1.0,
+                                    ),
+                                  )
+                        : 1.0;
+
+                    return Stack(
+                      alignment: Alignment.center,
+                      clipBehavior: Clip.none,
+                      children: [
+                        // Ripple rings (expanding circles that fade)
+                        if (_showHighlight) ...[
+                          // First ring
+                          _buildRippleRing(
+                            _highlightAnimation.value,
+                            const Color(0xFF3C4494),
+                            32,
+                          ),
+                          // Second ring (delayed)
+                          _buildRippleRing(
+                            (_highlightAnimation.value - 0.3).clamp(0.0, 1.0),
+                            const Color(0xFF3C4494),
+                            32,
+                          ),
+                        ],
+                        // The checkbox
+                        Transform.scale(
+                          scale: bounce,
+                          child: GestureDetector(
+                            onTap: () {
+                              // Only allow toggling if user hasn't already confirmed
+                              final hasConfirmed = context
+                                  .read<AuthService>()
+                                  .hasAgreedTerms;
+                              if (!hasConfirmed) {
+                                setState(
+                                  () => _agreedToTerms = !_agreedToTerms,
+                                );
+                              }
+                            },
+                            child: Container(
+                              width: 24,
+                              height: 24,
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: _showHighlight || _agreedToTerms
+                                      ? const Color(0xFF3C4494)
+                                      : const Color(0xFFB7B7B7),
+                                  width: 2,
+                                ),
+                                borderRadius: BorderRadius.circular(6),
+                                color: _agreedToTerms
+                                    ? const Color(0xFF3C4494)
+                                    : Colors.white,
+                                boxShadow: _showHighlight
+                                    ? [
+                                        BoxShadow(
+                                          color: const Color(
+                                            0xFF3C4494,
+                                          ).withValues(alpha: 0.3),
+                                          blurRadius: 8,
+                                          spreadRadius: 1,
+                                        ),
+                                      ]
+                                    : null,
+                              ),
+                              child: _agreedToTerms
+                                  ? const Icon(
+                                      Icons.check,
+                                      size: 18,
+                                      color: Colors.white,
+                                    )
+                                  : null,
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ),
               const SizedBox(width: 15),
@@ -426,7 +597,10 @@ class _ProfilePageState extends State<ProfilePage> {
             width: double.infinity,
             height: 50,
             child: ElevatedButton(
-              onPressed: _agreedToTerms
+              // Only enable if checkbox is checked AND user hasn't already confirmed
+              onPressed:
+                  (_agreedToTerms &&
+                      !context.read<AuthService>().hasAgreedTerms)
                   ? () async {
                       // Save agreement to API
                       final error = await context
@@ -442,14 +616,26 @@ class _ProfilePageState extends State<ProfilePage> {
                         );
                         return;
                       }
+
+                      // Show success message
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text(
                             "Agreement confirmed! You now have full access.",
                           ),
                           backgroundColor: Colors.green,
+                          duration: Duration(seconds: 3),
                         ),
                       );
+
+                      // Redirect to returnTo URL if available, otherwise switch to My Profile tab
+                      if (widget.returnTo != null &&
+                          widget.returnTo!.isNotEmpty) {
+                        context.go(widget.returnTo!);
+                      } else {
+                        // Stay on profile page but switch to My Profile tab
+                        setState(() => _currentTab = 1);
+                      }
                     }
                   : null,
               style: ElevatedButton.styleFrom(
@@ -966,7 +1152,6 @@ class _ProfilePageState extends State<ProfilePage> {
           Row(
             children: [
               Container(
-                width: 50,
                 height: 50,
                 decoration: BoxDecoration(
                   color: const Color(0xFFE6E5E5),
@@ -976,8 +1161,41 @@ class _ProfilePageState extends State<ProfilePage> {
                     bottomLeft: Radius.circular(5),
                   ),
                 ),
-                alignment: Alignment.center,
-                child: const Icon(Icons.flag, size: 20, color: Colors.green),
+                child: _isEditing
+                    ? CountryCodePicker(
+                        onChanged: (country) {
+                          setState(
+                            () => _countryCode = country.dialCode ?? '+993',
+                          );
+                        },
+                        initialSelection: 'TM',
+                        favorite: const ['TM', 'RU', 'US'],
+                        showCountryOnly: false,
+                        showOnlyCountryWhenClosed: false,
+                        alignLeft: false,
+                        padding: EdgeInsets.zero,
+                        textStyle: GoogleFonts.inter(fontSize: 16),
+                        showFlagMain: true,
+                        showDropDownButton: false,
+                      )
+                    : Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.flag,
+                              size: 20,
+                              color: Colors.green,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              _countryCode,
+                              style: GoogleFonts.inter(fontSize: 16),
+                            ),
+                          ],
+                        ),
+                      ),
               ),
               Expanded(
                 child: Container(

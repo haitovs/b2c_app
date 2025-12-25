@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart' as legacy_provider;
 
+import '../../../../core/services/registration_data_service.dart';
 import '../../../../core/widgets/custom_app_bar.dart';
 import '../../auth/services/auth_service.dart';
 import '../../notifications/ui/notification_drawer.dart';
@@ -43,40 +44,10 @@ class _EventRegistrationPageState extends ConsumerState<EventRegistrationPage> {
   String _countryCode = "+993";
 
   // Package selection state (Forum tab)
-  // Mock packages - in real app, fetch from API
-  final List<Map<String, dynamic>> _packages = [
-    {
-      'id': 1,
-      'name': 'Standard Delegate Package',
-      'price': 500,
-      'currency': 'USD',
-      'description':
-          'To register for sessions at the forum, please follow these steps:\n1. Go to the official forum website.\n2. Log in to your account or create a new one.\n3. Navigate to the "Schedule" or "Sessions" section.\n4. Choose the sessions you\'re interested in and click "Register" next to each one.\n5. You will receive a confirmation email once your registration is complete.\nIf you need assistance, feel free to contact our support team at [email@example.com].',
-    },
-    {
-      'id': 2,
-      'name': 'Plus Delegate Package',
-      'price': 700,
-      'currency': 'USD',
-      'description':
-          'Enhanced package with VIP seating, exclusive networking events, and priority access to all sessions.',
-    },
-    {
-      'id': 3,
-      'name': 'Standard Delegate Package',
-      'price': 500,
-      'currency': 'TMT',
-      'description': 'Local currency option for standard delegate access.',
-    },
-    {
-      'id': 4,
-      'name': 'Plus Delegate Package',
-      'price': 1800,
-      'currency': 'TMT',
-      'description':
-          'Local currency option for enhanced delegate access with VIP benefits.',
-    },
-  ];
+  // Packages loaded from backend API
+  List<Map<String, dynamic>> _packages = [];
+  // ignore: unused_field
+  bool _isLoadingPackages = true;
 
   // Track quantities for each package
   final Map<int, int> _packageQuantities = {};
@@ -102,41 +73,18 @@ class _EventRegistrationPageState extends ConsumerState<EventRegistrationPage> {
   final _whatsappController = TextEditingController();
   final _facebookController = TextEditingController();
 
+  // Delegate country code for mobile field
+  // ignore: unused_field
+  String _delegateCountryCode = '+993';
+
   // Store delegate data
   final List<Map<String, String>> _delegateData = [];
 
   // Expo products state (Phase 3)
-  final List<Map<String, dynamic>> _expoProducts = [
-    {
-      'id': 1,
-      'name': 'Registration fee',
-      'description': 'Standard registration fee for expo participation.',
-    },
-    {
-      'id': 2,
-      'name': 'Visa Support',
-      'description':
-          'To register for sessions at the forum, please follow these steps:\n1. Go to the official forum website.\n2. Log in to your account or create a new one.\n3. Navigate to the "Schedule" or "Sessions" section.\n4. Choose the sessions you\'re interested in and click "Register" next to each one.\n5. You will receive a confirmation email once your registration is complete.\nIf you need assistance, feel free to contact our support team at [email@example.com].',
-    },
-    {
-      'id': 3,
-      'name': 'Standard Booths:',
-      'description':
-          'To register for sessions at the forum, please follow these steps:\n1. Go to the official forum website.\n2. Log in to your account or create a new one.\n3. Navigate to the "Schedule" or "Sessions" section.\n4. Choose the sessions you\'re interested in and click "Register" next to each one.\n5. You will receive a confirmation email once your registration is complete.\nIf you need assistance, feel free to contact our support team at [email@example.com].',
-    },
-    {
-      'id': 4,
-      'name': 'Only Space for Booth:',
-      'description':
-          'To register for sessions at the forum, please follow these steps:\n1. Go to the official forum website.\n2. Log in to your account or create a new one.\n3. Navigate to the "Schedule" or "Sessions" section.\n4. Choose the sessions you\'re interested in and click "Register" next to each one.\n5. You will receive a confirmation email once your registration is complete.\nIf you need assistance, feel free to contact our support team at [email@example.com].',
-    },
-    {
-      'id': 5,
-      'name': 'Outdoor Exhibition Space:',
-      'description':
-          'To register for sessions at the forum, please follow these steps:\n1. Go to the official forum website.\n2. Log in to your account or create a new one.\n3. Navigate to the "Schedule" or "Sessions" section.\n4. Choose the sessions you\'re interested in and click "Register" next to each one.\n5. You will receive a confirmation email once your registration is complete.\nIf you need assistance, feel free to contact our support team at [email@example.com].',
-    },
-  ];
+  // Products loaded from backend API
+  List<Map<String, dynamic>> _expoProducts = [];
+  // ignore: unused_field
+  bool _isLoadingProducts = true;
 
   // Track quantities for each expo product
   final Map<int, int> _expoQuantities = {};
@@ -146,10 +94,169 @@ class _EventRegistrationPageState extends ConsumerState<EventRegistrationPage> {
   // Show confirmation screen after registration complete
   bool _showConfirmation = false;
 
+  // Registration ID from backend (created when starting registration)
+  // ignore: unused_field
+  String? _registrationId;
+
+  // Saving state for buttons
+  bool _isSaving = false;
+
   @override
   void initState() {
     super.initState();
     _prefillUserData();
+    _fetchPackagesAndProducts();
+  }
+
+  /// Fetch delegate packages and expo products from backend API
+  Future<void> _fetchPackagesAndProducts() async {
+    final authService = legacy_provider.Provider.of<AuthService>(
+      context,
+      listen: false,
+    );
+    final service = RegistrationDataService(authService);
+
+    try {
+      // Fetch packages
+      final packages = await service.fetchDelegatePackages(widget.eventId);
+      if (mounted) {
+        setState(() {
+          _packages = packages;
+          _isLoadingPackages = false;
+        });
+      }
+
+      // Fetch products
+      final products = await service.fetchExpoProducts(widget.eventId);
+      if (mounted) {
+        setState(() {
+          _expoProducts = products;
+          _isLoadingProducts = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching registration data: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingPackages = false;
+          _isLoadingProducts = false;
+        });
+      }
+    }
+  }
+
+  /// Submit the full registration to backend
+  Future<void> _submitFullRegistration() async {
+    if (_isSaving) return;
+
+    setState(() => _isSaving = true);
+
+    final authService = legacy_provider.Provider.of<AuthService>(
+      context,
+      listen: false,
+    );
+    final service = RegistrationDataService(authService);
+
+    try {
+      // Step 1: Create registration (or get existing)
+      final regData = await service.createRegistration(widget.eventId);
+      if (regData == null) {
+        _showError('Failed to create registration');
+        return;
+      }
+
+      final regId = regData['id'] as String;
+      final status = regData['status'] as String?;
+      _registrationId = regId;
+
+      // Step 2: Save Phase 1 - Contact info
+      final phase1Success = await service.savePhase1Contact(
+        registrationId: regId,
+        firstName: _nameController.text,
+        lastName: _surnameController.text,
+        email: _emailController.text,
+        mobile: '$_countryCode${_mobileController.text}',
+        country: _countryController.text,
+        city: _cityController.text,
+        companyName: _companyNameController.text,
+        companyWebsite: _companyWebsiteController.text.isEmpty
+            ? null
+            : _companyWebsiteController.text,
+      );
+      if (!phase1Success) {
+        _showError('Failed to save contact information');
+        return;
+      }
+
+      // Step 3: Save Phase 2 - Package selections
+      final packageSelections = <Map<String, dynamic>>[];
+      _packageQuantities.forEach((pkgId, qty) {
+        if (qty > 0) {
+          packageSelections.add({'package_id': pkgId, 'quantity': qty});
+        }
+      });
+
+      if (packageSelections.isNotEmpty) {
+        final phase2Success = await service.savePhase2Packages(
+          registrationId: regId,
+          packages: packageSelections,
+        );
+        if (!phase2Success) {
+          _showError('Failed to save package selections');
+          return;
+        }
+      }
+
+      // Step 4: Save Phase 3 - Expo products
+      final productSelections = <Map<String, dynamic>>[];
+      _expoQuantities.forEach((prodId, qty) {
+        if (qty > 0) {
+          productSelections.add({'product_id': prodId, 'quantity': qty});
+        }
+      });
+
+      if (productSelections.isNotEmpty) {
+        final phase3Success = await service.savePhase3Products(
+          registrationId: regId,
+          products: productSelections,
+        );
+        if (!phase3Success) {
+          _showError('Failed to save expo products');
+          return;
+        }
+      }
+
+      // Step 5: Submit registration (only if it's a draft)
+      if (status == 'draft') {
+        final submitSuccess = await service.submitRegistration(regId);
+        if (!submitSuccess) {
+          _showError('Failed to submit registration');
+          return;
+        }
+      }
+
+      // Success! Show confirmation
+      if (mounted) {
+        setState(() {
+          _showConfirmation = true;
+          _isSaving = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error submitting registration: $e');
+      _showError('An error occurred: $e');
+    } finally {
+      if (mounted && !_showConfirmation) {
+        setState(() => _isSaving = false);
+      }
+    }
+  }
+
+  void _showError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
+    );
   }
 
   /// Pre-fill form with current user's profile data
@@ -165,7 +272,52 @@ class _EventRegistrationPageState extends ConsumerState<EventRegistrationPage> {
       _nameController.text = user['first_name'] ?? '';
       _surnameController.text = user['last_name'] ?? '';
       _emailController.text = user['email'] ?? '';
-      _mobileController.text = user['phone'] ?? '';
+
+      // Parse phone number - extract country code if present
+      final phone = user['mobile'] as String? ?? '';
+      if (phone.startsWith('+')) {
+        // Try to match known country code lengths (most common first)
+        // +993 (Turkmenistan, 3 digits), +7 (Russia, 1 digit), etc.
+        String? detectedCode;
+        int codeLength = 0;
+
+        // Try 3 digits first (most common for countries like Turkmenistan +993)
+        if (phone.length > 3) {
+          final code3 = phone.substring(0, 4); // +XXX
+          if (RegExp(r'^\+\d{3}$').hasMatch(code3)) {
+            detectedCode = code3;
+            codeLength = 4;
+          }
+        }
+        // If not found, try 2 digits
+        if (detectedCode == null && phone.length > 2) {
+          final code2 = phone.substring(0, 3); // +XX
+          if (RegExp(r'^\+\d{2}$').hasMatch(code2)) {
+            detectedCode = code2;
+            codeLength = 3;
+          }
+        }
+        // If not found, try 1 digit (like +7 for Russia)
+        if (detectedCode == null && phone.length > 1) {
+          final code1 = phone.substring(0, 2); // +X
+          if (RegExp(r'^\+\d$').hasMatch(code1)) {
+            detectedCode = code1;
+            codeLength = 2;
+          }
+        }
+
+        if (detectedCode != null) {
+          _countryCode = detectedCode;
+          _mobileController.text = phone
+              .substring(codeLength)
+              .replaceAll(RegExp(r'^[-\s]*'), '');
+        } else {
+          _mobileController.text = phone;
+        }
+      } else {
+        _mobileController.text = phone;
+      }
+
       _countryController.text = user['country'] ?? '';
       _cityController.text = user['city'] ?? '';
       _companyNameController.text = user['company_name'] ?? '';
@@ -192,37 +344,6 @@ class _EventRegistrationPageState extends ConsumerState<EventRegistrationPage> {
 
   void _closeProfile() {
     if (_isProfileOpen) setState(() => _isProfileOpen = false);
-  }
-
-  void _onNextPressed() {
-    // Calculate total delegates from package quantities
-    int totalDelegates = 0;
-    for (final entry in _packageQuantities.entries) {
-      totalDelegates += entry.value;
-    }
-
-    if (totalDelegates == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select at least one delegate package'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
-
-    // Navigate to Phase 2 - Delegate Details
-    setState(() {
-      _totalDelegates = totalDelegates;
-      _currentDelegateIndex = 0;
-      _showDelegateDetails = true;
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Please fill details for $totalDelegates delegate(s)'),
-      ),
-    );
   }
 
   @override
@@ -389,15 +510,43 @@ class _EventRegistrationPageState extends ConsumerState<EventRegistrationPage> {
                   color: const Color(0xFFDFE1ED),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Text(
-                  'Application Accepted!\nWe will be in touch soon.',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.montserrat(
-                    fontWeight: FontWeight.w500,
-                    fontSize: isMobile ? 24 : 35,
-                    height: 1.43,
-                    color: Colors.black,
-                  ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Application Accepted!\nWe will be in touch soon.',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.montserrat(
+                        fontWeight: FontWeight.w500,
+                        fontSize: isMobile ? 24 : 35,
+                        height: 1.43,
+                        color: Colors.black,
+                      ),
+                    ),
+                    const SizedBox(height: 30),
+                    ElevatedButton(
+                      onPressed: () =>
+                          context.go('/events/${widget.eventId}/menu'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF17154B),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 40,
+                          vertical: 15,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: Text(
+                        'Go Home',
+                        style: GoogleFonts.montserrat(
+                          fontWeight: FontWeight.w600,
+                          fontSize: isMobile ? 16 : 18,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -898,7 +1047,11 @@ class _EventRegistrationPageState extends ConsumerState<EventRegistrationPage> {
                 ),
               ),
               child: CountryCodePicker(
-                onChanged: (country) {},
+                onChanged: (country) {
+                  setState(
+                    () => _delegateCountryCode = country.dialCode ?? '+993',
+                  );
+                },
                 initialSelection: 'TM',
                 favorite: const ['TM', 'RU', 'US'],
                 showCountryOnly: false,
@@ -931,7 +1084,7 @@ class _EventRegistrationPageState extends ConsumerState<EventRegistrationPage> {
                       horizontal: 15,
                       vertical: 14,
                     ),
-                    hintText: '+993-xx-xx-xx-xx',
+                    hintText: 'Enter your mobile number',
                     hintStyle: GoogleFonts.inter(
                       fontWeight: FontWeight.w400,
                       fontSize: 16,
@@ -1093,19 +1246,22 @@ class _EventRegistrationPageState extends ConsumerState<EventRegistrationPage> {
                     ),
                     const SizedBox(width: 20),
                     TextButton(
-                      onPressed: () {
-                        // Complete registration - show confirmation screen
-                        setState(() => _showConfirmation = true);
-                      },
-                      child: Text(
-                        'Next',
-                        style: GoogleFonts.inter(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 20,
-                          color: Colors.black.withValues(alpha: 0.5),
-                          decoration: TextDecoration.underline,
-                        ),
-                      ),
+                      onPressed: _isSaving ? null : _submitFullRegistration,
+                      child: _isSaving
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Text(
+                              'Submit',
+                              style: GoogleFonts.inter(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 20,
+                                color: Colors.black.withValues(alpha: 0.5),
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
                     ),
                   ],
                 ),
@@ -1141,13 +1297,30 @@ class _EventRegistrationPageState extends ConsumerState<EventRegistrationPage> {
               children: [
                 // Product name
                 Expanded(
-                  child: Text(
-                    product['name'] ?? '',
-                    style: GoogleFonts.roboto(
-                      fontWeight: FontWeight.w400,
-                      fontSize: isMobile ? 18 : 30,
-                      color: const Color(0xFF151938),
-                    ),
+                  child: Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          product['name'] ?? '',
+                          style: GoogleFonts.roboto(
+                            fontWeight: FontWeight.w400,
+                            fontSize: isMobile ? 18 : 30,
+                            color: const Color(0xFF151938),
+                          ),
+                        ),
+                      ),
+                      if (product['price'] != null) ...[
+                        const SizedBox(width: 15),
+                        Text(
+                          '${product['price']} ${product['currency'] ?? 'USD'}',
+                          style: GoogleFonts.roboto(
+                            fontWeight: FontWeight.w600,
+                            fontSize: isMobile ? 18 : 28,
+                            color: const Color(0xFF311370),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
 
@@ -1439,11 +1612,16 @@ class _EventRegistrationPageState extends ConsumerState<EventRegistrationPage> {
 
             const SizedBox(height: 40),
 
-            // Next button
+            // Next button - goes to Forum tab (tab 1)
             Align(
               alignment: Alignment.centerRight,
               child: TextButton(
-                onPressed: _onNextPressed,
+                onPressed: () {
+                  // Move to Forum tab (tab 1) from General Info
+                  setState(() {
+                    _currentTab = 1;
+                  });
+                },
                 child: Text(
                   'Next',
                   style: GoogleFonts.inter(
@@ -1689,7 +1867,7 @@ class _EventRegistrationPageState extends ConsumerState<EventRegistrationPage> {
                       horizontal: 15,
                       vertical: 14,
                     ),
-                    hintText: '+993-xx-xx-xx-xx',
+                    hintText: 'Enter your mobile number',
                     hintStyle: GoogleFonts.inter(
                       fontWeight: FontWeight.w400,
                       fontSize: 16,

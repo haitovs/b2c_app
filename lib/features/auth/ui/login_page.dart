@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/app_theme.dart';
 import '../services/auth_service.dart';
+import 'verification_pending_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -320,11 +321,21 @@ class _LoginPageState extends State<LoginPage> {
       rememberMe: _rememberMe,
     );
     if (!mounted) return;
+
     if (errorMessage == null) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text("Login Successful")));
       context.go('/');
+    } else if (errorMessage == 'EMAIL_NOT_VERIFIED') {
+      // Redirect to verification pending page
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) =>
+              VerificationPendingPage(email: _usernameController.text),
+        ),
+      );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

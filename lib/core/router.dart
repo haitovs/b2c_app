@@ -15,6 +15,7 @@ import '../features/events/ui/participant_list_page.dart';
 import '../features/events/ui/speaker_detail_page.dart';
 import '../features/events/ui/speaker_list_page.dart';
 import '../features/faq/ui/faq_page.dart';
+import '../features/feedback/ui/feedback_page.dart';
 import '../features/hotline/ui/hotline_page.dart';
 import '../features/networking/ui/meeting_b2g_request_page.dart';
 import '../features/networking/ui/meeting_edit_page.dart';
@@ -24,11 +25,14 @@ import '../features/networking/ui/meeting_review_page.dart';
 import '../features/networking/ui/new_meeting_page.dart';
 import '../features/news/ui/news_detail_page.dart';
 import '../features/news/ui/news_page.dart';
+import 'error_page.dart';
 
 GoRouter createRouter(AuthService authService) {
   return GoRouter(
     initialLocation: '/',
     refreshListenable: authService,
+    errorBuilder: (context, state) =>
+        ErrorPage(error: state.error?.message, path: state.uri.toString()),
     redirect: (context, state) {
       // Wait for auth to initialize before redirecting
       if (!authService.isInitialized) {
@@ -232,6 +236,12 @@ GoRouter createRouter(AuthService authService) {
             builder: (context, state) =>
                 FAQPage(eventId: state.pathParameters['id']!),
           ),
+          // Feedback route
+          GoRoute(
+            path: 'feedback',
+            builder: (context, state) =>
+                FeedbackPage(eventId: state.pathParameters['id']!),
+          ),
           // Registration route
           GoRoute(
             path: 'registration',
@@ -244,7 +254,18 @@ GoRouter createRouter(AuthService authService) {
       ),
       GoRoute(
         path: '/profile',
-        builder: (context, state) => const ProfilePage(),
+        builder: (context, state) {
+          final tab =
+              int.tryParse(state.uri.queryParameters['tab'] ?? '1') ?? 1;
+          final returnTo = state.uri.queryParameters['returnTo'];
+          // Highlight confirm button when coming from agreement dialog (tab=0)
+          final highlight = tab == 0;
+          return ProfilePage(
+            initialTab: tab,
+            returnTo: returnTo,
+            highlightConfirmButton: highlight,
+          );
+        },
       ),
       GoRoute(
         path: '/hotline',

@@ -56,6 +56,15 @@ class AuthService extends ChangeNotifier {
 
         notifyListeners();
         return null; // Success
+      } else if (response.statusCode == 403) {
+        // Check if it's an email verification error
+        try {
+          final data = jsonDecode(response.body);
+          if (data['detail'] == 'EMAIL_NOT_VERIFIED') {
+            return 'EMAIL_NOT_VERIFIED'; // Special error code for frontend
+          }
+        } catch (_) {}
+        return _parseError(response.body);
       } else {
         return _parseError(response.body);
       }
@@ -179,5 +188,23 @@ class AuthService extends ChangeNotifier {
       // fallback
     }
     return "Operation failed. Please try again.";
+  }
+
+  /// Resend verification email to the user
+  /// Returns null on success, or an error message string on failure.
+  Future<String?> resendVerificationEmail(String email) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/auth/resend-verification?email=$email'),
+      );
+
+      if (response.statusCode == 200) {
+        return null; // Success
+      } else {
+        return _parseError(response.body);
+      }
+    } catch (e) {
+      return "Failed to resend verification email: $e";
+    }
   }
 }

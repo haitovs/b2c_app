@@ -12,6 +12,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/config/app_config.dart';
 import '../../../../core/services/event_context_service.dart';
+import '../../../../core/widgets/attention_seeker.dart';
 import '../../../../l10n/generated/app_localizations.dart';
 import '../../auth/services/auth_service.dart';
 import '../../notifications/ui/notification_drawer.dart';
@@ -33,6 +34,16 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
   List<Map<String, dynamic>> _sponsors = [];
   bool _isLoadingSponsors = true;
 
+  // Event data for dynamic logo and name
+  Map<String, dynamic>? _eventData;
+
+  // Registration status
+  bool _isRegistered = false;
+  bool _isCheckingRegistration = true;
+
+  // Registration button highlight
+  bool _showRegistrationHighlight = false;
+
   // For endless scrolling carousel
   late ScrollController _sponsorScrollController;
   Timer? _sponsorScrollTimer;
@@ -48,7 +59,70 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
     // Ensure the event context is loaded for this event
     // This handles direct navigation and page refreshes
     await eventContextService.ensureEventContext(widget.eventId);
+    _fetchEvent();
     _fetchSponsors();
+    _checkRegistrationStatus();
+  }
+
+  Future<void> _checkRegistrationStatus() async {
+    try {
+      final authService = context.read<AuthService>();
+      final token = await authService.getToken();
+      final response = await http.get(
+        Uri.parse('${AppConfig.b2cApiBaseUrl}/api/v1/registrations/my-status'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final status = data['status'];
+        setState(() {
+          // Accept SUBMITTED, APPROVED/ACCEPTED as registered
+          _isRegistered =
+              status == 'ACCEPTED' ||
+              status == 'APPROVED' ||
+              status == 'SUBMITTED';
+          _isCheckingRegistration = false;
+        });
+      } else {
+        setState(() {
+          _isRegistered = false;
+          _isCheckingRegistration = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isRegistered = false;
+          _isCheckingRegistration = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _fetchEvent() async {
+    try {
+      // Events are in B2C API, not Tourism API
+      final uri = Uri.parse(
+        '${AppConfig.b2cApiBaseUrl}/api/v1/events/${widget.eventId}',
+      );
+      final response = await http.get(uri);
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        setState(() {
+          _eventData = data;
+        });
+      }
+    } catch (e) {
+      // Silently fail - event header will show defaults
+    }
   }
 
   @override
@@ -152,65 +226,76 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
 
-    // Menu Items (including exit event as last item)
+    // Menu Items - Registration first, then items requiring registration, then always-available items
     final menuItems = [
+      // REGISTRATION - First position, always accessible
+      {
+        'icon': 'registration.png',
+        'label': l10n.registration,
+        'route': '/events/${widget.eventId}/registration',
+        'isRegistrationButton': true,
+      },
+      // Items requiring registration
       {
         'icon': 'agenda.png',
         'label': l10n.agenda,
         'route': '/events/${widget.eventId}/agenda',
+        'requiresRegistration': true,
       },
       {
         'icon': 'speakers.png',
         'label': l10n.speakers,
         'route': '/events/${widget.eventId}/speakers',
+        'requiresRegistration': true,
         'requiresAgreement': true,
       },
       {
         'icon': 'participants.png',
         'label': l10n.participants,
         'route': '/events/${widget.eventId}/participants',
+        'requiresRegistration': true,
         'requiresAgreement': true,
       },
       {
         'icon': 'meetings.png',
         'label': l10n.meetings,
         'route': '/events/${widget.eventId}/meetings',
-        'requiresAgreement': true,
-      },
-      {
-        'icon': 'news.png',
-        'label': l10n.news,
-        'route': '/events/${widget.eventId}/news',
-      },
-      {
-        'icon': 'registration.png',
-        'label': l10n.registration,
-        'route': '/events/${widget.eventId}/registration',
+        'requiresRegistration': true,
         'requiresAgreement': true,
       },
       {
         'icon': 'my_participants.png',
         'label': l10n.myParticipants,
         'route': '/events/${widget.eventId}/my-participants',
+        'requiresRegistration': true,
         'requiresAgreement': true,
       },
       {
         'icon': 'flights.png',
         'label': l10n.flights,
         'route': '/events/${widget.eventId}/flights',
+        'requiresRegistration': true,
         'requiresAgreement': true,
       },
       {
         'icon': 'accommodation.png',
         'label': l10n.accommodation,
         'route': '/events/${widget.eventId}/accommodation',
+        'requiresRegistration': true,
         'requiresAgreement': true,
       },
       {
         'icon': 'transfer.png',
         'label': l10n.transfer,
         'route': '/events/${widget.eventId}/transfer',
+        'requiresRegistration': true,
         'requiresAgreement': true,
+      },
+      // Always available items - News moved before Hotline
+      {
+        'icon': 'news.png',
+        'label': l10n.news,
+        'route': '/events/${widget.eventId}/news',
       },
       {
         'icon': 'hotline.png',
@@ -263,40 +348,37 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
                         ),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(12),
-                          child: Image.asset(
-                            'assets/event_menu/logo.png',
-                            fit: BoxFit.cover,
-                            errorBuilder: (c, e, s) => const Icon(
-                              Icons.event,
-                              color: Colors.white,
-                              size: 40,
-                            ),
-                          ),
+                          child: _eventData?['logo_url'] != null
+                              ? Image.network(
+                                  _eventData!['logo_url'].startsWith('http')
+                                      ? _eventData!['logo_url']
+                                      : '${AppConfig.tourismApiBaseUrl}${_eventData!['logo_url']}',
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (c, e, s) => const Icon(
+                                    Icons.event,
+                                    color: Colors.white,
+                                    size: 40,
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons.event,
+                                  color: Colors.white,
+                                  size: 40,
+                                ),
                         ),
                       ),
                       const SizedBox(width: 15),
-                      // Title in 2 lines
+                      // Title - Event name from API
                       Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              l10n.eventMenuLine1,
-                              style: GoogleFonts.montserrat(
-                                fontWeight: FontWeight.w600,
-                                fontSize: isMobile ? 20 : 28,
-                                color: const Color(0xFFF1F1F6),
-                              ),
-                            ),
-                            Text(
-                              l10n.eventMenuLine2,
-                              style: GoogleFonts.montserrat(
-                                fontWeight: FontWeight.w600,
-                                fontSize: isMobile ? 20 : 28,
-                                color: const Color(0xFFF1F1F6),
-                              ),
-                            ),
-                          ],
+                        child: Text(
+                          _eventData?['title'] ?? l10n.eventMenuLine1,
+                          style: GoogleFonts.montserrat(
+                            fontWeight: FontWeight.w600,
+                            fontSize: isMobile ? 20 : 28,
+                            color: const Color(0xFFF1F1F6),
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       // AppBar Icons (Notifications, Profile)
@@ -395,74 +477,107 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
                                   }
                                 }
 
-                                return GestureDetector(
-                                  onTap: () async {
-                                    if (website != null && website.isNotEmpty) {
-                                      // Add http:// if missing
-                                      String url = website;
-                                      if (!url.startsWith('http://') &&
-                                          !url.startsWith('https://')) {
-                                        url = 'https://$url';
+                                return Material(
+                                  color: Colors.transparent,
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(8),
+                                    onTap: () async {
+                                      if (website != null &&
+                                          website.isNotEmpty) {
+                                        // Add http:// if missing
+                                        String url = website;
+                                        if (!url.startsWith('http://') &&
+                                            !url.startsWith('https://')) {
+                                          url = 'https://$url';
+                                        }
+                                        try {
+                                          final uri = Uri.parse(url);
+                                          await launchUrl(
+                                            uri,
+                                            mode:
+                                                LaunchMode.externalApplication,
+                                          );
+                                        } catch (e) {
+                                          debugPrint(
+                                            'Could not launch $url: $e',
+                                          );
+                                        }
                                       }
-                                      try {
-                                        final uri = Uri.parse(url);
-                                        await launchUrl(
-                                          uri,
-                                          mode: LaunchMode.externalApplication,
-                                        );
-                                      } catch (e) {
-                                        debugPrint('Could not launch $url: $e');
-                                      }
-                                    }
-                                  },
-                                  child: Container(
-                                    width: 160,
-                                    margin: const EdgeInsets.only(right: 15),
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 8,
-                                      horizontal: 10,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF262B60),
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(
-                                        color: tierColor.withValues(alpha: 0.5),
+                                    },
+                                    child: Container(
+                                      width: 160,
+                                      margin: const EdgeInsets.only(right: 15),
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 8,
+                                        horizontal: 10,
                                       ),
-                                    ),
-                                    child: Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        // Logo - takes most of the space
-                                        Expanded(
-                                          child: (fullLogoUrl != null)
-                                              ? Image.network(
-                                                  fullLogoUrl,
-                                                  fit: BoxFit.contain,
-                                                  errorBuilder: (c, e, s) =>
-                                                      Icon(
-                                                        Icons.business,
-                                                        color: tierColor,
-                                                        size: 40,
-                                                      ),
-                                                )
-                                              : Icon(
-                                                  Icons.business,
-                                                  color: tierColor,
-                                                  size: 40,
-                                                ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        // Tier label only
-                                        Text(
-                                          tier.toUpperCase(),
-                                          style: GoogleFonts.roboto(
-                                            color: tierColor,
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 12,
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: tierColor.withValues(
+                                            alpha: 0.5,
                                           ),
                                         ),
-                                      ],
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withValues(
+                                              alpha: 0.1,
+                                            ),
+                                            blurRadius: 4,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          // Logo - takes most of the space
+                                          Expanded(
+                                            child: (fullLogoUrl != null)
+                                                ? Image.network(
+                                                    fullLogoUrl,
+                                                    fit: BoxFit.contain,
+                                                    errorBuilder: (c, e, s) =>
+                                                        Icon(
+                                                          Icons.business,
+                                                          color: tierColor,
+                                                          size: 40,
+                                                        ),
+                                                  )
+                                                : Icon(
+                                                    Icons.business,
+                                                    color: tierColor,
+                                                    size: 40,
+                                                  ),
+                                          ),
+                                          // Tier label with dark bg strip
+                                          Container(
+                                            width: double.infinity,
+                                            padding: const EdgeInsets.symmetric(
+                                              vertical: 4,
+                                              horizontal: 8,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: const Color(
+                                                0xFF262B60,
+                                              ).withValues(alpha: 0.85),
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
+                                            ),
+                                            child: Text(
+                                              tier.toUpperCase(),
+                                              textAlign: TextAlign.center,
+                                              style: GoogleFonts.roboto(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 11,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ),
                                 );
@@ -499,11 +614,166 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
                                   final item = menuItems[index];
                                   final isExit = item['isExit'] == true;
                                   final iconName = item['icon'] as String;
+                                  final isRegistrationButton =
+                                      item['isRegistrationButton'] == true;
+                                  final requiresRegistration =
+                                      item['requiresRegistration'] == true;
+
+                                  // Check if button should be disabled
+                                  final isDisabled =
+                                      requiresRegistration &&
+                                      !_isRegistered &&
+                                      !_isCheckingRegistration;
+
+                                  // Build the menu card content
+                                  Widget cardContent = Container(
+                                    decoration: BoxDecoration(
+                                      color: isExit
+                                          ? Colors.orange.withValues(
+                                              alpha: 0.15,
+                                            )
+                                          : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: isExit
+                                            ? Colors.orange.withValues(
+                                                alpha: 0.3,
+                                              )
+                                            : Colors.white.withValues(
+                                                alpha: 0.1,
+                                              ),
+                                      ),
+                                    ),
+                                    child: Stack(
+                                      children: [
+                                        // Main content - centered
+                                        Center(
+                                          child: Opacity(
+                                            opacity: isDisabled ? 0.4 : 1.0,
+                                            child: Column(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                if (isExit)
+                                                  Icon(
+                                                    Icons.exit_to_app,
+                                                    color: Colors.orange,
+                                                    size: isMobile ? 48 : 52,
+                                                  )
+                                                else
+                                                  Image.asset(
+                                                    'assets/event_menu/$iconName',
+                                                    width: isMobile ? 64 : 58,
+                                                    height: isMobile ? 64 : 58,
+                                                    errorBuilder: (c, e, s) =>
+                                                        const Icon(
+                                                          Icons.image,
+                                                          color: Colors.white54,
+                                                          size: 24,
+                                                        ),
+                                                  ),
+                                                SizedBox(
+                                                  height: isMobile ? 4 : 8,
+                                                ),
+                                                Padding(
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 4.0,
+                                                      ),
+                                                  child: Text(
+                                                    item['label'] as String,
+                                                    textAlign: TextAlign.center,
+                                                    style: GoogleFonts.roboto(
+                                                      fontSize: isMobile
+                                                          ? 14
+                                                          : 18,
+                                                      fontWeight:
+                                                          FontWeight.w500,
+                                                      color: isExit
+                                                          ? Colors.orange
+                                                          : const Color(
+                                                              0xFFF1F1F6,
+                                                            ),
+                                                    ),
+                                                    maxLines: 2,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                        // Lock icon overlay for disabled buttons
+                                        if (isDisabled)
+                                          Positioned(
+                                            top: 6,
+                                            right: 6,
+                                            child: Container(
+                                              padding: const EdgeInsets.all(4),
+                                              decoration: BoxDecoration(
+                                                color: Colors.black54,
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                              ),
+                                              child: const Icon(
+                                                Icons.lock_outline,
+                                                color: Colors.white70,
+                                                size: 14,
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  );
+
+                                  // Wrap registration button with AttentionSeeker animation
+                                  if (isRegistrationButton) {
+                                    cardContent = AttentionSeeker(
+                                      animate: _showRegistrationHighlight,
+                                      glowColor: Colors.greenAccent,
+                                      repeatCount: 3,
+                                      onAnimationComplete: () {
+                                        if (mounted) {
+                                          setState(
+                                            () => _showRegistrationHighlight =
+                                                false,
+                                          );
+                                        }
+                                      },
+                                      child: cardContent,
+                                    );
+                                  }
 
                                   return Material(
                                     color: Colors.transparent,
                                     child: InkWell(
                                       onTap: () {
+                                        // Handle disabled button tap
+                                        if (isDisabled) {
+                                          // Show snackbar and trigger highlight
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                'Please register for this event first',
+                                              ),
+                                              backgroundColor: Color(
+                                                0xFF3C4494,
+                                              ),
+                                              duration: Duration(seconds: 2),
+                                            ),
+                                          );
+                                          // Trigger registration button highlight
+                                          setState(
+                                            () => _showRegistrationHighlight =
+                                                true,
+                                          );
+                                          return;
+                                        }
+
                                         if (isExit) {
                                           _onExitEvent();
                                         } else if (item['route'] != null) {
@@ -534,7 +804,9 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
                                                   ElevatedButton(
                                                     onPressed: () {
                                                       Navigator.pop(ctx);
-                                                      context.go('/profile');
+                                                      context.go(
+                                                        '/profile?tab=0&returnTo=/events/${widget.eventId}/menu',
+                                                      );
                                                     },
                                                     child: const Text(
                                                       'Go to Profile',
@@ -545,78 +817,17 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
                                             );
                                             return;
                                           }
-                                          // Use go() instead of push() for proper URL update on web
                                           context.go(item['route'] as String);
                                         }
                                       },
                                       borderRadius: BorderRadius.circular(12),
-                                      splashColor: Colors.white24,
-                                      highlightColor: Colors.white10,
-                                      child: Container(
-                                        decoration: BoxDecoration(
-                                          color: isExit
-                                              ? Colors.orange.withValues(
-                                                  alpha: 0.15,
-                                                )
-                                              : Colors.transparent,
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                          border: Border.all(
-                                            color: isExit
-                                                ? Colors.orange.withValues(
-                                                    alpha: 0.3,
-                                                  )
-                                                : Colors.white.withValues(
-                                                    alpha: 0.1,
-                                                  ),
-                                          ),
-                                        ),
-                                        child: Column(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            if (isExit)
-                                              Icon(
-                                                Icons.exit_to_app,
-                                                color: Colors.orange,
-                                                size: isMobile ? 48 : 52,
-                                              )
-                                            else
-                                              Image.asset(
-                                                'assets/event_menu/$iconName',
-                                                width: isMobile ? 64 : 58,
-                                                height: isMobile ? 64 : 58,
-                                                errorBuilder: (c, e, s) =>
-                                                    const Icon(
-                                                      Icons.image,
-                                                      color: Colors.white54,
-                                                      size: 24,
-                                                    ),
-                                              ),
-                                            SizedBox(height: isMobile ? 4 : 8),
-                                            Padding(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 4.0,
-                                                  ),
-                                              child: Text(
-                                                item['label'] as String,
-                                                textAlign: TextAlign.center,
-                                                style: GoogleFonts.roboto(
-                                                  fontSize: isMobile ? 14 : 18,
-                                                  fontWeight: FontWeight.w500,
-                                                  color: isExit
-                                                      ? Colors.orange
-                                                      : const Color(0xFFF1F1F6),
-                                                ),
-                                                maxLines: 2,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
+                                      splashColor: isDisabled
+                                          ? Colors.transparent
+                                          : Colors.white24,
+                                      highlightColor: isDisabled
+                                          ? Colors.transparent
+                                          : Colors.white10,
+                                      child: cardContent,
                                     ),
                                   );
                                 },
