@@ -1,27 +1,20 @@
-import 'dart:convert';
-
-import 'package:http/http.dart' as http;
-
-import '../../../core/config/app_config.dart';
+import '../../../core/services/api_client.dart';
 import '../../auth/services/auth_service.dart';
 
 class SpeakerService {
-  final String baseUrl = '${AppConfig.b2cApiBaseUrl}/api/v1/integration';
-  final AuthService authService;
+  final ApiClient _api;
 
-  SpeakerService(this.authService);
+  SpeakerService(AuthService authService) : _api = ApiClient(authService);
 
   Future<List<dynamic>> fetchSpeakers() async {
-    try {
-      final response = await http.get(Uri.parse('$baseUrl/speakers'));
+    final result = await _api.get<List<dynamic>>(
+      '/api/v1/integration/speakers',
+      auth: false,
+    );
 
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
-      } else {
-        throw Exception('Failed to load speakers');
-      }
-    } catch (e) {
-      throw Exception('Error fetching speakers: $e');
+    if (result.isSuccess && result.data != null) {
+      return result.data!;
     }
+    return [];
   }
 }

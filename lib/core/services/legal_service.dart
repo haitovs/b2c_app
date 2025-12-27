@@ -1,34 +1,5 @@
-import 'dart:convert';
-
-import 'package:http/http.dart' as http;
-
-import '../config/app_config.dart';
-
-/// Service for fetching legal documents (Terms, Privacy, Refund) from the API.
-class LegalService {
-  final String baseUrl = '${AppConfig.b2cApiBaseUrl}/api/v1';
-
-  /// Fetch a legal document by type.
-  /// [docType] should be one of: TERMS, PRIVACY, REFUND
-  Future<LegalDocument?> getDocument(String docType) async {
-    try {
-      final response = await http.get(
-        Uri.parse('$baseUrl/legal/${docType.toUpperCase()}'),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return LegalDocument.fromJson(data);
-      } else if (response.statusCode == 404) {
-        // Document not found - admin needs to create it
-        return null;
-      }
-    } catch (e) {
-      // Error fetching legal document - silently fail
-    }
-    return null;
-  }
-}
+import '../../features/auth/services/auth_service.dart';
+import '../services/api_client.dart';
 
 /// Legal document model
 class LegalDocument {
@@ -54,5 +25,23 @@ class LegalDocument {
   }
 }
 
-/// Global instance for easy access
-final legalService = LegalService();
+/// Service for fetching legal documents (Terms, Privacy, Refund) from the API.
+class LegalService {
+  final ApiClient _api;
+
+  LegalService(AuthService authService) : _api = ApiClient(authService);
+
+  /// Fetch a legal document by type.
+  /// [docType] should be one of: TERMS, PRIVACY, REFUND
+  Future<LegalDocument?> getDocument(String docType) async {
+    final result = await _api.get<Map<String, dynamic>>(
+      '/api/v1/legal/${docType.toUpperCase()}',
+      auth: false,
+    );
+
+    if (result.isSuccess && result.data != null) {
+      return LegalDocument.fromJson(result.data!);
+    }
+    return null;
+  }
+}

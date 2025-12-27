@@ -1,63 +1,32 @@
-import 'dart:convert';
+import '../../../core/services/api_client.dart';
+import '../../auth/services/auth_service.dart';
+import '../models/faq_item.dart';
 
-import 'package:http/http.dart' as http;
-
-import '../../../core/config/app_config.dart';
-
-class FAQItem {
-  final int id;
-  final int? eventId;
-  final String question;
-  final String answer; // Markdown format
-  final String? category;
-  final int order;
-
-  FAQItem({
-    required this.id,
-    this.eventId,
-    required this.question,
-    required this.answer,
-    this.category,
-    required this.order,
-  });
-
-  factory FAQItem.fromJson(Map<String, dynamic> json) {
-    return FAQItem(
-      id: json['id'],
-      eventId: json['event_id'],
-      question: json['question'] ?? '',
-      answer: json['answer'] ?? '',
-      category: json['category'],
-      order: json['order'] ?? 0,
-    );
-  }
-}
-
+/// Service for fetching FAQs from the B2C backend
 class FAQService {
-  final String baseUrl = '${AppConfig.b2cApiBaseUrl}/api/v1';
+  final ApiClient _api;
 
+  FAQService(AuthService authService) : _api = ApiClient(authService);
+
+  /// Get FAQs, optionally filtered by event ID and search query
   Future<List<FAQItem>> getFAQs({int? eventId, String? search}) async {
-    try {
-      final queryParams = <String, String>{};
-      if (eventId != null) {
-        queryParams['event_id'] = eventId.toString();
-      }
-      if (search != null && search.isNotEmpty) {
-        queryParams['search'] = search;
-      }
-
-      final uri = Uri.parse(
-        '$baseUrl/faq/',
-      ).replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
-      final response = await http.get(uri);
-
-      if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        return data.map((json) => FAQItem.fromJson(json)).toList();
-      }
-      return [];
-    } catch (e) {
-      return [];
+    final queryParams = <String, String>{};
+    if (eventId != null) {
+      queryParams['event_id'] = eventId.toString();
     }
+    if (search != null && search.isNotEmpty) {
+      queryParams['search'] = search;
+    }
+
+    final result = await _api.get<List<dynamic>>(
+      '/api/v1/faq/',
+      auth: false,
+      queryParams: queryParams.isNotEmpty ? queryParams : null,
+    );
+
+    if (result.isSuccess && result.data != null) {
+      return result.data!.map((json) => FAQItem.fromJson(json)).toList();
+    }
+    return [];
   }
 }

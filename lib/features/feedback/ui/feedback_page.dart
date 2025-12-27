@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart' as legacy_provider;
 
+import '../../auth/services/auth_service.dart';
 import '../services/feedback_service.dart';
 
 class FeedbackPage extends StatefulWidget {
@@ -15,7 +17,7 @@ class FeedbackPage extends StatefulWidget {
 }
 
 class _FeedbackPageState extends State<FeedbackPage> {
-  final FeedbackService _service = FeedbackService();
+  late final FeedbackService _service;
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _feedbackController = TextEditingController();
 
@@ -28,6 +30,11 @@ class _FeedbackPageState extends State<FeedbackPage> {
   @override
   void initState() {
     super.initState();
+    final authService = legacy_provider.Provider.of<AuthService>(
+      context,
+      listen: false,
+    );
+    _service = FeedbackService(authService);
     _loadData();
   }
 

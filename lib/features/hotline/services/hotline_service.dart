@@ -1,7 +1,5 @@
-import 'dart:convert';
-
-import 'package:http/http.dart' as http;
-
+import '../../../core/config/app_config.dart';
+import '../../../core/services/api_client.dart';
 import '../../auth/services/auth_service.dart';
 
 class ChatMessage {
@@ -36,66 +34,42 @@ class ChatMessage {
 }
 
 class HotlineService {
-  static const String baseUrl = 'http://127.0.0.1:8000/api/v1';
-
+  final ApiClient _api;
   final AuthService _authService;
 
-  HotlineService(this._authService);
-
-  Future<String?> _getToken() async {
-    // Get token from AuthService (checks both memory and SharedPreferences)
-    return await _authService.getToken();
-  }
-
-  Future<Map<String, String>> _getHeaders() async {
-    final token = await _getToken();
-    return {
-      'Content-Type': 'application/json',
-      if (token != null) 'Authorization': 'Bearer $token',
-    };
-  }
+  HotlineService(this._authService) : _api = ApiClient(_authService);
 
   /// Get chat history
   Future<List<ChatMessage>> getChatHistory({
     int skip = 0,
     int limit = 100,
   }) async {
-    try {
-      final headers = await _getHeaders();
-      final url = '$baseUrl/chat/history?skip=$skip&limit=$limit';
-      final response = await http.get(Uri.parse(url), headers: headers);
+    final result = await _api.get<List<dynamic>>(
+      '/api/v1/chat/history',
+      queryParams: {'skip': skip.toString(), 'limit': limit.toString()},
+    );
 
-      if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        return data.map((json) => ChatMessage.fromJson(json)).toList();
-      } else {
-        return [];
-      }
-    } catch (e) {
-      return [];
+    if (result.isSuccess && result.data != null) {
+      return result.data!.map((json) => ChatMessage.fromJson(json)).toList();
     }
+    return [];
   }
 
   /// Send a message via REST API
   Future<bool> sendMessage(String content) async {
-    try {
-      final headers = await _getHeaders();
-      final response = await http.post(
-        Uri.parse('$baseUrl/chat/send?content=${Uri.encodeComponent(content)}'),
-        headers: headers,
-      );
+    final result = await _api.post<Map<String, dynamic>>(
+      '/api/v1/chat/send?content=${Uri.encodeComponent(content)}',
+    );
 
-      return response.statusCode == 200;
-    } catch (e) {
-      // Failed to send message
-      return false;
-    }
+    return result.isSuccess;
   }
 
   /// Get WebSocket URL for real-time chat
   Future<String?> getWebSocketUrl() async {
-    final token = await _getToken();
+    final token = await _authService.getToken();
     if (token == null) return null;
-    return 'ws://127.0.0.1:8000/api/v1/chat/ws?token=$token';
+    // Convert http(s) to ws(s)
+    final wsUrl = AppConfig.b2cApiBaseUrl.replaceFirst('http', 'ws');
+    return '$wsUrl/api/v1/chat/ws?token=$token';
   }
 }

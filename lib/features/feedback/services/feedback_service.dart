@@ -1,9 +1,4 @@
-import 'dart:convert';
-
-import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
-
-import '../../../core/config/app_config.dart';
+import '../../../core/services/api_client.dart';
 import '../../auth/services/auth_service.dart';
 
 /// Model for a feedback item
@@ -35,84 +30,39 @@ class FeedbackItem {
 
 /// Service for managing event feedback
 class FeedbackService {
-  final String _baseUrl = AppConfig.b2cApiBaseUrl;
-  final AuthService _authService = AuthService();
+  final ApiClient _api;
+
+  FeedbackService(AuthService authService) : _api = ApiClient(authService);
 
   /// Get feedback status (open/closed) for an event
   Future<bool> getFeedbackStatus(int eventId) async {
-    try {
-      final token = await _authService.getToken();
-      final response = await http.get(
-        Uri.parse('$_baseUrl/feedbacks/$eventId/status'),
-        headers: {
-          'Content-Type': 'application/json',
-          if (token != null) 'Authorization': 'Bearer $token',
-        },
-      );
+    final result = await _api.get<Map<String, dynamic>>(
+      '/api/v1/feedbacks/$eventId/status',
+    );
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return data['is_open'] ?? false;
-      }
-      return false;
-    } catch (e) {
-      debugPrint('Error getting feedback status: $e');
-      return false;
+    if (result.isSuccess && result.data != null) {
+      return result.data!['is_open'] ?? false;
     }
+    return false;
   }
 
   /// Get all feedback for an event
   Future<List<FeedbackItem>> getFeedbacks(int eventId) async {
-    try {
-      final token = await _authService.getToken();
-      final response = await http.get(
-        Uri.parse('$_baseUrl/feedbacks/$eventId'),
-        headers: {
-          'Content-Type': 'application/json',
-          if (token != null) 'Authorization': 'Bearer $token',
-        },
-      );
+    final result = await _api.get<List<dynamic>>('/api/v1/feedbacks/$eventId');
 
-      if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body);
-        return data.map((item) => FeedbackItem.fromJson(item)).toList();
-      }
-      return [];
-    } catch (e) {
-      debugPrint('Error getting feedbacks: $e');
-      return [];
+    if (result.isSuccess && result.data != null) {
+      return result.data!.map((item) => FeedbackItem.fromJson(item)).toList();
     }
+    return [];
   }
 
   /// Submit feedback for an event
   Future<bool> submitFeedback(int eventId, String content) async {
-    try {
-      final token = await _authService.getToken();
-      if (token == null) {
-        debugPrint('No auth token for feedback submission');
-        return false;
-      }
+    final result = await _api.post<Map<String, dynamic>>(
+      '/api/v1/feedbacks/$eventId',
+      body: {'content': content},
+    );
 
-      final response = await http.post(
-        Uri.parse('$_baseUrl/feedbacks/$eventId'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode({'content': content}),
-      );
-
-      if (response.statusCode == 201) {
-        return true;
-      } else {
-        debugPrint(
-          'Failed to submit feedback: ${response.statusCode} - ${response.body}',
-        );
-        return false;
-      }
-    } catch (e) {
-      debugPrint('Error submitting feedback: $e');
-      return false;
-    }
+    return result.isSuccess;
   }
 }

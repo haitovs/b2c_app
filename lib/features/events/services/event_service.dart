@@ -1,51 +1,45 @@
-import 'dart:convert';
-
-import 'package:http/http.dart' as http;
-
-import '../../../core/config/app_config.dart';
+import '../../../core/services/api_client.dart';
 import '../../auth/services/auth_service.dart';
 
+/// Service for fetching events from the B2C backend
 class EventService {
-  final String baseUrl = '${AppConfig.b2cApiBaseUrl}/api/v1';
-  final AuthService authService;
+  final ApiClient _api;
 
-  EventService(this.authService);
+  EventService(AuthService authService) : _api = ApiClient(authService);
 
+  /// Fetch all events, optionally filtered by site ID
   Future<List<dynamic>> fetchEvents({int? siteId}) async {
-    try {
-      String query = '';
-      if (siteId != null) {
-        query = '?tourism_site_id=$siteId';
-      }
-      final response = await http.get(
-        Uri.parse('$baseUrl/events/$query'),
-        // headers: {'Authorization': 'Bearer ${authService.token}'}, // If protected
-      );
+    final queryParams = <String, String>{};
+    if (siteId != null) {
+      queryParams['tourism_site_id'] = siteId.toString();
+    }
 
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
-      } else {
-        throw Exception('Failed to load events');
-      }
-    } catch (e) {
-      throw Exception('Error fetching events: $e');
+    final result = await _api.get<List<dynamic>>(
+      '/api/v1/events/',
+      auth: false,
+      queryParams: queryParams.isNotEmpty ? queryParams : null,
+    );
+
+    if (result.isSuccess && result.data != null) {
+      return result.data!;
+    } else {
+      throw result.error ?? Exception('Failed to load events');
     }
   }
 
-  /// Fetch single event by ID
+  /// Fetch a single event by ID
   Future<Map<String, dynamic>?> fetchEvent(int id) async {
-    try {
-      final response = await http.get(Uri.parse('$baseUrl/events/$id'));
+    final result = await _api.get<Map<String, dynamic>>(
+      '/api/v1/events/$id',
+      auth: false,
+    );
 
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
-      } else if (response.statusCode == 404) {
-        return null;
-      } else {
-        throw Exception('Failed to load event');
-      }
-    } catch (e) {
-      throw Exception('Error fetching event: $e');
+    if (result.isSuccess) {
+      return result.data;
+    } else if (result.error?.isNotFound ?? false) {
+      return null;
+    } else {
+      throw result.error ?? Exception('Failed to load event');
     }
   }
 }

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart' as legacy_provider;
 
 import '../../core/services/legal_service.dart';
+import '../../features/auth/services/auth_service.dart';
 
 /// A bottom sheet widget that displays legal documents (Terms, Privacy, Refund)
 /// with markdown rendering.
@@ -29,16 +31,22 @@ class _LegalBottomSheetState extends State<LegalBottomSheet> {
   LegalDocument? _document;
   bool _isLoading = true;
   String? _error;
+  late final LegalService _legalService;
 
   @override
   void initState() {
     super.initState();
+    final authService = legacy_provider.Provider.of<AuthService>(
+      context,
+      listen: false,
+    );
+    _legalService = LegalService(authService);
     _loadDocument();
   }
 
   Future<void> _loadDocument() async {
     try {
-      final doc = await legalService.getDocument(widget.docType);
+      final doc = await _legalService.getDocument(widget.docType);
       if (mounted) {
         setState(() {
           _document = doc;

@@ -1,9 +1,6 @@
-import 'dart:convert';
-
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 
-import '../../../core/config/app_config.dart';
+import '../../../core/services/api_client.dart';
 import '../../auth/services/auth_service.dart';
 
 /// Notification model
@@ -43,8 +40,7 @@ class NotificationItem {
 
 /// Service for managing notifications
 class NotificationService extends ChangeNotifier {
-  final String baseUrl = '${AppConfig.b2cApiBaseUrl}/api/v1';
-  final AuthService _authService;
+  final ApiClient _api;
 
   List<NotificationItem> _notifications = [];
   int _unreadCount = 0;
@@ -54,49 +50,25 @@ class NotificationService extends ChangeNotifier {
   int get unreadCount => _unreadCount;
   bool get isLoading => _isLoading;
 
-  NotificationService(this._authService);
-
-  /// Get authorization headers
-  Future<Map<String, String>> _getHeaders() async {
-    final token = await _authService.getToken();
-    return {
-      'Content-Type': 'application/json',
-      if (token != null) 'Authorization': 'Bearer $token',
-    };
-  }
+  NotificationService(AuthService authService) : _api = ApiClient(authService);
 
   /// Fetch all notifications for current user
   Future<List<NotificationItem>> getNotifications() async {
     _isLoading = true;
     notifyListeners();
 
-    try {
-      final headers = await _getHeaders();
-      final response = await http.get(
-        Uri.parse('$baseUrl/notifications/'),
-        headers: headers,
-      );
+    final result = await _api.get<List<dynamic>>('/api/v1/notifications/');
 
-      if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body);
-        _notifications = data
-            .map((json) => NotificationItem.fromJson(json))
-            .toList();
-        _updateUnreadCount();
-        _isLoading = false;
-        notifyListeners();
-        return _notifications;
-      }
-
-      _isLoading = false;
-      notifyListeners();
-      return [];
-    } catch (e) {
-      debugPrint("Error fetching notifications: $e");
-      _isLoading = false;
-      notifyListeners();
-      return [];
+    if (result.isSuccess && result.data != null) {
+      _notifications = result.data!
+          .map((json) => NotificationItem.fromJson(json))
+          .toList();
+      _updateUnreadCount();
     }
+
+    _isLoading = false;
+    notifyListeners();
+    return _notifications;
   }
 
   /// Get unread notification count
@@ -110,36 +82,29 @@ class NotificationService extends ChangeNotifier {
 
   /// Mark a notification as read
   Future<bool> markAsRead(int id) async {
-    try {
-      final headers = await _getHeaders();
-      final response = await http.patch(
-        Uri.parse('$baseUrl/notifications/$id/read'),
-        headers: headers,
-      );
+    final result = await _api.patch<Map<String, dynamic>>(
+      '/api/v1/notifications/$id/read',
+    );
 
-      if (response.statusCode == 200) {
-        // Update local state
-        final index = _notifications.indexWhere((n) => n.id == id);
-        if (index != -1) {
-          _notifications[index] = NotificationItem(
-            id: _notifications[index].id,
-            title: _notifications[index].title,
-            body: _notifications[index].body,
-            isRead: true,
-            relatedEntityType: _notifications[index].relatedEntityType,
-            relatedEntityId: _notifications[index].relatedEntityId,
-            createdAt: _notifications[index].createdAt,
-          );
-          _updateUnreadCount();
-          notifyListeners();
-        }
-        return true;
+    if (result.isSuccess) {
+      // Update local state
+      final index = _notifications.indexWhere((n) => n.id == id);
+      if (index != -1) {
+        _notifications[index] = NotificationItem(
+          id: _notifications[index].id,
+          title: _notifications[index].title,
+          body: _notifications[index].body,
+          isRead: true,
+          relatedEntityType: _notifications[index].relatedEntityType,
+          relatedEntityId: _notifications[index].relatedEntityId,
+          createdAt: _notifications[index].createdAt,
+        );
+        _updateUnreadCount();
+        notifyListeners();
       }
-      return false;
-    } catch (e) {
-      debugPrint("Error marking notification as read: $e");
-      return false;
+      return true;
     }
+    return false;
   }
 
   /// Mark all notifications as read

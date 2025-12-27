@@ -68,19 +68,28 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
     try {
       final authService = context.read<AuthService>();
       final token = await authService.getToken();
+      debugPrint('[EventMenu] Checking registration status...');
+      debugPrint('[EventMenu] Token: ${token?.substring(0, 20)}...');
+
       final response = await http.get(
-        Uri.parse('${AppConfig.b2cApiBaseUrl}/api/v1/registrations/my-status'),
+        Uri.parse(
+          '${AppConfig.b2cApiBaseUrl}/api/v1/registrations/my-status?event_id=${widget.eventId}',
+        ),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
         },
       );
 
+      debugPrint('[EventMenu] Response status: ${response.statusCode}');
+      debugPrint('[EventMenu] Response body: ${response.body}');
+
       if (!mounted) return;
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final status = data['status'];
+        debugPrint('[EventMenu] Registration status: $status');
         setState(() {
           // Accept SUBMITTED, APPROVED/ACCEPTED as registered
           _isRegistered =
@@ -88,14 +97,17 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
               status == 'APPROVED' ||
               status == 'SUBMITTED';
           _isCheckingRegistration = false;
+          debugPrint('[EventMenu] _isRegistered set to: $_isRegistered');
         });
       } else {
+        debugPrint('[EventMenu] Non-200 response, setting _isRegistered=false');
         setState(() {
           _isRegistered = false;
           _isCheckingRegistration = false;
         });
       }
     } catch (e) {
+      debugPrint('[EventMenu] Error checking registration: $e');
       if (mounted) {
         setState(() {
           _isRegistered = false;

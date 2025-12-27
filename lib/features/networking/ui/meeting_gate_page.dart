@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:provider/provider.dart' as legacy_provider;
 
 import '../../auth/services/auth_service.dart';
-import '../services/meeting_service.dart';
+import '../../registration/services/registration_service.dart';
 import 'meeting_not_registered_page.dart';
 import 'meetings_page.dart';
 
@@ -46,8 +46,11 @@ class _MeetingGatePageState extends ConsumerState<MeetingGatePage> {
         context,
         listen: false,
       );
-      final meetingService = MeetingService(authService);
-      final isRegistered = await meetingService.checkRegistrationStatus();
+      final registrationService = RegistrationService(authService);
+      final eventId = int.tryParse(widget.eventId) ?? 0;
+      final isRegistered = await registrationService.hasApprovedRegistration(
+        eventId,
+      );
 
       if (mounted) {
         setState(() {

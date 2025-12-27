@@ -1,8 +1,4 @@
-import 'dart:convert';
-
-import 'package:http/http.dart' as http;
-
-import '../../../core/config/app_config.dart';
+import '../../../core/services/api_client.dart';
 import '../../auth/services/auth_service.dart';
 
 /// Meeting types matching the B2C backend enum
@@ -13,45 +9,31 @@ enum MeetingStatus { pending, confirmed, declined, cancelled }
 
 /// Service for managing meetings via the B2C backend
 class MeetingService {
-  final String baseUrl = '${AppConfig.b2cApiBaseUrl}/api/v1/meetings';
-  final AuthService authService;
+  final ApiClient _api;
 
-  MeetingService(this.authService);
+  MeetingService(AuthService authService) : _api = ApiClient(authService);
 
   /// Get all meetings for the current user
   Future<List<Map<String, dynamic>>> fetchMyMeetings() async {
-    final token = await authService.getToken();
-    final response = await http.get(
-      Uri.parse(baseUrl),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
-    );
+    final result = await _api.get<List<dynamic>>('/api/v1/meetings');
 
-    if (response.statusCode == 200) {
-      final List data = jsonDecode(response.body);
-      return data.cast<Map<String, dynamic>>();
+    if (result.isSuccess && result.data != null) {
+      return result.data!.cast<Map<String, dynamic>>();
     } else {
-      throw Exception('Failed to load meetings: ${response.body}');
+      throw result.error ?? Exception('Failed to load meetings');
     }
   }
 
   /// Get a single meeting by ID
   Future<Map<String, dynamic>> fetchMeeting(String meetingId) async {
-    final token = await authService.getToken();
-    final response = await http.get(
-      Uri.parse('$baseUrl/$meetingId'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
+    final result = await _api.get<Map<String, dynamic>>(
+      '/api/v1/meetings/$meetingId',
     );
 
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
+    if (result.isSuccess && result.data != null) {
+      return result.data!;
     } else {
-      throw Exception('Failed to load meeting: ${response.body}');
+      throw result.error ?? Exception('Failed to load meeting');
     }
   }
 
@@ -63,13 +45,12 @@ class MeetingService {
     required DateTime startTime,
     required DateTime endTime,
     String? location,
-    String? targetUserId, // B2C User UUID for B2B
+    String? targetUserId,
     int? targetGovEntityId,
     int? targetSpeakerId,
     String? attendeesText,
+    String? language,
   }) async {
-    final token = await authService.getToken();
-
     final body = {
       'event_id': eventId,
       'type': type.name.toUpperCase(),
@@ -81,21 +62,18 @@ class MeetingService {
       if (targetGovEntityId != null) 'target_gov_entity_id': targetGovEntityId,
       if (targetSpeakerId != null) 'target_speaker_id': targetSpeakerId,
       if (attendeesText != null) 'attendees_text': attendeesText,
+      if (language != null) 'language': language,
     };
 
-    final response = await http.post(
-      Uri.parse(baseUrl),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode(body),
+    final result = await _api.post<Map<String, dynamic>>(
+      '/api/v1/meetings',
+      body: body,
     );
 
-    if (response.statusCode == 200 || response.statusCode == 201) {
-      return jsonDecode(response.body);
+    if (result.isSuccess && result.data != null) {
+      return result.data!;
     } else {
-      throw Exception('Failed to create meeting: ${response.body}');
+      throw result.error ?? Exception('Failed to create meeting');
     }
   }
 
@@ -108,8 +86,6 @@ class MeetingService {
     String? location,
     String? attendeesText,
   }) async {
-    final token = await authService.getToken();
-
     final body = <String, dynamic>{};
     if (subject != null) body['subject'] = subject;
     if (startTime != null) body['start_time'] = startTime.toIso8601String();
@@ -117,19 +93,15 @@ class MeetingService {
     if (location != null) body['location'] = location;
     if (attendeesText != null) body['attendees_text'] = attendeesText;
 
-    final response = await http.put(
-      Uri.parse('$baseUrl/$meetingId'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode(body),
+    final result = await _api.put<Map<String, dynamic>>(
+      '/api/v1/meetings/$meetingId',
+      body: body,
     );
 
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
+    if (result.isSuccess && result.data != null) {
+      return result.data!;
     } else {
-      throw Exception('Failed to update meeting: ${response.body}');
+      throw result.error ?? Exception('Failed to update meeting');
     }
   }
 
@@ -138,88 +110,46 @@ class MeetingService {
     required String meetingId,
     required MeetingStatus status,
   }) async {
-    final token = await authService.getToken();
-
-    final response = await http.patch(
-      Uri.parse(
-        '$baseUrl/$meetingId/status?status_in=${status.name.toUpperCase()}',
-      ),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
+    final result = await _api.patch<Map<String, dynamic>>(
+      '/api/v1/meetings/$meetingId/status?status_in=${status.name.toUpperCase()}',
     );
 
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
+    if (result.isSuccess && result.data != null) {
+      return result.data!;
     } else {
-      throw Exception('Failed to update status: ${response.body}');
+      throw result.error ?? Exception('Failed to update status');
     }
   }
 
   /// Get government entities list (for B2G meetings)
   Future<List<Map<String, dynamic>>> fetchGovEntities() async {
-    final token = await authService.getToken();
-    final response = await http.get(
-      Uri.parse('$baseUrl/gov-entities'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
+    final result = await _api.get<List<dynamic>>(
+      '/api/v1/meetings/gov-entities',
     );
 
-    if (response.statusCode == 200) {
-      final List data = jsonDecode(response.body);
-      return data.cast<Map<String, dynamic>>();
+    if (result.isSuccess && result.data != null) {
+      return result.data!.cast<Map<String, dynamic>>();
     } else {
-      throw Exception('Failed to load gov entities: ${response.body}');
+      throw result.error ?? Exception('Failed to load gov entities');
     }
   }
 
   /// Fetch participants from Tourism backend (for B2B target selection)
   Future<List<Map<String, dynamic>>> fetchParticipants({int? siteId}) async {
-    final token = await authService.getToken();
-    var url = '${AppConfig.b2cApiBaseUrl}/api/v1/integration/participants';
+    final queryParams = <String, String>{};
     if (siteId != null) {
-      url += '?site_id=$siteId';
+      queryParams['site_id'] = siteId.toString();
     }
 
-    final response = await http.get(
-      Uri.parse(url),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
+    final result = await _api.get<List<dynamic>>(
+      '/api/v1/integration/participants',
+      queryParams: queryParams.isNotEmpty ? queryParams : null,
     );
 
-    if (response.statusCode == 200) {
-      final List data = jsonDecode(response.body);
-      return data.cast<Map<String, dynamic>>();
+    if (result.isSuccess && result.data != null) {
+      return result.data!.cast<Map<String, dynamic>>();
     } else {
-      throw Exception('Failed to load participants: ${response.body}');
-    }
-  }
-
-  /// Check if user is registered
-  Future<bool> checkRegistrationStatus() async {
-    try {
-      final token = await authService.getToken();
-      final response = await http.get(
-        Uri.parse('${AppConfig.b2cApiBaseUrl}/api/v1/registrations/my-status'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return data['status'] == 'ACCEPTED';
-      }
-      return false;
-    } catch (e) {
-      // API endpoint not available or error - assume not registered
-      return false;
+      throw result.error ?? Exception('Failed to load participants');
     }
   }
 }

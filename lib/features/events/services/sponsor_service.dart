@@ -1,27 +1,20 @@
-import 'dart:convert';
-
-import 'package:http/http.dart' as http;
-
-import '../../../core/config/app_config.dart';
+import '../../../core/services/api_client.dart';
 import '../../auth/services/auth_service.dart';
 
 class SponsorService {
-  final String baseUrl = '${AppConfig.b2cApiBaseUrl}/api/v1/integration';
-  final AuthService authService;
+  final ApiClient _api;
 
-  SponsorService(this.authService);
+  SponsorService(AuthService authService) : _api = ApiClient(authService);
 
   Future<List<dynamic>> fetchSponsors() async {
-    try {
-      final response = await http.get(Uri.parse('$baseUrl/sponsors'));
+    final result = await _api.get<List<dynamic>>(
+      '/api/v1/integration/sponsors',
+      auth: false,
+    );
 
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
-      } else {
-        throw Exception('Failed to load sponsors');
-      }
-    } catch (e) {
-      throw Exception('Error fetching sponsors: $e');
+    if (result.isSuccess && result.data != null) {
+      return result.data!;
     }
+    return [];
   }
 }
