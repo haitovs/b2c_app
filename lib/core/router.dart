@@ -16,6 +16,8 @@ import '../features/events/ui/speaker_detail_page.dart';
 import '../features/events/ui/speaker_list_page.dart';
 import '../features/faq/ui/faq_page.dart';
 import '../features/feedback/ui/feedback_page.dart';
+import '../features/flights/ui/flight_booking_page.dart';
+import '../features/flights/ui/flights_page.dart';
 import '../features/hotline/ui/hotline_page.dart';
 import '../features/networking/ui/meeting_b2g_request_page.dart';
 import '../features/networking/ui/meeting_edit_page.dart';
@@ -25,6 +27,8 @@ import '../features/networking/ui/meeting_review_page.dart';
 import '../features/networking/ui/new_meeting_page.dart';
 import '../features/news/ui/news_detail_page.dart';
 import '../features/news/ui/news_page.dart';
+import '../features/participants/ui/my_participants_page.dart';
+import '../features/transfer/ui/transfer_page.dart';
 import 'error_page.dart';
 
 GoRouter createRouter(AuthService authService) {
@@ -250,7 +254,39 @@ GoRouter createRouter(AuthService authService) {
               return EventRegistrationPage(eventId: int.tryParse(idStr) ?? 0);
             },
           ),
+          // Transfer route
+          GoRoute(
+            path: 'transfer',
+            builder: (context, state) {
+              final idStr = state.pathParameters['id']!;
+              return TransferPage(eventId: int.tryParse(idStr) ?? 0);
+            },
+          ),
+          // Flights route
+          GoRoute(
+            path: 'flights',
+            builder: (context, state) {
+              final idStr = state.pathParameters['id']!;
+              return FlightsPage(eventId: int.tryParse(idStr));
+            },
+          ),
+          // My Participants route
+          GoRoute(
+            path: 'my-participants',
+            builder: (context, state) {
+              final idStr = state.pathParameters['id']!;
+              return MyParticipantsPage(eventId: int.tryParse(idStr) ?? 0);
+            },
+          ),
         ],
+      ),
+      // Standalone flights routes (for booking)
+      GoRoute(
+        path: '/flights/:flightId/book',
+        builder: (context, state) {
+          final flightId = int.parse(state.pathParameters['flightId']!);
+          return FlightBookingPage(flightId: flightId);
+        },
       ),
       GoRoute(
         path: '/profile',

@@ -153,6 +153,7 @@ class EventContextService extends ChangeNotifier {
   bool get hasSiteId => _siteId != null;
 
   /// Get site_id or throw if not available
+  /// Get site_id or throw if not available
   int get requireSiteId {
     if (_siteId == null) {
       throw StateError(
@@ -161,6 +162,12 @@ class EventContextService extends ChangeNotifier {
     }
     return _siteId!;
   }
+
+  /// Whether there's an active event context
+  bool get hasEventContext => _eventId != null;
+
+  /// The path to the event menu for the current event
+  String get eventMenuPath => hasEventContext ? '/events/$_eventId/menu' : '/';
 }
 
 /// Global instance for easy access

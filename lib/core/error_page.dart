@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'services/event_context_service.dart';
+
 /// Styled error page for routing errors (404, invalid routes)
 class ErrorPage extends StatelessWidget {
   final String? error;
@@ -133,11 +135,20 @@ class ErrorPage extends StatelessWidget {
                     width: double.infinity,
                     height: 52,
                     child: ElevatedButton.icon(
-                      onPressed: () => context.go('/'),
+                      onPressed: () {
+                        // Navigate to event menu if in event context, otherwise home
+                        if (eventContextService.hasEventContext) {
+                          context.go(eventContextService.eventMenuPath);
+                        } else {
+                          context.go('/');
+                        }
+                      },
                       icon: const Icon(Icons.home_rounded),
-                      label: const Text(
-                        "Go to Home",
-                        style: TextStyle(
+                      label: Text(
+                        eventContextService.hasEventContext
+                            ? "Go to Event Menu"
+                            : "Go to Home",
+                        style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
                         ),
@@ -160,7 +171,10 @@ class ErrorPage extends StatelessWidget {
                   // Go Back button
                   TextButton.icon(
                     onPressed: () {
-                      if (Navigator.canPop(context)) {
+                      // If in event context, go to event menu
+                      if (eventContextService.hasEventContext) {
+                        context.go(eventContextService.eventMenuPath);
+                      } else if (Navigator.canPop(context)) {
                         Navigator.pop(context);
                       } else {
                         context.go('/');
