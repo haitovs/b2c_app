@@ -1,0 +1,35 @@
+# Git & CI
+.git
+.github
+.gitignore
+
+# IDE
+.idea
+.vscode
+*.iml
+
+# Flutter/Dart
+.dart_tool
+.packages
+.flutter-plugins
+.flutter-plugins-dependencies
+build/
+*.log
+
+# Platform directories (not needed for web build)
+android/
+ios/
+linux/
+macos/
+windows/
+
+# Local config
+.env
+*.local
+
+# Tests
+test/
+integration_test/
+
+# Docs
+*.md

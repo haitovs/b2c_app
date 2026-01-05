@@ -1,0 +1,27 @@
+# B2C Flutter Web App
+#
+# Builds Flutter web and serves via nginx
+# Proxies /api/ to b2c-backend on Docker network
+
+services:
+  b2c-frontend:
+    build:
+      context: .
+      args:
+        B2C_API_URL: https://b2c.oguzforum.com
+        TOURISM_API_URL: http://backend:8000
+    image: b2c-frontend:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8003:80"
+    networks:
+      - b2c
+      - tourism
+
+networks:
+  b2c:
+    external: true
+    name: b2c
+  tourism:
+    external: true
+    name: tourism

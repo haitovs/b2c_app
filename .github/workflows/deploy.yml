@@ -1,0 +1,67 @@
+name: Deploy B2C Frontend
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script_stop: true
+          command_timeout: 30m
+          script: |
+            set -Eeuo pipefail
+            export SHA="${{ github.sha }}"
+            export BRANCH="${{ github.ref_name }}"
+            export GIT_SSH_COMMAND='ssh -i ~/.ssh/b2c_app_deploy -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new'
+
+            APP_DIR="/root/apps/b2c-app"
+            if docker compose version >/dev/null 2>&1; then DC="docker compose"; else DC="docker-compose"; fi
+
+            echo "==> Switching to ${APP_DIR}"
+            cd "${APP_DIR}"
+
+            echo "==> Sync repo to ${SHA} (${BRANCH})"
+            git fetch --all --prune
+            git checkout -f "${BRANCH}"
+            git reset --hard "${SHA}"
+
+            echo "==> Ensure networks exist"
+            docker network inspect b2c >/dev/null 2>&1 || docker network create b2c
+            docker network inspect tourism >/dev/null 2>&1 || docker network create tourism
+
+            echo "==> Build & (re)start"
+            $DC build --pull
+            $DC up -d
+
+            echo "==> Wait for healthcheck"
+            CID=$($DC ps -q b2c-frontend)
+            if [ -z "$CID" ]; then
+              echo "b2c-frontend container not found"
+              $DC ps
+              exit 1
+            fi
+            deadline=$((SECONDS + 300))  # Flutter build takes longer
+            while [ "$(docker inspect -f '{{.State.Health.Status}}' "$CID")" != "healthy" ]; do
+              if [ $SECONDS -ge $deadline ]; then
+                echo "Timed out waiting for healthcheck"
+                docker logs "$CID" --tail=200
+                exit 1
+              fi
+              echo "Waiting for health..."
+              sleep 5
+            done
+
+            echo "==> Cleanup"
+            docker image prune -f || true
+
+            echo "==> OK"
