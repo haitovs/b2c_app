@@ -27,7 +27,7 @@ class FlightCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.1),
+                color: Colors.black.withValues(alpha: 0.1),
                 blurRadius: 15,
                 offset: const Offset(0, 3),
               ),
@@ -171,7 +171,7 @@ class FlightCard extends StatelessWidget {
                 '${flight.originCode} $departureDate',
                 style: TextStyle(
                   fontSize: 11,
-                  color: Colors.black.withOpacity(0.5),
+                  color: Colors.black.withValues(alpha: 0.5),
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -199,7 +199,7 @@ class FlightCard extends StatelessWidget {
                 '${flight.destinationCode} $arrivalDate',
                 style: TextStyle(
                   fontSize: 11,
-                  color: Colors.black.withOpacity(0.5),
+                  color: Colors.black.withValues(alpha: 0.5),
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -322,7 +322,7 @@ class FlightCard extends StatelessWidget {
                   '${flight.originCode} $departureDate',
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.black.withOpacity(0.5),
+                    color: Colors.black.withValues(alpha: 0.5),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -352,7 +352,7 @@ class FlightCard extends StatelessWidget {
                   '${flight.destinationCode} $arrivalDate',
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.black.withOpacity(0.5),
+                    color: Colors.black.withValues(alpha: 0.5),
                     fontWeight: FontWeight.w600,
                   ),
                 ),

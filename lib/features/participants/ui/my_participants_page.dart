@@ -202,9 +202,9 @@ class _MyParticipantsPageState extends State<MyParticipantsPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -228,7 +228,7 @@ class _MyParticipantsPageState extends State<MyParticipantsPage> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -321,7 +321,7 @@ class _MyParticipantsPageState extends State<MyParticipantsPage> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -344,7 +344,7 @@ class _MyParticipantsPageState extends State<MyParticipantsPage> {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: const Color(0xFF3C4494).withOpacity(0.1),
+                color: const Color(0xFF3C4494).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Icon(
@@ -396,11 +396,11 @@ class _MyParticipantsPageState extends State<MyParticipantsPage> {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: isSelf
-            ? const Color(0xFF3C4494).withOpacity(0.05)
+            ? const Color(0xFF3C4494).withValues(alpha: 0.05)
             : Colors.grey[50],
         borderRadius: BorderRadius.circular(10),
         border: isSelf
-            ? Border.all(color: const Color(0xFF3C4494).withOpacity(0.3))
+            ? Border.all(color: const Color(0xFF3C4494).withValues(alpha: 0.3))
             : null,
       ),
       child: Row(
@@ -473,7 +473,7 @@ class _MyParticipantsPageState extends State<MyParticipantsPage> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -485,7 +485,7 @@ class _MyParticipantsPageState extends State<MyParticipantsPage> {
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              color: Colors.green.withOpacity(0.1),
+              color: Colors.green.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Icon(Icons.shopping_bag_outlined, color: Colors.green),
@@ -525,7 +525,7 @@ class _MyParticipantsPageState extends State<MyParticipantsPage> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),

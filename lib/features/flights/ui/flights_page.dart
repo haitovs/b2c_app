@@ -170,7 +170,7 @@ class _FlightsPageState extends State<FlightsPage> {
             Text(
               'Failed to load flights',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.8),
+                color: Colors.white.withValues(alpha: 0.8),
                 fontSize: 16,
               ),
             ),
@@ -191,7 +191,7 @@ class _FlightsPageState extends State<FlightsPage> {
             Text(
               'No flights found',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.8),
+                color: Colors.white.withValues(alpha: 0.8),
                 fontSize: 16,
               ),
             ),
@@ -199,7 +199,7 @@ class _FlightsPageState extends State<FlightsPage> {
             Text(
               'Try adjusting your search criteria',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.5),
+                color: Colors.white.withValues(alpha: 0.5),
                 fontSize: 14,
               ),
             ),

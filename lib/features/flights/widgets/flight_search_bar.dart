@@ -126,7 +126,10 @@ class _FlightSearchBarState extends State<FlightSearchBar> {
             color: Colors.white,
             shape: BoxShape.circle,
             boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 3),
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.1),
+                blurRadius: 3,
+              ),
             ],
           ),
           child: IconButton(
@@ -212,7 +215,10 @@ class _FlightSearchBarState extends State<FlightSearchBar> {
             color: Colors.white,
             shape: BoxShape.circle,
             boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 5),
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.1),
+                blurRadius: 5,
+              ),
             ],
           ),
           child: IconButton(
