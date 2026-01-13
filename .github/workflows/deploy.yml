@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # ---------------------------------------------------------
-      # STEP 1: PREPARE & BUILD ON GITHUB (Fast Internet)
+      # STEP 1: PREPARE & BUILD ON GITHUB
       # ---------------------------------------------------------
       - name: Checkout code
         uses: actions/checkout@v4
@@ -31,7 +31,7 @@ jobs:
             --dart-define=TOURISM_API_URL=http://backend:8000
 
       # ---------------------------------------------------------
-      # STEP 2: PREPARE SERVER (Sync configs)
+      # STEP 2: PREPARE SERVER (Self-Healing Sync)
       # ---------------------------------------------------------
       - name: Sync Config Files via SSH
         uses: appleboy/ssh-action@v1.2.0
@@ -42,21 +42,26 @@ jobs:
           port: ${{ secrets.SSH_PORT || 22 }}
           script: |
             set -Eeuo pipefail
-            
-            # --- FIX: Tell git explicitly which key to use ---
             export GIT_SSH_COMMAND='ssh -i ~/.ssh/deploy_b2c_app_frontend -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new'
             
             APP_DIR="/root/apps/b2c-app"
             mkdir -p "$APP_DIR"
             cd "$APP_DIR"
             
-            # Sync config files from GitHub
+            # --- FIX: HEAL BROKEN REPO ---
+            # If .git folder is missing (because SCP wiped it), re-initialize it.
+            if [ ! -d ".git" ]; then
+              echo "==> Repo missing or broken. Re-initializing..."
+              git init
+              git remote add origin git@github.com:haitovs/b2c_app.git || git remote set-url origin git@github.com:haitovs/b2c_app.git
+            fi
+            
+            echo "==> Fetching latest configs..."
             git fetch --all --prune
-            git checkout -f main
             git reset --hard origin/main
 
       # ---------------------------------------------------------
-      # STEP 3: UPLOAD BUILT ASSETS
+      # STEP 3: UPLOAD BUILT ASSETS (Targeted Upload)
       # ---------------------------------------------------------
       - name: Copy built files to Server
         uses: appleboy/scp-action@v0.1.7
@@ -65,11 +70,9 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT || 22 }}
-          # Upload the CONTENTS of build/web
           source: "build/web/*"
-          # Put them specifically into a 'build/web' subfolder
+          # FIX: Target the specific subfolder so we don't wipe the root again
           target: "/root/apps/b2c-app/build/web"
-          # This will now only wipe /root/apps/b2c-app/build/web, keeping docker-compose.yml safe!
           rm: true
 
       # ---------------------------------------------------------
@@ -88,8 +91,7 @@ jobs:
             
             if docker compose version >/dev/null 2>&1; then DC="docker compose"; else DC="docker-compose"; fi
             
-            echo "==> Rebuilding with new assets..."
-            # Rebuild using the new Dockerfile and the assets we just uploaded
+            echo "==> Rebuilding..."
             $DC build --no-cache b2c-frontend
             $DC up -d b2c-frontend
             
