@@ -65,9 +65,12 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT || 22 }}
-          source: "build/web"
-          target: "/root/apps/b2c-app"
-          rm: true # Overwrite old build folder
+          # Upload the CONTENTS of build/web
+          source: "build/web/*"
+          # Put them specifically into a 'build/web' subfolder
+          target: "/root/apps/b2c-app/build/web"
+          # This will now only wipe /root/apps/b2c-app/build/web, keeping docker-compose.yml safe!
+          rm: true
 
       # ---------------------------------------------------------
       # STEP 4: RESTART DOCKER
