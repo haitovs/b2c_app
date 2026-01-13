@@ -25,7 +25,6 @@ jobs:
         run: flutter pub get
 
       - name: Build Web Release
-        # We inject the API URLs right here during the build
         run: |
           flutter build web --release \
             --dart-define=B2C_API_URL=https://b2c.oguzforum.com \
@@ -42,13 +41,16 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT || 22 }}
           script: |
-            # We still need git to update nginx.conf, Dockerfile, and docker-compose.yml
             set -Eeuo pipefail
+            
+            # --- FIX: Tell git explicitly which key to use ---
+            export GIT_SSH_COMMAND='ssh -i ~/.ssh/deploy_b2c_app_frontend -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new'
+            
             APP_DIR="/root/apps/b2c-app"
             mkdir -p "$APP_DIR"
             cd "$APP_DIR"
             
-            # Sync config files (git reset is safe here because 'build/' is gitignored)
+            # Sync config files from GitHub
             git fetch --all --prune
             git checkout -f main
             git reset --hard origin/main
@@ -84,7 +86,7 @@ jobs:
             if docker compose version >/dev/null 2>&1; then DC="docker compose"; else DC="docker-compose"; fi
             
             echo "==> Rebuilding with new assets..."
-            # This is now instant because it just copies the files we uploaded
+            # Rebuild using the new Dockerfile and the assets we just uploaded
             $DC build --no-cache b2c-frontend
             $DC up -d b2c-frontend
             
