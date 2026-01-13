@@ -9,59 +9,84 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy over SSH
+      # ---------------------------------------------------------
+      # STEP 1: PREPARE & BUILD ON GITHUB (Fast Internet)
+      # ---------------------------------------------------------
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Build Web Release
+        # We inject the API URLs right here during the build
+        run: |
+          flutter build web --release \
+            --dart-define=B2C_API_URL=https://b2c.oguzforum.com \
+            --dart-define=TOURISM_API_URL=http://backend:8000
+
+      # ---------------------------------------------------------
+      # STEP 2: PREPARE SERVER (Sync configs)
+      # ---------------------------------------------------------
+      - name: Sync Config Files via SSH
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT || 22 }}
-          script_stop: true
-          command_timeout: 45m
+          script: |
+            # We still need git to update nginx.conf, Dockerfile, and docker-compose.yml
+            set -Eeuo pipefail
+            APP_DIR="/root/apps/b2c-app"
+            mkdir -p "$APP_DIR"
+            cd "$APP_DIR"
+            
+            # Sync config files (git reset is safe here because 'build/' is gitignored)
+            git fetch --all --prune
+            git checkout -f main
+            git reset --hard origin/main
+
+      # ---------------------------------------------------------
+      # STEP 3: UPLOAD BUILT ASSETS
+      # ---------------------------------------------------------
+      - name: Copy built files to Server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          source: "build/web"
+          target: "/root/apps/b2c-app"
+          rm: true # Overwrite old build folder
+
+      # ---------------------------------------------------------
+      # STEP 4: RESTART DOCKER
+      # ---------------------------------------------------------
+      - name: Restart Container
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
           script: |
             set -Eeuo pipefail
-            export SHA="${{ github.sha }}"
-            export BRANCH="${{ github.ref_name }}"
-            export GIT_SSH_COMMAND='ssh -i ~/.ssh/deploy_b2c_app_frontend -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new'
-
-            APP_DIR="/root/apps/b2c-app"
+            cd /root/apps/b2c-app
+            
             if docker compose version >/dev/null 2>&1; then DC="docker compose"; else DC="docker-compose"; fi
-
-            echo "==> Switching to ${APP_DIR}"
-            cd "${APP_DIR}"
-
-            echo "==> Sync repo to ${SHA} (${BRANCH})"
-            git fetch --all --prune
-            git checkout -f "${BRANCH}"
-            git reset --hard "${SHA}"
-
-            echo "==> Ensure networks exist"
-            docker network inspect b2c >/dev/null 2>&1 || docker network create b2c
-            docker network inspect tourism >/dev/null 2>&1 || docker network create tourism
-
-            echo "==> Build & (re)start"
-            $DC build --pull
-            $DC up -d
-
-            echo "==> Wait for healthcheck"
-            CID=$($DC ps -q b2c-frontend)
-            if [ -z "$CID" ]; then
-              echo "b2c-frontend container not found"
-              $DC ps
-              exit 1
-            fi
-            deadline=$((SECONDS + 300))  # Flutter build takes longer
-            while [ "$(docker inspect -f '{{.State.Health.Status}}' "$CID")" != "healthy" ]; do
-              if [ $SECONDS -ge $deadline ]; then
-                echo "Timed out waiting for healthcheck"
-                docker logs "$CID" --tail=200
-                exit 1
-              fi
-              echo "Waiting for health..."
-              sleep 5
-            done
-
-            echo "==> Cleanup"
-            docker image prune -f || true
-
-            echo "==> OK"
+            
+            echo "==> Rebuilding with new assets..."
+            # This is now instant because it just copies the files we uploaded
+            $DC build --no-cache b2c-frontend
+            $DC up -d b2c-frontend
+            
+            echo "==> Pruning..."
+            docker image prune -f
