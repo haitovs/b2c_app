@@ -13,7 +13,7 @@
 .packages
 .flutter-plugins
 .flutter-plugins-dependencies
-build/
+# build/
 *.log
 
 # Platform directories (not needed for web build)
