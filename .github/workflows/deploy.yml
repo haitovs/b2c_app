@@ -85,6 +85,8 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT || 22 }}
+          # FIX: Increase timeout to 60 minutes (default is 10m)
+          command_timeout: 60m
           script: |
             set -Eeuo pipefail
             cd /root/apps/b2c-app
