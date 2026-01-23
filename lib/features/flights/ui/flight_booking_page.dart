@@ -373,7 +373,7 @@ class _FlightBookingPageState extends State<FlightBookingPage> {
         ),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
-          value: _gender.isNotEmpty ? _gender : null,
+          initialValue: _gender.isNotEmpty ? _gender : null,
           decoration: InputDecoration(
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(5)),
             contentPadding: const EdgeInsets.symmetric(horizontal: 12),

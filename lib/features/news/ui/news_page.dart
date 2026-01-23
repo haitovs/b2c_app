@@ -452,7 +452,7 @@ class _NewsCardState extends State<_NewsCard> {
           duration: const Duration(milliseconds: 200),
           curve: Curves.easeOut,
           transform: Matrix4.identity()
-            ..translate(0.0, _isHovered ? -4.0 : 0.0),
+            ..setTranslationRaw(0.0, _isHovered ? -4.0 : 0.0, 0.0),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),

@@ -28,7 +28,12 @@ import '../features/networking/ui/new_meeting_page.dart';
 import '../features/news/ui/news_detail_page.dart';
 import '../features/news/ui/news_page.dart';
 import '../features/participants/ui/my_participants_page.dart';
+import '../features/participants/ui/add_participant_select_event_page.dart';
+import '../features/participants/ui/add_participant_form_page.dart';
 import '../features/transfer/ui/transfer_page.dart';
+import '../features/visa/ui/visa_application_form_page.dart';
+import '../features/visa/ui/visa_status_page.dart';
+import '../features/visa/ui/visa_details_page.dart';
 import 'error_page.dart';
 
 GoRouter createRouter(AuthService authService) {
@@ -278,6 +283,40 @@ GoRouter createRouter(AuthService authService) {
               return MyParticipantsPage(eventId: int.tryParse(idStr) ?? 0);
             },
           ),
+          // Visa routes
+          GoRoute(
+            path: 'visa/form/:participantId',
+            builder: (context, state) {
+              final eventIdStr = state.pathParameters['id']!;
+              final participantId = state.pathParameters['participantId']!;
+              return VisaApplicationFormPage(
+                eventId: int.tryParse(eventIdStr) ?? 0,
+                participantId: participantId,
+              );
+            },
+          ),
+          GoRoute(
+            path: 'visa/status/:participantId',
+            builder: (context, state) {
+              final eventIdStr = state.pathParameters['id']!;
+              final participantId = state.pathParameters['participantId']!;
+              return VisaStatusPage(
+                eventId: int.tryParse(eventIdStr) ?? 0,
+                participantId: participantId,
+              );
+            },
+          ),
+          GoRoute(
+            path: 'visa/details/:participantId',
+            builder: (context, state) {
+              final eventIdStr = state.pathParameters['id']!;
+              final participantId = state.pathParameters['participantId']!;
+              return VisaDetailsPage(
+                eventId: int.tryParse(eventIdStr) ?? 0,
+                participantId: participantId,
+              );
+            },
+          ),
         ],
       ),
       // Standalone flights routes (for booking)
@@ -306,6 +345,18 @@ GoRouter createRouter(AuthService authService) {
       GoRoute(
         path: '/hotline',
         builder: (context, state) => const HotlinePage(),
+      ),
+      // Standalone Add Participant routes (not nested under events)
+      GoRoute(
+        path: '/participants/select-event',
+        builder: (context, state) => const AddParticipantSelectEventPage(),
+      ),
+      GoRoute(
+        path: '/participants/add',
+        builder: (context, state) {
+          final eventIdStr = state.uri.queryParameters['event_id'] ?? '0';
+          return AddParticipantFormPage(eventId: int.tryParse(eventIdStr) ?? 0);
+        },
       ),
     ],
   );

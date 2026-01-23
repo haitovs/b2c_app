@@ -17,6 +17,7 @@ import '../../../../l10n/generated/app_localizations.dart';
 import '../../auth/services/auth_service.dart';
 import '../../notifications/ui/notification_drawer.dart';
 import 'widgets/profile_dropdown.dart';
+import 'widgets/terms_compliance_modal.dart';
 
 class EventMenuPage extends ConsumerStatefulWidget {
   final int eventId;
@@ -41,6 +42,10 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
   bool _isRegistered = false;
   bool _isCheckingRegistration = true;
 
+  // Terms & Conditions acceptance status (for participants)
+  bool _termsAccepted = false;
+  bool _isCheckingTerms = true;
+
   // Registration button highlight
   bool _showRegistrationHighlight = false;
 
@@ -62,6 +67,7 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
     _fetchEvent();
     _fetchSponsors();
     _checkRegistrationStatus();
+    _checkTermsAcceptance();
   }
 
   Future<void> _checkRegistrationStatus() async {
@@ -112,6 +118,55 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
         setState(() {
           _isRegistered = false;
           _isCheckingRegistration = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _checkTermsAcceptance() async {
+    try {
+      final authService = context.read<AuthService>();
+      final token = await authService.getToken();
+      debugPrint('[EventMenu] Checking terms acceptance status...');
+
+      // Check if user is a participant by trying participant profile endpoint
+      final response = await http.get(
+        Uri.parse(
+          '${AppConfig.b2cApiBaseUrl}/api/v1/participant-auth/my-profile',
+        ),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      debugPrint('[EventMenu] Terms check status: ${response.statusCode}');
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final termsAccepted = data['is_terms_accepted'] ?? false;
+        debugPrint('[EventMenu] is_terms_accepted: $termsAccepted');
+        setState(() {
+          _termsAccepted = termsAccepted;
+          _isCheckingTerms = false;
+          _isRegistered = true; // Participants are auto-registered
+        });
+      } else {
+        // Not a participant, use default (regular user flow)
+        debugPrint('[EventMenu] Not a participant, using regular flow');
+        setState(() {
+          _termsAccepted = true; // Regular users don't need this gate
+          _isCheckingTerms = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('[EventMenu] Error checking terms: $e');
+      if (mounted) {
+        setState(() {
+          _termsAccepted = true; // Fail open for regular users
+          _isCheckingTerms = false;
         });
       }
     }
@@ -208,6 +263,23 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
     }
   }
 
+  void _showTermsModal() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => TermsComplianceModal(
+        onAccepted: () {
+          Navigator.of(context).pop();
+          setState(() {
+            _termsAccepted = true;
+          });
+          // Refresh to update button states
+          _checkTermsAcceptance();
+        },
+      ),
+    );
+  }
+
   void _onExitEvent() {
     eventContextService.clearContext();
     context.go('/');
@@ -275,6 +347,7 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
         'requiresRegistration': true,
         'requiresAgreement': true,
       },
+      // My Participants - Show after registration is SUBMITTED/APPROVED
       {
         'icon': 'my_participants.png',
         'label': l10n.myParticipants,
@@ -331,6 +404,15 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
       },
       {'icon': 'exit', 'label': l10n.exitEvent, 'route': null, 'isExit': true},
     ];
+
+    // Filter menu items - hide "My Participants" until registered
+    final filteredMenuItems = menuItems.where((item) {
+      final showOnlyWhenRegistered = item['showOnlyWhenRegistered'] == true;
+      if (showOnlyWhenRegistered && !_isRegistered) {
+        return false; // Hide "My Participants" until status is SUBMITTED/APPROVED
+      }
+      return true;
+    }).toList();
 
     return Scaffold(
       key: _scaffoldKey,
@@ -621,21 +703,28 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
                                       crossAxisSpacing: isMobile ? 10 : 20,
                                       childAspectRatio: isMobile ? 0.9 : 1.0,
                                     ),
-                                itemCount: menuItems.length,
+                                itemCount: filteredMenuItems.length,
                                 itemBuilder: (context, index) {
-                                  final item = menuItems[index];
+                                  final item = filteredMenuItems[index];
                                   final isExit = item['isExit'] == true;
                                   final iconName = item['icon'] as String;
                                   final isRegistrationButton =
                                       item['isRegistrationButton'] == true;
                                   final requiresRegistration =
                                       item['requiresRegistration'] == true;
+                                  final requiresAgreement =
+                                      item['requiresAgreement'] == true;
 
-                                  // Check if button should be disabled
+                                  // Two-gate system:
+                                  // Gate 1: Registration (for guests)
+                                  // Gate 2: Terms acceptance (for participants)
                                   final isDisabled =
                                       requiresRegistration &&
-                                      !_isRegistered &&
-                                      !_isCheckingRegistration;
+                                      (!_isRegistered ||
+                                          (requiresAgreement &&
+                                              !_termsAccepted)) &&
+                                      !_isCheckingRegistration &&
+                                      !_isCheckingTerms;
 
                                   // Build the menu card content
                                   Widget cardContent = Container(
@@ -764,7 +853,15 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
                                       onTap: () {
                                         // Handle disabled button tap
                                         if (isDisabled) {
-                                          // Show snackbar and trigger highlight
+                                          // Check if it's a terms issue (participant without T&C)
+                                          if (_isRegistered &&
+                                              !_termsAccepted) {
+                                            // Participant needs to accept terms
+                                            _showTermsModal();
+                                            return;
+                                          }
+
+                                          // Regular registration required
                                           ScaffoldMessenger.of(
                                             context,
                                           ).showSnackBar(

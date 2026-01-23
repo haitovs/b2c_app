@@ -8,7 +8,7 @@ import 'package:provider/provider.dart';
 import '../../../core/config/app_config.dart';
 import '../../auth/services/auth_service.dart';
 
-/// Page showing user's registration details, delegates, packages, and fees.
+/// My Participants - Responsive design with Figma specifications
 class MyParticipantsPage extends StatefulWidget {
   final int eventId;
 
@@ -21,22 +21,32 @@ class MyParticipantsPage extends StatefulWidget {
 class _MyParticipantsPageState extends State<MyParticipantsPage> {
   bool _isLoading = true;
   String? _error;
-  Map<String, dynamic>? _data;
+  List<Map<String, dynamic>> _participants = [];
+  int _totalSlots = 10;
+  int _usedSlots = 0;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _loadParticipants();
   }
 
-  Future<void> _loadData() async {
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadParticipants() async {
     try {
       final authService = context.read<AuthService>();
       final token = await authService.getToken();
 
       final response = await http.get(
         Uri.parse(
-          '${AppConfig.b2cApiBaseUrl}/api/v1/my-participants/${widget.eventId}',
+          '${AppConfig.b2cApiBaseUrl}/api/v1/participants/my-participants?event_id=${widget.eventId}',
         ),
         headers: {
           'Authorization': 'Bearer $token',
@@ -47,18 +57,20 @@ class _MyParticipantsPageState extends State<MyParticipantsPage> {
       if (!mounted) return;
 
       if (response.statusCode == 200) {
+        final Map<String, dynamic> responseData = jsonDecode(response.body);
+        final List<dynamic> participantsList =
+            responseData['participants'] ?? [];
+        final Map<String, dynamic> slotsData = responseData['slots'] ?? {};
+
         setState(() {
-          _data = jsonDecode(response.body);
-          _isLoading = false;
-        });
-      } else if (response.statusCode == 404) {
-        setState(() {
-          _error = 'No registration found for this event';
+          _participants = participantsList.cast<Map<String, dynamic>>();
+          _totalSlots = slotsData['total'] ?? 0;
+          _usedSlots = slotsData['used'] ?? _participants.length;
           _isLoading = false;
         });
       } else {
         setState(() {
-          _error = 'Failed to load data';
+          _error = 'Failed to load participants';
           _isLoading = false;
         });
       }
@@ -72,38 +84,306 @@ class _MyParticipantsPageState extends State<MyParticipantsPage> {
     }
   }
 
+  List<Map<String, dynamic>> get _filteredParticipants {
+    if (_searchQuery.isEmpty) return _participants;
+
+    return _participants.where((p) {
+      final name = '${p['first_name']} ${p['last_name']}'.toLowerCase();
+      final email = (p['email'] as String? ?? '').toLowerCase();
+      final company = (p['company_name'] as String? ?? '').toLowerCase();
+      final query = _searchQuery.toLowerCase();
+
+      return name.contains(query) ||
+          email.contains(query) ||
+          company.contains(query);
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF3C4494),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF3C4494),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => context.go('/events/${widget.eventId}/menu'),
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isDesktop = constraints.maxWidth >= 1200;
+            final isTablet =
+                constraints.maxWidth >= 768 && constraints.maxWidth < 1200;
+            final isMobile = constraints.maxWidth < 768;
+
+            return Column(
+              children: [
+                _buildHeader(
+                  constraints.maxWidth,
+                  isDesktop,
+                  isTablet,
+                  isMobile,
+                ),
+                SizedBox(height: isDesktop ? 40 : 20),
+                _buildSearchBar(
+                  constraints.maxWidth,
+                  isDesktop,
+                  isTablet,
+                  isMobile,
+                ),
+                SizedBox(height: isDesktop ? 40 : 20),
+                Expanded(
+                  child: _buildContent(
+                    constraints.maxWidth,
+                    isDesktop,
+                    isTablet,
+                    isMobile,
+                  ),
+                ),
+              ],
+            );
+          },
         ),
-        title: const Text(
-          'My Participants',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-      ),
-      body: Container(
-        decoration: const BoxDecoration(
-          color: Color(0xFFF1F1F6),
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(24),
-            topRight: Radius.circular(24),
-          ),
-        ),
-        child: _buildContent(),
       ),
     );
   }
 
-  Widget _buildContent() {
+  Widget _buildHeader(
+    double width,
+    bool isDesktop,
+    bool isTablet,
+    bool isMobile,
+  ) {
+    final horizontalPadding = isDesktop ? 50.0 : (isTablet ? 30.0 : 20.0);
+    final titleSize = isDesktop ? 40.0 : (isTablet ? 32.0 : 24.0);
+    final buttonHeight = isDesktop ? 67.0 : (isTablet ? 56.0 : 48.0);
+    final buttonFontSize = isDesktop ? 26.0 : (isTablet ? 22.0 : 18.0);
+    final buttonPaddingH = isDesktop ? 53.0 : (isTablet ? 40.0 : 30.0);
+    final buttonPaddingV = isDesktop ? 17.0 : (isTablet ? 14.0 : 12.0);
+
+    if (isMobile) {
+      return Padding(
+        padding: EdgeInsets.fromLTRB(
+          horizontalPadding,
+          20,
+          horizontalPadding,
+          0,
+        ),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.menu, color: Color(0xFFF1F1F6)),
+                  iconSize: 28,
+                  onPressed: () => context.go('/events/${widget.eventId}/menu'),
+                ),
+                Text(
+                  'My participants',
+                  style: TextStyle(
+                    fontFamily: 'Montserrat',
+                    fontWeight: FontWeight.w600,
+                    fontSize: titleSize,
+                    color: const Color(0xFFF1F1F6),
+                  ),
+                ),
+                const SizedBox(width: 48),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    height: buttonHeight,
+                    alignment: Alignment.center,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 16.0,
+                      vertical: buttonPaddingV,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        '$_usedSlots/$_totalSlots',
+                        style: TextStyle(
+                          fontFamily: 'Roboto',
+                          fontStyle: FontStyle.italic,
+                          fontWeight: FontWeight.w700,
+                          fontSize: buttonFontSize,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: SizedBox(
+                    height: buttonHeight,
+                    child: ElevatedButton(
+                      onPressed: _navigateToAddParticipant,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: buttonPaddingH * 0.7,
+                          vertical: buttonPaddingV,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      child: Text(
+                        'Add new',
+                        style: TextStyle(
+                          fontFamily: 'Roboto',
+                          fontWeight: FontWeight.w600,
+                          fontSize: buttonFontSize,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(horizontalPadding, 50, horizontalPadding, 0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Container(
+            width: 50,
+            height: 50,
+            decoration: const BoxDecoration(color: Colors.transparent),
+            child: IconButton(
+              padding: EdgeInsets.zero,
+              icon: const Icon(Icons.menu, color: Color(0xFFF1F1F6), size: 32),
+              onPressed: () => context.go('/events/${widget.eventId}/menu'),
+            ),
+          ),
+          Text(
+            'My participants',
+            style: TextStyle(
+              fontFamily: 'Montserrat',
+              fontWeight: FontWeight.w600,
+              fontSize: titleSize,
+              color: const Color(0xFFF1F1F6),
+            ),
+          ),
+          Container(
+            height: buttonHeight,
+            padding: EdgeInsets.symmetric(
+              horizontal: 24.0,
+              vertical: buttonPaddingV,
+            ),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            alignment: Alignment.center,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                '$_usedSlots/$_totalSlots',
+                style: TextStyle(
+                  fontFamily: 'Roboto',
+                  fontStyle: FontStyle.italic,
+                  fontWeight: FontWeight.w700,
+                  fontSize: buttonFontSize,
+                  color: Colors.black,
+                ),
+              ),
+            ),
+          ),
+          SizedBox(
+            height: buttonHeight,
+            child: ElevatedButton(
+              onPressed: _navigateToAddParticipant,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                padding: EdgeInsets.symmetric(
+                  horizontal: buttonPaddingH,
+                  vertical: buttonPaddingV,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: Text(
+                'Add new',
+                style: TextStyle(
+                  fontFamily: 'Roboto',
+                  fontWeight: FontWeight.w600,
+                  fontSize: buttonFontSize,
+                  color: Colors.black,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSearchBar(
+    double width,
+    bool isDesktop,
+    bool isTablet,
+    bool isMobile,
+  ) {
+    final horizontalPadding = isDesktop ? 50.0 : (isTablet ? 30.0 : 20.0);
+    final height = isDesktop ? 64.0 : (isTablet ? 56.0 : 48.0);
+    final iconSize = isDesktop ? 36.0 : (isTablet ? 32.0 : 28.0);
+
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+      child: Container(
+        height: height,
+        padding: EdgeInsets.symmetric(
+          horizontal: isDesktop ? 24 : 16,
+          vertical: isDesktop ? 14 : 10,
+        ),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF1F1F6).withValues(alpha: 0.3),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.search, color: const Color(0xFFF1F1F6), size: iconSize),
+            const SizedBox(width: 20),
+            Expanded(
+              child: TextField(
+                controller: _searchController,
+                onChanged: (value) => setState(() => _searchQuery = value),
+                style: const TextStyle(color: Color(0xFFF1F1F6), fontSize: 16),
+                decoration: const InputDecoration(
+                  hintText: 'Search...',
+                  hintStyle: TextStyle(color: Color(0xFFF1F1F6)),
+                  border: InputBorder.none,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContent(
+    double width,
+    bool isDesktop,
+    bool isTablet,
+    bool isMobile,
+  ) {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(
+        child: CircularProgressIndicator(color: Colors.white),
+      );
     }
 
     if (_error != null) {
@@ -111,126 +391,409 @@ class _MyParticipantsPageState extends State<MyParticipantsPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.info_outline, size: 48, color: Colors.grey[400]),
+            const Icon(Icons.error_outline, size: 64, color: Colors.white70),
             const SizedBox(height: 16),
             Text(
               _error!,
-              style: TextStyle(color: Colors.grey[600], fontSize: 16),
+              style: const TextStyle(color: Colors.white70, fontSize: 16),
+              textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
             ElevatedButton(
-              onPressed: () =>
-                  context.go('/events/${widget.eventId}/registration'),
-              child: const Text('Register Now'),
+              onPressed: _loadParticipants,
+              child: const Text('Retry'),
             ),
           ],
         ),
       );
     }
 
-    if (_data == null) return const SizedBox();
+    if (_participants.isEmpty) {
+      return _buildEmptyState();
+    }
 
-    final contact = _data!['contact'] as Map<String, dynamic>?;
-    final packages = _data!['package_selections'] as List? ?? [];
-    final products = _data!['product_selections'] as List? ?? [];
-    final fees = _data!['fees'] as Map<String, dynamic>? ?? {};
-    final status = _data!['status'] as String? ?? 'DRAFT';
+    final filtered = _filteredParticipants;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Status Badge
-          _buildStatusBadge(status),
-          const SizedBox(height: 20),
+    if (filtered.isEmpty) {
+      return const Center(
+        child: Text(
+          'No participants found',
+          style: TextStyle(color: Colors.white70, fontSize: 18),
+        ),
+      );
+    }
 
-          // Contact Info
-          if (contact != null) _buildContactCard(contact),
-          const SizedBox(height: 20),
+    final horizontalPadding = isDesktop ? 50.0 : (isTablet ? 30.0 : 20.0);
 
-          // Delegates Section
-          if (packages.isNotEmpty) ...[
-            _buildSectionTitle('Delegates & Packages'),
-            const SizedBox(height: 12),
-            ...packages.map(
-              (p) => _buildPackageCard(p as Map<String, dynamic>),
-            ),
-          ],
-
-          // Products Section
-          if (products.isNotEmpty) ...[
-            const SizedBox(height: 20),
-            _buildSectionTitle('Products & Services'),
-            const SizedBox(height: 12),
-            ...products.map(
-              (p) => _buildProductCard(p as Map<String, dynamic>),
-            ),
-          ],
-
-          // Fee Summary
-          const SizedBox(height: 20),
-          _buildFeeSummary(fees),
-
-          const SizedBox(height: 40),
-        ],
+    return ListView.builder(
+      padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+      itemCount: filtered.length,
+      itemBuilder: (context, index) => _buildParticipantCard(
+        filtered[index],
+        index + 1,
+        width,
+        isDesktop,
+        isTablet,
+        isMobile,
       ),
     );
   }
 
-  Widget _buildStatusBadge(String status) {
-    Color color;
-    IconData icon;
-    switch (status) {
-      case 'APPROVED':
-        color = Colors.green;
-        icon = Icons.check_circle;
-        break;
-      case 'SUBMITTED':
-        color = Colors.orange;
-        icon = Icons.hourglass_top;
-        break;
-      case 'REJECTED':
-        color = Colors.red;
-        icon = Icons.cancel;
-        break;
-      default:
-        color = Colors.grey;
-        icon = Icons.edit;
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, color: color, size: 20),
-          const SizedBox(width: 8),
+          const Icon(
+            Icons.person_add_outlined,
+            size: 80,
+            color: Colors.white54,
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            'No participants added yet',
+            style: TextStyle(
+              fontSize: 24,
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 12),
           Text(
-            'Status: $status',
-            style: TextStyle(color: color, fontWeight: FontWeight.w600),
+            'You have $_totalSlots available slots',
+            style: const TextStyle(fontSize: 18, color: Colors.white70),
+          ),
+          const SizedBox(height: 32),
+          ElevatedButton.icon(
+            onPressed: _navigateToAddParticipant,
+            icon: const Icon(Icons.add),
+            label: const Text('Add your first participant'),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildContactCard(Map<String, dynamic> contact) {
+  Widget _buildParticipantCard(
+    Map<String, dynamic> participant,
+    int index,
+    double width,
+    bool isDesktop,
+    bool isTablet,
+    bool isMobile,
+  ) {
+    final visaStatus = participant['visa_status'] as String? ?? 'FILL_OUT';
+    final visaColor = participant['visa_button_color'] as String? ?? '#E8E84F';
+    final visaLabel = participant['visa_button_label'] as String? ?? 'Fill out';
+    final role = participant['role'] as String? ?? 'Administrator';
+
+    if (isMobile) {
+      return _buildMobileCard(
+        participant,
+        index,
+        visaStatus,
+        visaColor,
+        visaLabel,
+        role,
+      );
+    }
+
+    // Desktop/Tablet card with headers at top
+    final cardHeight = isDesktop ? 305.0 : 280.0;
+    final photoWidth = isDesktop ? 150.0 : 130.0;
+    final photoHeight = isDesktop ? 260.0 : 230.0; // Bigger photo
+    final photoLeft = isDesktop ? 65.0 : 50.0;
+    final photoTop = isDesktop ? 25.0 : 30.0; // Less top padding
+
     return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      height: cardHeight,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.3),
+            blurRadius: 15,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          // Number badge
+          Positioned(
+            left: 15,
+            top: 15,
+            child: Container(
+              width: 39,
+              height: 39,
+              decoration: const BoxDecoration(
+                color: Color(0xFF3C4494),
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                '$index',
+                style: const TextStyle(
+                  fontFamily: 'Inter',
+                  fontWeight: FontWeight.w600,
+                  fontSize: 20,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+          // Photo (bigger with less top padding)
+          Positioned(
+            left: photoLeft,
+            top: photoTop,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                width: photoWidth,
+                height: photoHeight,
+                decoration: const BoxDecoration(color: Color(0xFF9CA4CC)),
+                child: participant['profile_photo_url'] != null
+                    ? Image.network(
+                        participant['profile_photo_url'],
+                        width: photoWidth,
+                        height: photoHeight,
+                        fit: BoxFit.cover,
+                      )
+                    : const Icon(Icons.person, size: 80, color: Colors.white),
+              ),
+            ),
+          ),
+          // Participant info
+          Positioned(
+            left: isDesktop ? 266 : 220,
+            top: isDesktop ? 58 : 50,
+            right: isDesktop ? 600 : 450,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildInfoRow('Role:', role),
+                const SizedBox(height: 8),
+                _buildInfoRow('Name:', participant['first_name'] ?? ''),
+                const SizedBox(height: 8),
+                _buildInfoRow('Surname:', participant['last_name'] ?? ''),
+                const SizedBox(height: 8),
+                _buildInfoRow('Company:', participant['company_name'] ?? ''),
+                const SizedBox(height: 8),
+                _buildInfoRow('Phone:', participant['mobile'] ?? ''),
+              ],
+            ),
+          ),
+          // Visa Section (Divider + Header + Button)
+          Positioned(
+            left: isDesktop ? 756 : 650,
+            width: isDesktop ? 273 : 200,
+            top: 0,
+            bottom: 0,
+            child: Row(
+              children: [
+                // Divider
+                Container(
+                  width: 2,
+                  margin: const EdgeInsets.symmetric(vertical: 68),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.black.withValues(alpha: 0.1),
+                        Colors.black.withValues(alpha: 0.5),
+                        Colors.black.withValues(alpha: 0.1),
+                      ],
+                    ),
+                  ),
+                ),
+                // Content
+                Expanded(
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 20),
+                      // Header
+                      const Text(
+                        'Visa',
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontWeight: FontWeight.w600,
+                          fontSize: 25,
+                          color: Colors.black,
+                        ),
+                      ),
+                      // Button (Centered)
+                      Expanded(
+                        child: Center(
+                          child: GestureDetector(
+                            onTap: () =>
+                                _handleVisaAction(visaStatus, participant),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 33,
+                                vertical: 9,
+                              ),
+                              decoration: BoxDecoration(
+                                color: _parseColor(visaColor),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                visaLabel,
+                                style: TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 20,
+                                  color: visaStatus == 'FILL_OUT'
+                                      ? Colors.black
+                                      : Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Role Section (Divider + Header + Value)
+          Positioned(
+            left: isDesktop ? 1029 : 850,
+            right: 0,
+            top: 0,
+            bottom: 0,
+            child: Row(
+              children: [
+                // Divider
+                Container(
+                  width: 2,
+                  margin: const EdgeInsets.symmetric(vertical: 68),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.black.withValues(alpha: 0.1),
+                        Colors.black.withValues(alpha: 0.5),
+                        Colors.black.withValues(alpha: 0.1),
+                      ],
+                    ),
+                  ),
+                ),
+                // Content
+                Expanded(
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 20),
+                      // Header
+                      const Text(
+                        'Role',
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontWeight: FontWeight.w600,
+                          fontSize: 25,
+                          color: Colors.black,
+                        ),
+                      ),
+                      // Value (Centered)
+                      Expanded(
+                        child: Center(
+                          child: Text(
+                            role,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontFamily: 'Inter',
+                              fontWeight: FontWeight.w600,
+                              fontSize: 20,
+                              color: Colors.black,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // More menu
+          Positioned(
+            right: 15,
+            top: 15,
+            child: Container(
+              width: 39,
+              height: 39,
+              decoration: const BoxDecoration(
+                color: Color(0xFF3C4494),
+                shape: BoxShape.circle,
+              ),
+              child: PopupMenuButton<String>(
+                icon: const Icon(
+                  Icons.more_vert,
+                  color: Colors.white,
+                  size: 24,
+                ),
+                onSelected: (value) => _handleMenuAction(value, participant),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                elevation: 8,
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit, size: 20, color: Color(0xFF3C4494)),
+                        SizedBox(width: 12),
+                        Text('Edit'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete, size: 20, color: Colors.red),
+                        SizedBox(width: 12),
+                        Text('Delete', style: TextStyle(color: Colors.red)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMobileCard(
+    Map<String, dynamic> participant,
+    int index,
+    String visaStatus,
+    String visaColor,
+    String visaLabel,
+    String role,
+  ) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 10,
-            offset: const Offset(0, 2),
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -239,324 +802,165 @@ class _MyParticipantsPageState extends State<MyParticipantsPage> {
         children: [
           Row(
             children: [
-              CircleAvatar(
-                backgroundColor: const Color(0xFF3C4494),
+              // Number badge
+              Container(
+                width: 32,
+                height: 32,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF3C4494),
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
                 child: Text(
-                  '${contact['first_name'][0]}${contact['last_name'][0]}',
+                  '$index',
                   style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
                     color: Colors.white,
-                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
+              const Spacer(),
+              // More menu
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert, size: 24),
+                onSelected: (value) => _handleMenuAction(value, participant),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit, size: 20, color: Color(0xFF3C4494)),
+                        SizedBox(width: 12),
+                        Text('Edit'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete, size: 20, color: Colors.red),
+                        SizedBox(width: 12),
+                        Text('Delete', style: TextStyle(color: Colors.red)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Photo
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  width: 100,
+                  height: 133,
+                  color: const Color(0xFF9CA4CC),
+                  child: participant['profile_photo_url'] != null
+                      ? Image.network(
+                          participant['profile_photo_url'],
+                          fit: BoxFit.cover,
+                        )
+                      : const Icon(Icons.person, size: 50, color: Colors.white),
+                ),
+              ),
               const SizedBox(width: 12),
+              // Info
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      '${contact['first_name']} ${contact['last_name']}',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    _buildMobileInfoRow('Role:', role),
+                    const SizedBox(height: 4),
+                    _buildMobileInfoRow(
+                      'Name:',
+                      participant['first_name'] ?? '',
                     ),
-                    Text(
-                      contact['company_name'] ?? '',
-                      style: TextStyle(color: Colors.grey[600]),
+                    const SizedBox(height: 4),
+                    _buildMobileInfoRow(
+                      'Surname:',
+                      participant['last_name'] ?? '',
                     ),
+                    const SizedBox(height: 4),
+                    _buildMobileInfoRow(
+                      'Company:',
+                      participant['company_name'] ?? '',
+                    ),
+                    const SizedBox(height: 4),
+                    _buildMobileInfoRow('Phone:', participant['mobile'] ?? ''),
                   ],
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          const Divider(),
-          const SizedBox(height: 8),
-          _infoRow(Icons.email_outlined, contact['email']),
-          _infoRow(Icons.phone_outlined, contact['mobile']),
-          _infoRow(
-            Icons.location_on_outlined,
-            '${contact['city']}, ${contact['country']}',
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _infoRow(IconData icon, String? text) {
-    if (text == null || text.isEmpty) return const SizedBox();
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: Colors.grey),
-          const SizedBox(width: 8),
-          Text(text, style: TextStyle(color: Colors.grey[700])),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSectionTitle(String title) {
-    return Text(
-      title,
-      style: const TextStyle(
-        fontSize: 20,
-        fontWeight: FontWeight.bold,
-        color: Color(0xFF3C4494),
-      ),
-    );
-  }
-
-  Widget _buildPackageCard(Map<String, dynamic> pkg) {
-    final delegates = pkg['delegates'] as List? ?? [];
-    final packageId =
-        pkg['id']?.toString() ?? pkg['package_id']?.toString() ?? '';
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: Theme(
-          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-          child: ExpansionTile(
-            key: PageStorageKey('package_$packageId'),
-            tilePadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 8,
-            ),
-            childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            collapsedIconColor: const Color(0xFF3C4494),
-            iconColor: const Color(0xFF3C4494),
-            leading: Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: const Color(0xFF3C4494).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(
-                Icons.card_membership,
-                color: Color(0xFF3C4494),
-              ),
-            ),
-            title: Text(
-              pkg['package_name'] ?? 'Package',
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-            subtitle: Row(
-              children: [
-                Text(
-                  '${pkg['quantity']}x • ${pkg['currency']} ${(pkg['total_price'] as num).toStringAsFixed(2)}',
-                  style: TextStyle(color: Colors.grey[600]),
-                ),
-                const Spacer(),
-                Text(
-                  '${delegates.length} delegate${delegates.length != 1 ? 's' : ''}',
-                  style: TextStyle(color: Colors.grey[500], fontSize: 12),
-                ),
-              ],
-            ),
+          Row(
             children: [
-              const Divider(),
-              const SizedBox(height: 8),
-              if (delegates.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Text('No delegates added yet'),
-                )
-              else
-                ...delegates.map(
-                  (d) => _buildDelegateRow(d as Map<String, dynamic>),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDelegateRow(Map<String, dynamic> delegate) {
-    final isSelf = delegate['is_self_registration'] == true;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isSelf
-            ? const Color(0xFF3C4494).withValues(alpha: 0.05)
-            : Colors.grey[50],
-        borderRadius: BorderRadius.circular(10),
-        border: isSelf
-            ? Border.all(color: const Color(0xFF3C4494).withValues(alpha: 0.3))
-            : null,
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: isSelf
-                ? const Color(0xFF3C4494)
-                : Colors.grey[400],
-            child: Text(
-              '${delegate['first_name'][0]}',
-              style: const TextStyle(color: Colors.white, fontSize: 14),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+              Expanded(
+                child: Column(
                   children: [
-                    Text(
-                      '${delegate['first_name']} ${delegate['last_name']}',
-                      style: const TextStyle(fontWeight: FontWeight.w500),
+                    const Text(
+                      'Visa',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                      ),
                     ),
-                    if (isSelf) ...[
-                      const SizedBox(width: 8),
-                      Container(
+                    const SizedBox(height: 8),
+                    GestureDetector(
+                      onTap: () => _handleVisaAction(visaStatus, participant),
+                      child: Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
+                          horizontal: 20,
+                          vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF3C4494),
-                          borderRadius: BorderRadius.circular(4),
+                          color: _parseColor(visaColor),
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Text(
-                          'You',
-                          style: TextStyle(color: Colors.white, fontSize: 10),
+                        child: Text(
+                          visaLabel,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                            color: visaStatus == 'FILL_OUT'
+                                ? Colors.black
+                                : Colors.white,
+                          ),
                         ),
                       ),
-                    ],
+                    ),
                   ],
                 ),
-                Text(
-                  delegate['email'] ?? '',
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                ),
-              ],
-            ),
-          ),
-          Text(
-            '#${delegate['delegate_number']}',
-            style: TextStyle(
-              color: Colors.grey[400],
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildProductCard(Map<String, dynamic> product) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: Colors.green.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(Icons.shopping_bag_outlined, color: Colors.green),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  product['product_name'] ?? 'Product',
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-                Text(
-                  product['product_category'] ?? '',
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                ),
-              ],
-            ),
-          ),
-          Text(
-            '${product['currency']} ${(product['total_price'] as num).toStringAsFixed(2)}',
-            style: const TextStyle(fontWeight: FontWeight.w600),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFeeSummary(Map<String, dynamic> fees) {
-    final currency = fees['currency'] ?? 'USD';
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Fee Summary',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 16),
-          _feeRow('Packages Total', fees['packages_total'] ?? 0, currency),
-          _feeRow('Products Total', fees['products_total'] ?? 0, currency),
-          if ((fees['service_fee'] ?? 0) > 0)
-            _feeRow('Service Fee', fees['service_fee'] ?? 0, currency),
-          const Divider(height: 24),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Grand Total',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
-              Text(
-                '$currency ${((fees['grand_total'] ?? 0) as num).toStringAsFixed(2)}',
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF3C4494),
+              Container(width: 1, height: 50, color: Colors.grey[300]),
+              Expanded(
+                child: Column(
+                  children: [
+                    const Text(
+                      'Role',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      role,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -566,19 +970,192 @@ class _MyParticipantsPageState extends State<MyParticipantsPage> {
     );
   }
 
-  Widget _feeRow(String label, num amount, String currency) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: TextStyle(color: Colors.grey[700])),
-          Text(
-            '$currency ${amount.toStringAsFixed(2)}',
-            style: const TextStyle(fontWeight: FontWeight.w500),
+  Widget _buildInfoRow(String label, String value) {
+    return Row(
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontFamily: 'Inter',
+            fontWeight: FontWeight.w600,
+            fontSize: 20,
+            color: Colors.black,
+          ),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(
+              fontFamily: 'Inter',
+              fontWeight: FontWeight.w400,
+              fontSize: 20,
+              color: Colors.black,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMobileInfoRow(String label, String value) {
+    return Row(
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+        ),
+        const SizedBox(width: 4),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(fontSize: 13),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Color _parseColor(String hex) {
+    try {
+      return Color(int.parse(hex.replaceFirst('#', '0xFF')));
+    } catch (e) {
+      return const Color(0xFFE8E84F);
+    }
+  }
+
+  void _handleVisaAction(String status, Map<String, dynamic> participant) {
+    final participantId = participant['id'];
+    String route;
+
+    switch (status) {
+      case 'FILL_OUT':
+      case 'NOT_STARTED':
+        route = '/events/${widget.eventId}/visa/form/$participantId';
+        break;
+      case 'PENDING':
+        route = '/events/${widget.eventId}/visa/status/$participantId';
+        break;
+      case 'APPROVED':
+      case 'DECLINED':
+        route = '/events/${widget.eventId}/visa/details/$participantId';
+        break;
+      default:
+        route = '/events/${widget.eventId}/visa/form/$participantId';
+    }
+
+    context.push(route);
+  }
+
+  void _handleMenuAction(
+    String action,
+    Map<String, dynamic> participant,
+  ) async {
+    switch (action) {
+      case 'edit':
+        _editParticipant(participant);
+        break;
+      case 'delete':
+        await _deleteParticipant(participant);
+        break;
+    }
+  }
+
+  void _editParticipant(Map<String, dynamic> participant) {
+    context.push(
+      '/events/${widget.eventId}/participants/edit/${participant['id']}',
+    );
+  }
+
+  Future<void> _deleteParticipant(Map<String, dynamic> participant) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Participant'),
+        content: Text(
+          'Are you sure you want to delete ${participant['first_name']} ${participant['last_name']}?\n\nThis action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
           ),
         ],
       ),
     );
+
+    if (confirmed != true) return;
+
+    try {
+      if (!mounted) return;
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final token = await authService.getToken();
+
+      final response = await http.delete(
+        Uri.parse(
+          '${AppConfig.b2cApiBaseUrl}/api/v1/participants/${participant['id']}',
+        ),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      if (response.statusCode == 204 && mounted) {
+        setState(() {
+          _participants.removeWhere((p) => p['id'] == participant['id']);
+          _usedSlots = _participants.length;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Participant deleted successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else if (mounted) {
+        throw Exception('Failed to delete participant');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _navigateToAddParticipant() {
+    if (_usedSlots >= _totalSlots) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Slot Limit Reached'),
+          content: Text(
+            'You have used all $_totalSlots available participant slots.\n\nPlease purchase additional packages to add more participants.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    context.push('/participants/add?event_id=${widget.eventId}').then((result) {
+      if (result == true || result == null) {
+        _loadParticipants();
+      }
+    });
   }
 }

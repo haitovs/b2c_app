@@ -2,6 +2,7 @@ import 'package:b2c_app/core/router.dart';
 import 'package:b2c_app/core/services/event_context_service.dart';
 import 'package:b2c_app/features/auth/services/auth_service.dart';
 import 'package:b2c_app/features/events/services/event_service.dart';
+import 'package:b2c_app/features/visa/services/visa_service.dart';
 import 'package:b2c_app/l10n/generated/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -30,6 +31,9 @@ void main() async {
           ChangeNotifierProvider(create: (_) => AuthService()..tryAutoLogin()),
           ProxyProvider<AuthService, EventService>(
             update: (context, auth, previous) => EventService(auth),
+          ),
+          ProxyProvider<AuthService, VisaService>(
+            update: (context, auth, previous) => VisaService(auth),
           ),
           // Provide EventContextService for widgets that need to listen to changes
           ChangeNotifierProvider.value(value: eventContextService),

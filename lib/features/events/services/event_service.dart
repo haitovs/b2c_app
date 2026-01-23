@@ -42,4 +42,19 @@ class EventService {
       throw result.error ?? Exception('Failed to load event');
     }
   }
+
+  /// Fetch events where the current user can add participants
+  /// Returns events where user has purchased packages and has available slots
+  Future<List<dynamic>> getEligibleEventsForParticipants() async {
+    final result = await _api.get<List<dynamic>>(
+      '/api/v1/events/eligible-for-participants',
+      auth: true, // Requires authentication
+    );
+
+    if (result.isSuccess && result.data != null) {
+      return result.data!;
+    } else {
+      throw result.error ?? Exception('Failed to load eligible events');
+    }
+  }
 }
