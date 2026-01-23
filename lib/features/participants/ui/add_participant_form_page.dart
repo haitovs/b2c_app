@@ -8,6 +8,10 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/config/app_config.dart';
+import '../../../core/widgets/app_snackbar.dart';
+import '../../../core/widgets/app_text_field.dart';
+import '../../../core/widgets/phone_input_field.dart';
+import '../../../core/widgets/website_input_field.dart';
 import '../../auth/services/auth_service.dart';
 
 /// Add Participant Form Page (Figma Design)
@@ -28,7 +32,8 @@ class _AddParticipantFormPageState extends State<AddParticipantFormPage> {
   final _lastNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _companyController = TextEditingController();
-  final _mobileController = TextEditingController();
+  String _mobileE164 = ''; // Store phone in E.164 format
+  final String _websiteUrl = ''; // Store website in https:// format
   final ImagePicker _imagePicker = ImagePicker();
 
   bool _isSubmitting = false;
@@ -41,7 +46,7 @@ class _AddParticipantFormPageState extends State<AddParticipantFormPage> {
     _lastNameController.dispose();
     _emailController.dispose();
     _companyController.dispose();
-    _mobileController.dispose();
+    // _mobileE164 is a String, no need to dispose
     super.dispose();
   }
 
@@ -143,7 +148,9 @@ class _AddParticipantFormPageState extends State<AddParticipantFormPage> {
         'last_name': _lastNameController.text.trim(),
         'email': _emailController.text.trim(),
         'company_name': _companyController.text.trim(),
-        'mobile': _mobileController.text.trim(),
+        'mobile': _mobileE164, // E.164 format: +99362436999
+        if (photoUrl != null)
+          'profile_photo_url': photoUrl, // ✅ Include photo URL
       };
 
       final response = await http.post(
@@ -161,12 +168,7 @@ class _AddParticipantFormPageState extends State<AddParticipantFormPage> {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Participant added successfully!'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          AppSnackBar.showSuccess(context, 'Participant added successfully!');
           context.go('/events/${widget.eventId}/my-participants');
         }
       } else {
@@ -182,12 +184,9 @@ class _AddParticipantFormPageState extends State<AddParticipantFormPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString().replaceAll('Exception: ', '')),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 5),
-          ),
+        AppSnackBar.showError(
+          context,
+          e.toString().replaceAll('Exception: ', ''),
         );
       }
     } finally {
@@ -435,14 +434,13 @@ class _AddParticipantFormPageState extends State<AddParticipantFormPage> {
                                       ),
                                       const SizedBox(width: 22),
                                       Expanded(
-                                        child: _buildTextField(
-                                          controller: _mobileController,
-                                          label: 'Mobile Number: *',
-                                          keyboardType: TextInputType.phone,
-                                          validator: (v) =>
-                                              v?.trim().isEmpty ?? true
-                                              ? 'Required'
-                                              : null,
+                                        child: PhoneInputField(
+                                          labelText: 'Mobile Number: *',
+                                          hintText: '62436999',
+                                          required: true,
+                                          onChanged: (e164) {
+                                            setState(() => _mobileE164 = e164);
+                                          },
                                         ),
                                       ),
                                     ],

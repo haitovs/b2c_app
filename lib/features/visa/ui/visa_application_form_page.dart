@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/widgets/phone_input_field.dart';
 import '../services/visa_service.dart';
 
 /// Visa Application Form Page matching Figma design
@@ -43,7 +44,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
   final _educationController = TextEditingController();
   final _specialtyController = TextEditingController();
   final _homeAddressController = TextEditingController();
-  final _phoneNumberController = TextEditingController();
+  String _phoneNumberE164 = ''; // Store phone in E.164 format
   final _passportNumberController = TextEditingController();
   final _placeOfStudyController = TextEditingController();
   final _jobTitleController = TextEditingController();
@@ -88,9 +89,9 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
     _educationController.dispose();
     _specialtyController.dispose();
     _homeAddressController.dispose();
-    _phoneNumberController.dispose();
+    // _phoneNumberE164 is a String, no need to dispose
     _passportNumberController.dispose();
-    _passportDateIssueController.dispose();
+    // REMOVED DUPLICATE: _passportDateIssueController.dispose();
     _placeOfStudyController.dispose();
     _jobTitleController.dispose();
     _homeCityController.dispose();
@@ -101,7 +102,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
     _spouseFullNameController.dispose();
     _spousePlaceOfBirthController.dispose();
     _spouseCitizenshipController.dispose();
-    _spouseCitizenshipController.dispose();
+    // REMOVED DUPLICATE: _spouseCitizenshipController.dispose();
     super.dispose();
   }
 
@@ -151,12 +152,16 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
       }
 
       // Pre-fill form data
+      // Visa applicant's name (separate from participant)
+      _nameController.text = visa['first_name'] ?? '';
+      _surnameController.text = visa['last_name'] ?? '';
+
       _citizenshipController.text = visa['citizenship'] ?? '';
       _placeOfBirthController.text = visa['place_of_birth'] ?? '';
       if (visa['date_of_birth'] != null) {
         _dateOfBirth = DateTime.parse(visa['date_of_birth']);
       }
-      _phoneNumberController.text = visa['phone_number'] ?? '';
+      _phoneNumberE164 = visa['phone_number'] ?? '';
 
       _passportSeriesController.text = visa['passport_series'] ?? '';
       _passportNumberController.text = visa['passport_number'] ?? '';
@@ -342,13 +347,16 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
           : '';
 
       final formData = <String, dynamic>{
-        // Personal Information
+        // Personal Information - Visa Applicant's Name
+        'first_name': _nameController.text.trim(),
+        'last_name': _surnameController.text.trim(),
+
+        // Personal Information - Other Details
         'place_of_birth': _placeOfBirthController.text.trim(),
         if (_dateOfBirth != null)
           'date_of_birth': _dateOfBirth!.toIso8601String().split('T')[0],
         'citizenship': _citizenshipController.text.trim(),
-        'phone_number': _phoneNumberController.text.trim(),
-
+        'phone_number': _phoneNumberE164, // E.164 format
         // Passport Details
         'passport_series': _passportSeriesController.text.trim(),
         'passport_number': _passportNumberController.text.trim(),
@@ -745,18 +753,40 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
         Expanded(
           child: Column(
             children: [
-              buildTextField('Name:', _nameController),
-              buildTextField('Surname:', _surnameController),
-              buildTextField('Place of birth:', _placeOfBirthController),
-              buildTextField('Citizenship:', _citizenshipController),
-              buildTextField('Passport series:', _passportSeriesController),
+              buildTextField('Name:', _nameController, 'John'),
+              buildTextField('Surname:', _surnameController, 'Smith'),
+              buildTextField(
+                'Place of birth:',
+                _placeOfBirthController,
+                'New York',
+              ),
+              buildTextField(
+                'Citizenship:',
+                _citizenshipController,
+                'United States',
+              ),
+              buildTextField(
+                'Passport series:',
+                _passportSeriesController,
+                'AB',
+              ),
               buildDateField(
                 'Passport date issue:',
                 _passportDateIssueController,
                 null,
+                null,
+                '2020-01-15',
               ),
-              buildTextField('Education:', _educationController),
-              buildTextField('Speciality:', _specialtyController),
+              buildTextField(
+                'Education:',
+                _educationController,
+                'Bachelor\'s Degree',
+              ),
+              buildTextField(
+                'Speciality:',
+                _specialtyController,
+                'Computer Science',
+              ),
             ],
           ),
         ),
@@ -769,9 +799,20 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
               buildPhotoUpload(),
               buildDateField('Date of birth:', null, _dateOfBirth, (date) {
                 setState(() => _dateOfBirth = date);
-              }),
-              buildTextField('Phone number:', _phoneNumberController),
-              buildTextField('Passport number:', _passportNumberController),
+              }, '1990-05-20'),
+              PhoneInputField(
+                initialPhone: _phoneNumberE164,
+                labelText: 'Phone number:',
+                hintText: '62436999',
+                onChanged: (e164) {
+                  setState(() => _phoneNumberE164 = e164);
+                },
+              ),
+              buildTextField(
+                'Passport number:',
+                _passportNumberController,
+                '1234567',
+              ),
               buildDateField(
                 'Passport validity period:',
                 null,
@@ -779,9 +820,18 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
                 (date) {
                   setState(() => _passportExpiry = date);
                 },
+                '2030-01-15',
               ),
-              buildTextField('Place of study:', _placeOfStudyController),
-              buildTextField('Job title:', _jobTitleController),
+              buildTextField(
+                'Place of study:',
+                _placeOfStudyController,
+                'Harvard University',
+              ),
+              buildTextField(
+                'Job title:',
+                _jobTitleController,
+                'Software Engineer',
+              ),
             ],
           ),
         ),
@@ -793,51 +843,74 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
     return Column(
       children: [
         buildPhotoUpload(),
-        buildTextField('Name:', _nameController),
-        buildTextField('Surname:', _surnameController),
-        buildTextField('Place of Birth:', _placeOfBirthController),
+        buildTextField('Name:', _nameController, 'John'),
+        buildTextField('Surname:', _surnameController, 'Smith'),
+        buildTextField('Place of Birth:', _placeOfBirthController, 'New York'),
         buildDateField('Date of birth:', null, _dateOfBirth, (date) {
           setState(() => _dateOfBirth = date);
-        }),
-        buildTextField('Citizenship:', _citizenshipController),
-        buildTextField('Phone number:', _phoneNumberController),
-        buildTextField('Passport series:', _passportSeriesController),
-        buildTextField('Passport number:', _passportNumberController),
-        buildDateField(
-          'Passport date issue:',
-          _passportDateIssueController,
-          null,
+        }, '1990-05-20'),
+        buildTextField('Citizenship:', _citizenshipController, 'United States'),
+        PhoneInputField(
+          initialPhone: _phoneNumberE164,
+          labelText: 'Phone number:',
+          hintText: '62436999',
+          onChanged: (e164) {
+            setState(() => _phoneNumberE164 = e164);
+          },
         ),
-        buildTextField('Citizenship:', _citizenshipController),
-        buildTextField('Phone number:', _phoneNumberController),
-        buildTextField('Passport series:', _passportSeriesController),
-        buildTextField('Passport number:', _passportNumberController),
+        buildTextField('Passport series:', _passportSeriesController, 'AB'),
+        buildTextField(
+          'Passport number:',
+          _passportNumberController,
+          '1234567',
+        ),
         buildDateField('Passport date issue:', null, _passportDateIssue, (
           date,
         ) {
           setState(() => _passportDateIssue = date);
-        }),
+        }, '2020-01-15'),
         buildDateField('Passport expiry:', null, _passportExpiry, (date) {
           setState(() => _passportExpiry = date);
-        }),
+        }, '2030-01-15'),
         buildTextField(
           'Passport issuing country:',
           _passportIssuingCountryController,
+          'United States',
         ),
-        buildTextField('Education:', _educationController),
-        buildTextField('Place of study:', _placeOfStudyController),
-        buildTextField('Specialty:', _specialtyController),
-        buildTextField('Job title:', _jobTitleController),
-        buildTextField('Employer name:', _employerNameController),
-        buildTextField('Home address:', _homeAddressController),
-        buildTextField('Home city:', _homeCityController),
-        buildTextField('Home country:', _homeCountryController),
-        buildTextField('Home postal code:', _homePostalCodeController),
+        buildTextField(
+          'Education:',
+          _educationController,
+          'Bachelor\'s Degree',
+        ),
+        buildTextField(
+          'Place of study:',
+          _placeOfStudyController,
+          'Harvard University',
+        ),
+        buildTextField('Specialty:', _specialtyController, 'Computer Science'),
+        buildTextField('Job title:', _jobTitleController, 'Software Engineer'),
+        buildTextField('Employer name:', _employerNameController, 'Tech Corp'),
+        buildTextField(
+          'Home address:',
+          _homeAddressController,
+          '123 Main Street',
+        ),
+        buildTextField('Home city:', _homeCityController, 'New York'),
+        buildTextField(
+          'Home country:',
+          _homeCountryController,
+          'United States',
+        ),
+        buildTextField('Home postal code:', _homePostalCodeController, '10001'),
       ],
     );
   }
 
-  Widget buildTextField(String label, TextEditingController controller) {
+  Widget buildTextField(
+    String label,
+    TextEditingController controller, [
+    String? hintText,
+  ]) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Column(
@@ -863,6 +936,8 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
                 horizontal: 12,
                 vertical: 12,
               ),
+              hintText: hintText,
+              hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
             ),
           ),
         ],
@@ -875,7 +950,17 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
     TextEditingController? controller,
     DateTime? selectedDate, [
     Function(DateTime)? onDateSelected,
+    String? hintText,
   ]) {
+    // Create a temporary controller if one wasn't provided
+    final TextEditingController displayController =
+        controller ?? TextEditingController();
+
+    // Set the text to the formatted date if a date is selected
+    if (selectedDate != null && controller == null) {
+      displayController.text = DateFormat('yyyy-MM-dd').format(selectedDate);
+    }
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Column(
@@ -887,8 +972,9 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
           ),
           const SizedBox(height: 6),
           TextFormField(
-            controller: controller,
+            controller: displayController,
             readOnly: true,
+            style: const TextStyle(color: Colors.black, fontSize: 14),
             onTap: () {
               selectDate(
                 context,
@@ -913,9 +999,8 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
                 vertical: 12,
               ),
               suffixIcon: const Icon(Icons.calendar_today, size: 18),
-              hintText: selectedDate != null
-                  ? DateFormat('yyyy-MM-dd').format(selectedDate)
-                  : '',
+              hintText: hintText ?? '',
+              hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
             ),
           ),
         ],
@@ -1035,7 +1120,11 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
         Row(
           children: [
             Expanded(
-              child: buildTextField('Full name:', _spouseFullNameController),
+              child: buildTextField(
+                'Full name:',
+                _spouseFullNameController,
+                'Jane Smith',
+              ),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -1083,6 +1172,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
               child: buildTextField(
                 'Place of birth:',
                 _spousePlaceOfBirthController,
+                'Los Angeles',
               ),
             ),
             const SizedBox(width: 16),
@@ -1094,11 +1184,16 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
                 (date) {
                   setState(() => _spouseDateOfBirth = date);
                 },
+                '1992-07-10',
               ),
             ),
           ],
         ),
-        buildTextField('Citizenship:', _spouseCitizenshipController),
+        buildTextField(
+          'Citizenship:',
+          _spouseCitizenshipController,
+          'United States',
+        ),
       ],
     );
   }

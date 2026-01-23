@@ -1,5 +1,6 @@
 import 'package:b2c_app/core/router.dart';
 import 'package:b2c_app/core/services/event_context_service.dart';
+import 'package:b2c_app/core/theme/app_theme.dart';
 import 'package:b2c_app/features/auth/services/auth_service.dart';
 import 'package:b2c_app/features/events/services/event_service.dart';
 import 'package:b2c_app/features/visa/services/visa_service.dart';
@@ -9,7 +10,6 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 void main() async {
@@ -69,11 +69,7 @@ class _B2CAppState extends State<B2CApp> {
     return MaterialApp.router(
       debugShowCheckedModeBanner: false,
       title: 'B2C App',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF3C4494)),
-        useMaterial3: true,
-        textTheme: GoogleFonts.interTextTheme(),
-      ),
+      theme: AppTheme.theme, // ✅ Use centralized theme
       routerConfig: _router!,
       localizationsDelegates: const [
         AppLocalizations.delegate,
