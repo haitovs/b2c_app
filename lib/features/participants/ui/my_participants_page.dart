@@ -26,11 +26,26 @@ class _MyParticipantsPageState extends State<MyParticipantsPage> {
   int _usedSlots = 0;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  bool _isAdministrator = true; // Default to true for safety;
 
   @override
   void initState() {
     super.initState();
+    _checkUserRole();
     _loadParticipants();
+  }
+
+  void _checkUserRole() {
+    final authService = context.read<AuthService>();
+    final user = authService.currentUser;
+    if (user != null) {
+      final roles = List<String>.from(user['roles'] ?? []);
+      // Administrator if doesn't have PARTICIPANT role, or has USER/ADMIN role
+      _isAdministrator =
+          !roles.contains('PARTICIPANT') ||
+          roles.contains('USER') ||
+          roles.contains('ADMIN');
+    }
   }
 
   @override
@@ -217,33 +232,35 @@ class _MyParticipantsPageState extends State<MyParticipantsPage> {
                   ),
                 ),
                 const SizedBox(width: 12),
-                Expanded(
-                  child: SizedBox(
-                    height: buttonHeight,
-                    child: ElevatedButton(
-                      onPressed: _navigateToAddParticipant,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        padding: EdgeInsets.symmetric(
-                          horizontal: buttonPaddingH * 0.7,
-                          vertical: buttonPaddingV,
+                // Only show Add button for administrators
+                if (_isAdministrator)
+                  Expanded(
+                    child: SizedBox(
+                      height: buttonHeight,
+                      child: ElevatedButton(
+                        onPressed: _navigateToAddParticipant,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          padding: EdgeInsets.symmetric(
+                            horizontal: buttonPaddingH * 0.7,
+                            vertical: buttonPaddingV,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                         ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                      child: Text(
-                        'Add new',
-                        style: TextStyle(
-                          fontFamily: 'Roboto',
-                          fontWeight: FontWeight.w600,
-                          fontSize: buttonFontSize,
-                          color: Colors.black,
+                        child: Text(
+                          'Add new',
+                          style: TextStyle(
+                            fontFamily: 'Roboto',
+                            fontWeight: FontWeight.w600,
+                            fontSize: buttonFontSize,
+                            color: Colors.black,
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
               ],
             ),
           ],
@@ -300,31 +317,33 @@ class _MyParticipantsPageState extends State<MyParticipantsPage> {
               ),
             ),
           ),
-          SizedBox(
-            height: buttonHeight,
-            child: ElevatedButton(
-              onPressed: _navigateToAddParticipant,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.white,
-                padding: EdgeInsets.symmetric(
-                  horizontal: buttonPaddingH,
-                  vertical: buttonPaddingV,
+          // Only show Add button for administrators
+          if (_isAdministrator)
+            SizedBox(
+              height: buttonHeight,
+              child: ElevatedButton(
+                onPressed: _navigateToAddParticipant,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: buttonPaddingH,
+                    vertical: buttonPaddingV,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              child: Text(
-                'Add new',
-                style: TextStyle(
-                  fontFamily: 'Roboto',
-                  fontWeight: FontWeight.w600,
-                  fontSize: buttonFontSize,
-                  color: Colors.black,
+                child: Text(
+                  'Add new',
+                  style: TextStyle(
+                    fontFamily: 'Roboto',
+                    fontWeight: FontWeight.w600,
+                    fontSize: buttonFontSize,
+                    color: Colors.black,
+                  ),
                 ),
               ),
             ),
-          ),
         ],
       ),
     );
@@ -723,53 +742,54 @@ class _MyParticipantsPageState extends State<MyParticipantsPage> {
               ],
             ),
           ),
-          // More menu
-          Positioned(
-            right: 15,
-            top: 15,
-            child: Container(
-              width: 39,
-              height: 39,
-              decoration: const BoxDecoration(
-                color: Color(0xFF3C4494),
-                shape: BoxShape.circle,
-              ),
-              child: PopupMenuButton<String>(
-                icon: const Icon(
-                  Icons.more_vert,
-                  color: Colors.white,
-                  size: 24,
+          // More menu - only for administrators
+          if (_isAdministrator)
+            Positioned(
+              right: 15,
+              top: 15,
+              child: Container(
+                width: 39,
+                height: 39,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF3C4494),
+                  shape: BoxShape.circle,
                 ),
-                onSelected: (value) => _handleMenuAction(value, participant),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+                child: PopupMenuButton<String>(
+                  icon: const Icon(
+                    Icons.more_vert,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                  onSelected: (value) => _handleMenuAction(value, participant),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  elevation: 8,
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit, size: 20, color: Color(0xFF3C4494)),
+                          SizedBox(width: 12),
+                          Text('Edit'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete, size: 20, color: Colors.red),
+                          SizedBox(width: 12),
+                          Text('Delete', style: TextStyle(color: Colors.red)),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                elevation: 8,
-                itemBuilder: (context) => [
-                  const PopupMenuItem(
-                    value: 'edit',
-                    child: Row(
-                      children: [
-                        Icon(Icons.edit, size: 20, color: Color(0xFF3C4494)),
-                        SizedBox(width: 12),
-                        Text('Edit'),
-                      ],
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'delete',
-                    child: Row(
-                      children: [
-                        Icon(Icons.delete, size: 20, color: Colors.red),
-                        SizedBox(width: 12),
-                        Text('Delete', style: TextStyle(color: Colors.red)),
-                      ],
-                    ),
-                  ),
-                ],
               ),
             ),
-          ),
         ],
       ),
     );
@@ -821,36 +841,37 @@ class _MyParticipantsPageState extends State<MyParticipantsPage> {
                 ),
               ),
               const Spacer(),
-              // More menu
-              PopupMenuButton<String>(
-                icon: const Icon(Icons.more_vert, size: 24),
-                onSelected: (value) => _handleMenuAction(value, participant),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+              // More menu - only for administrators
+              if (_isAdministrator)
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert, size: 24),
+                  onSelected: (value) => _handleMenuAction(value, participant),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit, size: 20, color: Color(0xFF3C4494)),
+                          SizedBox(width: 12),
+                          Text('Edit'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete, size: 20, color: Colors.red),
+                          SizedBox(width: 12),
+                          Text('Delete', style: TextStyle(color: Colors.red)),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                itemBuilder: (context) => [
-                  const PopupMenuItem(
-                    value: 'edit',
-                    child: Row(
-                      children: [
-                        Icon(Icons.edit, size: 20, color: Color(0xFF3C4494)),
-                        SizedBox(width: 12),
-                        Text('Edit'),
-                      ],
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'delete',
-                    child: Row(
-                      children: [
-                        Icon(Icons.delete, size: 20, color: Colors.red),
-                        SizedBox(width: 12),
-                        Text('Delete', style: TextStyle(color: Colors.red)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
             ],
           ),
           const SizedBox(height: 12),

@@ -746,94 +746,186 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
   }
 
   Widget buildTwoColumnLayout() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Column(
       children: [
-        // Left Column
-        Expanded(
-          child: Column(
-            children: [
-              buildTextField('Name:', _nameController, 'John'),
-              buildTextField('Surname:', _surnameController, 'Smith'),
-              buildTextField(
-                'Place of birth:',
-                _placeOfBirthController,
-                'New York',
+        // Section 1: Personal Information
+        buildSectionHeader('Şahsy maglumatlar / Personal Information'),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                children: [
+                  buildTextField('Name:', _nameController, 'John', true),
+                  buildTextField('Surname:', _surnameController, 'Smith', true),
+                  buildTextField(
+                    'Place of birth:',
+                    _placeOfBirthController,
+                    'New York',
+                    true,
+                  ),
+                  buildTextField(
+                    'Citizenship:',
+                    _citizenshipController,
+                    'United States',
+                    true,
+                  ),
+                ],
               ),
-              buildTextField(
-                'Citizenship:',
-                _citizenshipController,
-                'United States',
+            ),
+            const SizedBox(width: 24),
+            Expanded(
+              child: Column(
+                children: [
+                  buildPhotoUpload(),
+                  buildDateField('Date of birth:', null, _dateOfBirth, (date) {
+                    setState(() => _dateOfBirth = date);
+                  }, '1990-05-20'),
+                  PhoneInputField(
+                    initialPhone: _phoneNumberE164,
+                    labelText: 'Phone number:',
+                    hintText: '62436999',
+                    onChanged: (e164) {
+                      setState(() => _phoneNumberE164 = e164);
+                    },
+                  ),
+                ],
               ),
-              buildTextField(
-                'Passport series:',
-                _passportSeriesController,
-                'AB',
-              ),
-              buildDateField(
-                'Passport date issue:',
-                _passportDateIssueController,
-                null,
-                null,
-                '2020-01-15',
-              ),
-              buildTextField(
-                'Education:',
-                _educationController,
-                'Bachelor\'s Degree',
-              ),
-              buildTextField(
-                'Speciality:',
-                _specialtyController,
-                'Computer Science',
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
-        const SizedBox(width: 24),
-        // Right Column
-        Expanded(
-          child: Column(
-            children: [
-              // Photo Upload (compact, aligned with Name + Surname)
-              buildPhotoUpload(),
-              buildDateField('Date of birth:', null, _dateOfBirth, (date) {
-                setState(() => _dateOfBirth = date);
-              }, '1990-05-20'),
-              PhoneInputField(
-                initialPhone: _phoneNumberE164,
-                labelText: 'Phone number:',
-                hintText: '62436999',
-                onChanged: (e164) {
-                  setState(() => _phoneNumberE164 = e164);
-                },
+
+        // Section 2: Passport Details
+        buildSectionHeader('Passport maglumatlary / Passport Details'),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                children: [
+                  buildTextField(
+                    'Passport series:',
+                    _passportSeriesController,
+                    'AB',
+                    true,
+                  ),
+                  buildDateField(
+                    'Passport date issue:',
+                    _passportDateIssueController,
+                    null,
+                    null,
+                    '2020-01-15',
+                  ),
+                ],
               ),
-              buildTextField(
-                'Passport number:',
-                _passportNumberController,
-                '1234567',
+            ),
+            const SizedBox(width: 24),
+            Expanded(
+              child: Column(
+                children: [
+                  buildTextField(
+                    'Passport number:',
+                    _passportNumberController,
+                    '1234567',
+                    true,
+                  ),
+                  buildDateField(
+                    'Passport validity period:',
+                    null,
+                    _passportExpiry,
+                    (date) {
+                      setState(() => _passportExpiry = date);
+                    },
+                    '2030-01-15',
+                  ),
+                ],
               ),
-              buildDateField(
-                'Passport validity period:',
-                null,
-                _passportExpiry,
-                (date) {
-                  setState(() => _passportExpiry = date);
-                },
-                '2030-01-15',
+            ),
+          ],
+        ),
+
+        // Section 3: Professional & Academic
+        buildSectionHeader('Hünär we bilim / Professional & Academic'),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                children: [
+                  buildTextField(
+                    'Education:',
+                    _educationController,
+                    'Bachelor\'s Degree',
+                    true,
+                  ),
+                  buildTextField(
+                    'Speciality:',
+                    _specialtyController,
+                    'Computer Science',
+                    true,
+                  ),
+                ],
               ),
-              buildTextField(
-                'Place of study:',
-                _placeOfStudyController,
-                'Harvard University',
+            ),
+            const SizedBox(width: 24),
+            Expanded(
+              child: Column(
+                children: [
+                  buildTextField(
+                    'Place of study:',
+                    _placeOfStudyController,
+                    'Harvard University',
+                    true,
+                  ),
+                  buildTextField(
+                    'Job title:',
+                    _jobTitleController,
+                    'Software Engineer',
+                    true,
+                  ),
+                ],
               ),
-              buildTextField(
-                'Job title:',
-                _jobTitleController,
-                'Software Engineer',
+            ),
+          ],
+        ),
+
+        // Section 4: Residential Information
+        buildSectionHeader('Ýaşaýan ýeri / Residential Information'),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                children: [
+                  buildTextField(
+                    'Home Address:',
+                    _homeAddressController,
+                    'Köçe, jaý, kwartira / Street, Building, Apt',
+                    true,
+                  ),
+                  buildTextField(
+                    'Home City:',
+                    _homeCityController,
+                    'Aşgabat',
+                    true,
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+            const SizedBox(width: 24),
+            Expanded(
+              child: Column(
+                children: [
+                  buildTextField(
+                    'Home Country:',
+                    _homeCountryController,
+                    'Türkmenistan',
+                    true,
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -843,13 +935,24 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
     return Column(
       children: [
         buildPhotoUpload(),
-        buildTextField('Name:', _nameController, 'John'),
-        buildTextField('Surname:', _surnameController, 'Smith'),
-        buildTextField('Place of Birth:', _placeOfBirthController, 'New York'),
+        buildSectionHeader('Şahsy maglumatlar / Personal Information'),
+        buildTextField('Name:', _nameController, 'John', true),
+        buildTextField('Surname:', _surnameController, 'Smith', true),
+        buildTextField(
+          'Place of Birth:',
+          _placeOfBirthController,
+          'New York',
+          true,
+        ),
         buildDateField('Date of birth:', null, _dateOfBirth, (date) {
           setState(() => _dateOfBirth = date);
         }, '1990-05-20'),
-        buildTextField('Citizenship:', _citizenshipController, 'United States'),
+        buildTextField(
+          'Citizenship:',
+          _citizenshipController,
+          'United States',
+          true,
+        ),
         PhoneInputField(
           initialPhone: _phoneNumberE164,
           labelText: 'Phone number:',
@@ -858,11 +961,18 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
             setState(() => _phoneNumberE164 = e164);
           },
         ),
-        buildTextField('Passport series:', _passportSeriesController, 'AB'),
+        buildSectionHeader('Passport maglumatlary / Passport Details'),
+        buildTextField(
+          'Passport series:',
+          _passportSeriesController,
+          'AB',
+          true,
+        ),
         buildTextField(
           'Passport number:',
           _passportNumberController,
           '1234567',
+          true,
         ),
         buildDateField('Passport date issue:', null, _passportDateIssue, (
           date,
@@ -877,32 +987,62 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
           _passportIssuingCountryController,
           'United States',
         ),
+        buildSectionHeader('Hünär we bilim / Professional & Academic'),
         buildTextField(
           'Education:',
           _educationController,
           'Bachelor\'s Degree',
+          true,
         ),
         buildTextField(
           'Place of study:',
           _placeOfStudyController,
           'Harvard University',
+          true,
         ),
-        buildTextField('Specialty:', _specialtyController, 'Computer Science'),
-        buildTextField('Job title:', _jobTitleController, 'Software Engineer'),
+        buildTextField(
+          'Specialty:',
+          _specialtyController,
+          'Computer Science',
+          true,
+        ),
+        buildTextField(
+          'Job title:',
+          _jobTitleController,
+          'Software Engineer',
+          true,
+        ),
         buildTextField('Employer name:', _employerNameController, 'Tech Corp'),
+        buildSectionHeader('Ýaşaýan ýeri / Residential Information'),
         buildTextField(
           'Home address:',
           _homeAddressController,
-          '123 Main Street',
+          'Köçe, jaý, kwartira / Street, Building, Apt',
+          true,
         ),
-        buildTextField('Home city:', _homeCityController, 'New York'),
+        buildTextField('Home city:', _homeCityController, 'New York', true),
         buildTextField(
           'Home country:',
           _homeCountryController,
-          'United States',
+          'Türkmenistan',
+          true,
         ),
         buildTextField('Home postal code:', _homePostalCodeController, '10001'),
       ],
+    );
+  }
+
+  Widget buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 24, bottom: 12),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+          color: Color(0xFF1E1E1E),
+        ),
+      ),
     );
   }
 
@@ -910,6 +1050,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
     String label,
     TextEditingController controller, [
     String? hintText,
+    bool isRequired = false,
   ]) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
@@ -923,6 +1064,14 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
           const SizedBox(height: 6),
           TextFormField(
             controller: controller,
+            validator: isRequired
+                ? (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'This field is required';
+                    }
+                    return null;
+                  }
+                : null,
             decoration: InputDecoration(
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(4),

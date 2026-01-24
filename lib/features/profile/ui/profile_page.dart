@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:country_code_picker/country_code_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -8,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/widgets/phone_input_field.dart';
 import '../../../shared/widgets/legal_bottom_sheet.dart';
 import '../../auth/services/auth_service.dart';
 
@@ -33,7 +33,8 @@ class _ProfilePageState extends State<ProfilePage>
   bool _isEditing = false;
   bool _agreedToTerms = false;
   XFile? _selectedImage;
-  String _countryCode = '+993'; // For mobile field country selector
+  String? _profilePhotoUrl; // Profile photo URL from user data
+  String _mobileE164 = ''; // Store mobile in E.164 format (e.g., +99362436999)
 
   // Button highlight animation
   late AnimationController _highlightController;
@@ -150,7 +151,14 @@ class _ProfilePageState extends State<ProfilePage>
       _nameController.text = user['first_name'] ?? '';
       _surnameController.text = user['last_name'] ?? '';
       _emailController.text = user['email'] ?? '';
-      _mobileController.text = user['mobile'] ?? '';
+      // Load profile photo URL and trigger rebuild
+      _profilePhotoUrl = user['profile_photo_url'];
+      if (mounted) {
+        setState(() {});
+      }
+
+      // Store mobile in E.164 format for PhoneInputField
+      _mobileE164 = user['mobile'] ?? '';
 
       _countryController.text = user['country'] ?? '';
       _cityController.text = user['city'] ?? '';
@@ -198,10 +206,7 @@ class _ProfilePageState extends State<ProfilePage>
       width: size,
       height: size,
       decoration: BoxDecoration(
-        border: Border.all(
-          color: color.withValues(alpha: opacity * 0.6),
-          width: 2,
-        ),
+        border: Border.all(color: color.withOpacity(opacity * 0.6), width: 2),
         borderRadius: BorderRadius.circular(size / 4),
       ),
     );
@@ -756,7 +761,18 @@ class _ProfilePageState extends State<ProfilePage>
               _buildField("Company Name", _companyNameController),
               _buildField("Company Website", _websiteController),
               _buildField("E-mail address", _emailController),
-              _buildMobileField(_mobileController),
+              // Use global PhoneInputField widget - no border styling here
+              SizedBox(
+                width: 394,
+                child: PhoneInputField(
+                  initialPhone: _mobileE164,
+                  onChanged: (e164Phone) {
+                    _mobileE164 = e164Phone;
+                  },
+                  labelText: "Mobile number:",
+                  hintText: "62436999",
+                ),
+              ),
               _buildField("Country", _countryController),
               _buildField("City", _cityController),
             ],
@@ -794,7 +810,7 @@ class _ProfilePageState extends State<ProfilePage>
             final updates = {
               'first_name': _nameController.text,
               'last_name': _surnameController.text,
-              'mobile': _mobileController.text,
+              'mobile': _mobileE164, // Use E.164 format from PhoneInputField
               'country': _countryController.text,
               'city': _cityController.text,
               'company_name': _companyNameController.text,
@@ -885,9 +901,6 @@ class _ProfilePageState extends State<ProfilePage>
   }
 
   Widget _buildProfilePhoto() {
-    final user = context.read<AuthService>().currentUser;
-    final photoUrl = user?['photo_url'];
-
     return Column(
       children: [
         Container(
@@ -896,24 +909,34 @@ class _ProfilePageState extends State<ProfilePage>
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(10),
             color: Colors.grey[300],
-            image: _selectedImage != null
-                ? DecorationImage(
-                    image: kIsWeb
-                        ? NetworkImage(_selectedImage!.path)
-                        : FileImage(File(_selectedImage!.path))
-                              as ImageProvider,
-                    fit: BoxFit.cover,
-                  )
-                : photoUrl != null
-                ? DecorationImage(
-                    image: NetworkImage(photoUrl),
-                    fit: BoxFit.cover,
-                  )
-                : const DecorationImage(
-                    image: AssetImage('assets/profile_placeholder.png'),
-                    fit: BoxFit.cover,
-                  ),
           ),
+          clipBehavior: Clip.hardEdge,
+          child: _selectedImage != null
+              ? (kIsWeb
+                    ? Image.network(_selectedImage!.path, fit: BoxFit.cover)
+                    : Image.file(File(_selectedImage!.path), fit: BoxFit.cover))
+              : (_profilePhotoUrl != null && _profilePhotoUrl!.isNotEmpty)
+              ? Image.network(
+                  _profilePhotoUrl!,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    // Fallback to placeholder if image fails to load
+                    return const Icon(
+                      Icons.person,
+                      size: 80,
+                      color: Color(0xFF979797),
+                    );
+                  },
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return const Center(
+                      child: CircularProgressIndicator(
+                        color: Color(0xFF3C4494),
+                      ),
+                    );
+                  },
+                )
+              : const Icon(Icons.person, size: 80, color: Color(0xFF979797)),
         ),
         // Upload photo button - only visible in edit mode
         if (_isEditing) ...[
@@ -969,7 +992,8 @@ class _ProfilePageState extends State<ProfilePage>
                       final updates = {
                         'first_name': _nameController.text,
                         'last_name': _surnameController.text,
-                        'mobile': _mobileController.text,
+                        'mobile':
+                            _mobileE164, // Use E.164 format from PhoneInputField
                         'country': _countryController.text,
                         'city': _cityController.text,
                         'company_name': _companyNameController.text,
@@ -1057,7 +1081,18 @@ class _ProfilePageState extends State<ProfilePage>
               _buildField("Name", _nameController),
               _buildField("Surname", _surnameController),
               _buildField("E-mail address", _emailController),
-              _buildMobileField(_mobileController),
+              // Use global PhoneInputField widget
+              SizedBox(
+                width: 394,
+                child: PhoneInputField(
+                  initialPhone: _mobileE164,
+                  onChanged: (e164Phone) {
+                    _mobileE164 = e164Phone;
+                  },
+                  labelText: "Mobile number:",
+                  hintText: "62436999",
+                ),
+              ),
               _buildField("Country", _countryController),
               _buildField("City", _cityController),
               _buildField("Company Name", _companyNameController),
@@ -1128,111 +1163,6 @@ class _ProfilePageState extends State<ProfilePage>
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMobileField(TextEditingController controller) {
-    return SizedBox(
-      width: 394,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            "Mobile number:",
-            style: GoogleFonts.inter(
-              fontWeight: FontWeight.w500,
-              fontSize: 18,
-              color: Colors.black,
-            ),
-          ),
-          const SizedBox(height: 15),
-          Row(
-            children: [
-              Container(
-                height: 50,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE6E5E5),
-                  border: Border.all(color: const Color(0xFFADADAD)),
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(5),
-                    bottomLeft: Radius.circular(5),
-                  ),
-                ),
-                child: _isEditing
-                    ? CountryCodePicker(
-                        onChanged: (country) {
-                          setState(
-                            () => _countryCode = country.dialCode ?? '+993',
-                          );
-                        },
-                        initialSelection: 'TM',
-                        favorite: const ['TM', 'RU', 'US'],
-                        showCountryOnly: false,
-                        showOnlyCountryWhenClosed: false,
-                        alignLeft: false,
-                        padding: EdgeInsets.zero,
-                        textStyle: GoogleFonts.inter(fontSize: 16),
-                        showFlagMain: true,
-                        showDropDownButton: false,
-                      )
-                    : Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.flag,
-                              size: 20,
-                              color: Colors.green,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              _countryCode,
-                              style: GoogleFonts.inter(fontSize: 16),
-                            ),
-                          ],
-                        ),
-                      ),
-              ),
-              Expanded(
-                child: Container(
-                  height: 50,
-                  decoration: const BoxDecoration(
-                    border: Border(
-                      top: BorderSide(color: Color(0xFFB7B7B7)),
-                      right: BorderSide(color: Color(0xFFB7B7B7)),
-                      bottom: BorderSide(color: Color(0xFFB7B7B7)),
-                    ),
-                    borderRadius: BorderRadius.only(
-                      topRight: Radius.circular(5),
-                      bottomRight: Radius.circular(5),
-                    ),
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  alignment: Alignment.centerLeft,
-                  child: _isEditing
-                      ? TextField(
-                          controller: controller,
-                          decoration: const InputDecoration(
-                            border: InputBorder.none,
-                            isDense: true,
-                          ),
-                          style: GoogleFonts.inter(fontSize: 16),
-                        )
-                      : Text(
-                          controller.text,
-                          style: GoogleFonts.inter(
-                            fontSize: 16,
-                            color: const Color.fromRGBO(0, 0, 0, 0.5),
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                ),
-              ),
-            ],
           ),
         ],
       ),

@@ -88,9 +88,11 @@ class _PhoneInputFieldState extends State<PhoneInputField> {
           children: [
             // Country Code Picker
             Container(
+              height: 48,
               decoration: BoxDecoration(
+                color: Colors.white,
                 border: Border.all(color: Colors.grey.shade300),
-                borderRadius: BorderRadius.circular(4),
+                borderRadius: BorderRadius.circular(8),
               ),
               child: CountryCodePicker(
                 onChanged: (country) {
@@ -104,11 +106,12 @@ class _PhoneInputFieldState extends State<PhoneInputField> {
                 showCountryOnly: false,
                 showOnlyCountryWhenClosed: false,
                 alignLeft: false,
-                padding: EdgeInsets.zero,
-                flagWidth: 30,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                flagWidth: 24,
+                textStyle: const TextStyle(fontSize: 14),
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 12),
             // Local Number Input
             Expanded(
               child: TextFormField(
@@ -117,11 +120,11 @@ class _PhoneInputFieldState extends State<PhoneInputField> {
                 decoration: InputDecoration(
                   hintText: widget.hintText ?? '62436999',
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 12,
+                    horizontal: 16,
+                    vertical: 14,
                   ),
                 ),
                 validator: widget.required

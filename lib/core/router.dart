@@ -30,6 +30,7 @@ import '../features/news/ui/news_page.dart';
 import '../features/participants/ui/my_participants_page.dart';
 import '../features/participants/ui/add_participant_select_event_page.dart';
 import '../features/participants/ui/add_participant_form_page.dart';
+import '../features/participants/ui/edit_participant_page.dart';
 import '../features/transfer/ui/transfer_page.dart';
 import '../features/visa/ui/visa_application_form_page.dart';
 import '../features/visa/ui/visa_status_page.dart';
@@ -281,6 +282,18 @@ GoRouter createRouter(AuthService authService) {
             builder: (context, state) {
               final idStr = state.pathParameters['id']!;
               return MyParticipantsPage(eventId: int.tryParse(idStr) ?? 0);
+            },
+          ),
+          // Edit Participant route
+          GoRoute(
+            path: 'participants/edit/:participantId',
+            builder: (context, state) {
+              final eventIdStr = state.pathParameters['id']!;
+              final participantId = state.pathParameters['participantId']!;
+              return EditParticipantPage(
+                participantId: participantId,
+                eventId: int.tryParse(eventIdStr) ?? 0,
+              );
             },
           ),
           // Visa routes

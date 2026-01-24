@@ -9,9 +9,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/widgets/app_snackbar.dart';
-import '../../../core/widgets/app_text_field.dart';
 import '../../../core/widgets/phone_input_field.dart';
-import '../../../core/widgets/website_input_field.dart';
 import '../../auth/services/auth_service.dart';
 
 /// Add Participant Form Page (Figma Design)
@@ -150,7 +148,7 @@ class _AddParticipantFormPageState extends State<AddParticipantFormPage> {
         'company_name': _companyController.text.trim(),
         'mobile': _mobileE164, // E.164 format: +99362436999
         if (photoUrl != null)
-          'profile_photo_url': photoUrl, // ✅ Include photo URL
+          'profile_photo_url': photoUrl, // Include photo URL
       };
 
       final response = await http.post(
