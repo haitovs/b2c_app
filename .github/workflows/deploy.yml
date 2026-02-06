@@ -72,7 +72,7 @@ jobs:
           port: ${{ secrets.SSH_PORT || 22 }}
           source: "build/web/*"
           # FIX: Target the specific subfolder so we don't wipe the root again
-          target: "/home/main/apps/b2c_app/build/web"
+          target: "/home/main/apps/b2c_app/"
           rm: true
 
       # ---------------------------------------------------------
