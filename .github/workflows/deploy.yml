@@ -44,7 +44,7 @@ jobs:
             set -Eeuo pipefail
             export GIT_SSH_COMMAND='ssh -i ~/.ssh/deploy_b2c_app_frontend -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new'
             
-            APP_DIR="/root/apps/b2c_app"
+            APP_DIR="/home/main/apps/b2c_app"
             mkdir -p "$APP_DIR"
             cd "$APP_DIR"
             
@@ -72,7 +72,7 @@ jobs:
           port: ${{ secrets.SSH_PORT || 22 }}
           source: "build/web/*"
           # FIX: Target the specific subfolder so we don't wipe the root again
-          target: "/root/apps/b2c_app/build/web"
+          target: "/home/main/apps/b2c_app/build/web"
           rm: true
 
       # ---------------------------------------------------------
@@ -89,7 +89,7 @@ jobs:
           command_timeout: 60m
           script: |
             set -Eeuo pipefail
-            cd /root/apps/b2c_app
+            cd /home/main/apps/b2c_app
             
             if docker compose version >/dev/null 2>&1; then DC="docker compose"; else DC="docker-compose"; fi
             
