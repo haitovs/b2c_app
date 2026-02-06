@@ -42,7 +42,7 @@ jobs:
           port: ${{ secrets.SSH_PORT || 22 }}
           script: |
             set -Eeuo pipefail
-            export GIT_SSH_COMMAND='ssh -i ~/.ssh/deploy_b2c_app_frontend -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new'
+            export GIT_SSH_COMMAND='ssh -i ~/.ssh/deploy_b2c_app -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new'
             
             APP_DIR="/home/main/apps/b2c_app"
             mkdir -p "$APP_DIR"
