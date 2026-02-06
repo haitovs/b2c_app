@@ -88,7 +88,7 @@ class _LoginPageState extends State<LoginPage> {
                 bottomLeft: Radius.circular(35),
               ),
               image: DecorationImage(
-                image: AssetImage('assets/login_image.png'),
+                image: AssetImage('login_image.png'),
                 fit: BoxFit.cover,
               ),
             ),
