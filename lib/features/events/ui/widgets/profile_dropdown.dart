@@ -107,7 +107,17 @@ class _ProfileDropdownState extends State<ProfileDropdown>
                         color: Colors.grey[300],
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.person, color: Colors.grey),
+                      clipBehavior: Clip.antiAlias,
+                      child:
+                          user?['photo_url'] != null &&
+                              (user!['photo_url'] as String).isNotEmpty
+                          ? Image.network(
+                              user['photo_url'] as String,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  const Icon(Icons.person, color: Colors.grey),
+                            )
+                          : const Icon(Icons.person, color: Colors.grey),
                     ),
                     const SizedBox(width: 10),
                     Expanded(

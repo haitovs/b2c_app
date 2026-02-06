@@ -1,12 +1,16 @@
 import 'dart:io';
+import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../core/widgets/phone_input_field.dart';
 import '../../../shared/widgets/legal_bottom_sheet.dart';
 import '../../auth/services/auth_service.dart';
@@ -33,6 +37,7 @@ class _ProfilePageState extends State<ProfilePage>
   bool _isEditing = false;
   bool _agreedToTerms = false;
   XFile? _selectedImage;
+  Uint8List? _selectedImageBytes; // Store image bytes for upload
   String? _profilePhotoUrl; // Profile photo URL from user data
   String _mobileE164 = ''; // Store mobile in E.164 format (e.g., +99362436999)
 
@@ -152,7 +157,7 @@ class _ProfilePageState extends State<ProfilePage>
       _surnameController.text = user['last_name'] ?? '';
       _emailController.text = user['email'] ?? '';
       // Load profile photo URL and trigger rebuild
-      _profilePhotoUrl = user['profile_photo_url'];
+      _profilePhotoUrl = user['photo_url'];
       if (mounted) {
         setState(() {});
       }
@@ -189,12 +194,261 @@ class _ProfilePageState extends State<ProfilePage>
 
   Future<void> _pickImage() async {
     final picker = ImagePicker();
-    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+    final XFile? image = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 800,
+      maxHeight: 800,
+      imageQuality: 85,
+    );
     if (image != null) {
+      final bytes = await image.readAsBytes();
       setState(() {
         _selectedImage = image;
+        _selectedImageBytes = bytes;
       });
     }
+  }
+
+  /// Upload profile photo to server and return URL
+  Future<String?> _uploadProfilePhoto() async {
+    if (_selectedImageBytes == null) return null;
+
+    try {
+      final authService = context.read<AuthService>();
+      final token = await authService.getToken();
+
+      var request = http.MultipartRequest(
+        'POST',
+        Uri.parse('${AppConfig.b2cApiBaseUrl}/api/v1/files/upload'),
+      );
+
+      request.headers['Authorization'] = 'Bearer $token';
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'file',
+          _selectedImageBytes!,
+          filename:
+              'profile_photo_${DateTime.now().millisecondsSinceEpoch}.jpg',
+        ),
+      );
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = jsonDecode(responseBody);
+        return data['url'] ?? data['file_url'];
+      } else {
+        throw Exception('Upload failed: ${response.statusCode}');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Photo upload failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return null;
+    }
+  }
+
+  /// Show password change dialog
+  Future<void> _showChangePasswordDialog() async {
+    final currentPasswordController = TextEditingController();
+    final newPasswordController = TextEditingController();
+    final confirmPasswordController = TextEditingController();
+    bool obscureCurrentPassword = true;
+    bool obscureNewPassword = true;
+    bool obscureConfirmPassword = true;
+
+    return showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text(
+                "Change Password",
+                style: GoogleFonts.inter(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 20,
+                ),
+              ),
+              content: SizedBox(
+                width: 400,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Current Password
+                    TextField(
+                      controller: currentPasswordController,
+                      obscureText: obscureCurrentPassword,
+                      decoration: InputDecoration(
+                        labelText: "Current Password",
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            obscureCurrentPassword
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                          ),
+                          onPressed: () => setState(
+                            () => obscureCurrentPassword =
+                                !obscureCurrentPassword,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    // New Password
+                    TextField(
+                      controller: newPasswordController,
+                      obscureText: obscureNewPassword,
+                      decoration: InputDecoration(
+                        labelText: "New Password (min 8 characters)",
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            obscureNewPassword
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                          ),
+                          onPressed: () => setState(
+                            () => obscureNewPassword = !obscureNewPassword,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    // Confirm Password
+                    TextField(
+                      controller: confirmPasswordController,
+                      obscureText: obscureConfirmPassword,
+                      decoration: InputDecoration(
+                        labelText: "Confirm New Password",
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            obscureConfirmPassword
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                          ),
+                          onPressed: () => setState(
+                            () => obscureConfirmPassword =
+                                !obscureConfirmPassword,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: Text(
+                    "Cancel",
+                    style: GoogleFonts.inter(color: Colors.grey[600]),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    // Validation
+                    if (currentPasswordController.text.isEmpty) {
+                      ScaffoldMessenger.of(this.context).showSnackBar(
+                        const SnackBar(
+                          content: Text("Current password is required"),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                      return;
+                    }
+                    if (newPasswordController.text.length < 8) {
+                      ScaffoldMessenger.of(this.context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            "New password must be at least 8 characters",
+                          ),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                      return;
+                    }
+                    if (newPasswordController.text !=
+                        confirmPasswordController.text) {
+                      ScaffoldMessenger.of(this.context).showSnackBar(
+                        const SnackBar(
+                          content: Text("Passwords do not match"),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                      return;
+                    }
+
+                    // Call API
+                    try {
+                      final authService = this.context.read<AuthService>();
+                      final token = await authService.getToken();
+                      final response = await http.patch(
+                        Uri.parse(
+                          '${AppConfig.b2cApiBaseUrl}/api/v1/users/me/password?current_password=${Uri.encodeComponent(currentPasswordController.text)}&new_password=${Uri.encodeComponent(newPasswordController.text)}',
+                        ),
+                        headers: {'Authorization': 'Bearer $token'},
+                      );
+
+                      if (response.statusCode == 200) {
+                        if (!this.context.mounted) return;
+                        Navigator.pop(dialogContext);
+                        ScaffoldMessenger.of(this.context).showSnackBar(
+                          const SnackBar(
+                            content: Text("Password changed successfully!"),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      } else {
+                        final error = jsonDecode(response.body);
+                        if (!this.context.mounted) return;
+                        ScaffoldMessenger.of(this.context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              error['detail'] ?? 'Failed to change password',
+                            ),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (!this.context.mounted) return;
+                      ScaffoldMessenger.of(this.context).showSnackBar(
+                        SnackBar(
+                          content: Text('Error: $e'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF3C4494),
+                  ),
+                  child: Text(
+                    "Change Password",
+                    style: GoogleFonts.inter(color: Colors.white),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   /// Builds a ripple ring that expands and fades out
@@ -206,7 +460,10 @@ class _ProfilePageState extends State<ProfilePage>
       width: size,
       height: size,
       decoration: BoxDecoration(
-        border: Border.all(color: color.withOpacity(opacity * 0.6), width: 2),
+        border: Border.all(
+          color: color.withValues(alpha: opacity * 0.6),
+          width: 2,
+        ),
         borderRadius: BorderRadius.circular(size / 4),
       ),
     );
@@ -314,7 +571,7 @@ class _ProfilePageState extends State<ProfilePage>
   }
 
   Widget _buildTabBar(bool isMobile) {
-    final tabs = ["Agreement process", "My profile", "Company profile"];
+    final tabs = ["Agreement process", "My profile"];
 
     return Container(
       padding: EdgeInsets.symmetric(horizontal: isMobile ? 10 : 50),
@@ -370,10 +627,6 @@ class _ProfilePageState extends State<ProfilePage>
         return _buildAgreementProcess();
       case 1:
         return isMobile ? _buildMobileLayout() : _buildDesktopLayout();
-      case 2:
-        return isMobile
-            ? _buildCompanyMobileLayout()
-            : _buildCompanyDesktopLayout();
       default:
         return const SizedBox();
     }
@@ -701,112 +954,19 @@ class _ProfilePageState extends State<ProfilePage>
 
   // ============== Company Profile Tab ==============
 
-  Widget _buildCompanyDesktopLayout() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildProfilePhoto(),
-        const SizedBox(width: 50),
-        Expanded(child: _buildCompanyFormContainer()),
-      ],
-    );
-  }
-
-  Widget _buildCompanyMobileLayout() {
-    return Column(
-      children: [
-        _buildProfilePhoto(),
-        const SizedBox(height: 30),
-        _buildCompanyFormContainer(),
-      ],
-    );
-  }
-
-  Widget _buildCompanyFormContainer() {
-    return Container(
-      constraints: const BoxConstraints(maxWidth: 890),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      padding: const EdgeInsets.all(30),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Flexible(
-                child: Text(
-                  "Company Information",
-                  style: GoogleFonts.inter(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 20,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              _buildEditButton(),
-            ],
-          ),
-
-          const SizedBox(height: 30),
-
-          // Company fields
-          Wrap(
-            spacing: 20,
-            runSpacing: 30,
-            children: [
-              _buildField("Company Name", _companyNameController),
-              _buildField("Company Website", _websiteController),
-              _buildField("E-mail address", _emailController),
-              // Use global PhoneInputField widget - no border styling here
-              SizedBox(
-                width: 394,
-                child: PhoneInputField(
-                  initialPhone: _mobileE164,
-                  onChanged: (e164Phone) {
-                    _mobileE164 = e164Phone;
-                  },
-                  labelText: "Mobile number:",
-                  hintText: "62436999",
-                ),
-              ),
-              _buildField("Country", _countryController),
-              _buildField("City", _cityController),
-            ],
-          ),
-
-          const SizedBox(height: 50),
-
-          Text(
-            "Follow Me:",
-            style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 20),
-          ),
-
-          const SizedBox(height: 30),
-
-          Wrap(
-            spacing: 20,
-            runSpacing: 30,
-            children: [
-              _buildSocialField("Instagram", _instagramController),
-              _buildSocialField("WhatsApp", _whatsappController),
-              _buildSocialField("Facebook", _facebookController),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildEditButton() {
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: () async {
           if (_isEditing) {
+            // Upload photo if selected
+            String? photoUrl;
+            if (_selectedImageBytes != null) {
+              photoUrl = await _uploadProfilePhoto();
+              // Don't abort if photo upload fails - still save other fields
+            }
+
             final updates = {
               'first_name': _nameController.text,
               'last_name': _surnameController.text,
@@ -815,6 +975,8 @@ class _ProfilePageState extends State<ProfilePage>
               'city': _cityController.text,
               'company_name': _companyNameController.text,
               'website': _websiteController.text,
+              // Include photo URL if uploaded
+              if (photoUrl != null) 'photo_url': photoUrl,
               'social_links': [
                 if (_instagramController.text.isNotEmpty)
                   {'network': 'INSTAGRAM', 'handle': _instagramController.text},
@@ -989,6 +1151,12 @@ class _ProfilePageState extends State<ProfilePage>
                 child: InkWell(
                   onTap: () async {
                     if (_isEditing) {
+                      // Upload photo if selected
+                      String? photoUrl;
+                      if (_selectedImageBytes != null) {
+                        photoUrl = await _uploadProfilePhoto();
+                      }
+
                       final updates = {
                         'first_name': _nameController.text,
                         'last_name': _surnameController.text,
@@ -998,6 +1166,8 @@ class _ProfilePageState extends State<ProfilePage>
                         'city': _cityController.text,
                         'company_name': _companyNameController.text,
                         'website': _websiteController.text,
+                        // Include photo URL if uploaded
+                        if (photoUrl != null) 'photo_url': photoUrl,
                         'social_links': [
                           if (_instagramController.text.isNotEmpty)
                             {
@@ -1081,18 +1251,7 @@ class _ProfilePageState extends State<ProfilePage>
               _buildField("Name", _nameController),
               _buildField("Surname", _surnameController),
               _buildField("E-mail address", _emailController),
-              // Use global PhoneInputField widget
-              SizedBox(
-                width: 394,
-                child: PhoneInputField(
-                  initialPhone: _mobileE164,
-                  onChanged: (e164Phone) {
-                    _mobileE164 = e164Phone;
-                  },
-                  labelText: "Mobile number:",
-                  hintText: "62436999",
-                ),
-              ),
+              _buildMobilePhoneField(),
               _buildField("Country", _countryController),
               _buildField("City", _cityController),
               _buildField("Company Name", _companyNameController),
@@ -1117,6 +1276,42 @@ class _ProfilePageState extends State<ProfilePage>
               _buildSocialField("WhatsApp", _whatsappController),
               _buildSocialField("Facebook", _facebookController),
             ],
+          ),
+
+          const SizedBox(height: 50),
+
+          // Security Section
+          Text(
+            "Security:",
+            style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 20),
+          ),
+
+          const SizedBox(height: 20),
+
+          SizedBox(
+            width: 394,
+            child: ElevatedButton.icon(
+              onPressed: _showChangePasswordDialog,
+              icon: const Icon(Icons.lock_outline, color: Colors.white),
+              label: Text(
+                "Change Password",
+                style: GoogleFonts.inter(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF3C4494),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 15,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(5),
+                ),
+              ),
+            ),
           ),
         ],
       ),
@@ -1151,7 +1346,10 @@ class _ProfilePageState extends State<ProfilePage>
                     controller: controller,
                     decoration: const InputDecoration(
                       border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
                       isDense: true,
+                      contentPadding: EdgeInsets.zero,
                     ),
                     style: GoogleFonts.inter(fontSize: 16),
                   )
@@ -1164,6 +1362,55 @@ class _ProfilePageState extends State<ProfilePage>
                     overflow: TextOverflow.ellipsis,
                   ),
           ),
+        ],
+      ),
+    );
+  }
+
+  // Custom mobile phone field that supports edit/view modes
+  Widget _buildMobilePhoneField() {
+    return SizedBox(
+      width: 394,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "Mobile number:",
+            style: GoogleFonts.inter(
+              fontWeight: FontWeight.w500,
+              fontSize: 18,
+              color: Colors.black,
+            ),
+          ),
+          const SizedBox(height: 15),
+          if (_isEditing)
+            // Editable mode: Use PhoneInputField
+            PhoneInputField(
+              initialPhone: _mobileE164,
+              onChanged: (e164Phone) {
+                _mobileE164 = e164Phone;
+              },
+              hintText: "62436999",
+            )
+          else
+            // View mode: Display formatted phone number
+            Container(
+              height: 50,
+              decoration: BoxDecoration(
+                border: Border.all(color: const Color(0xFFB7B7B7)),
+                borderRadius: BorderRadius.circular(5),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              alignment: Alignment.centerLeft,
+              child: Text(
+                _mobileE164.isNotEmpty ? _mobileE164 : '',
+                style: GoogleFonts.inter(
+                  fontSize: 16,
+                  color: const Color.fromRGBO(0, 0, 0, 0.5),
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
         ],
       ),
     );
@@ -1197,7 +1444,10 @@ class _ProfilePageState extends State<ProfilePage>
                     controller: controller,
                     decoration: const InputDecoration(
                       border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
                       isDense: true,
+                      contentPadding: EdgeInsets.zero,
                     ),
                     style: GoogleFonts.inter(fontSize: 16),
                   )

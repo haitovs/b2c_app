@@ -30,28 +30,49 @@ class PhoneNumberUtil {
       return {'dialCode': '+993', 'localNumber': e164Phone};
     }
 
-    // Extract dial code by trying different lengths (1-4 digits)
-    // Common dial codes: +1 (USA), +44 (UK), +993 (TM), +7 (RU)
-    for (int len = 1; len <= 4; len++) {
-      if (e164Phone.length > len + 1) {
-        final code = e164Phone.substring(0, len + 1); // Include the '+'
-        final local = e164Phone.substring(len + 1);
+    // Known dial codes sorted by length (longest first for accurate matching)
+    const knownDialCodes = [
+      '+1684', '+1264', '+1268', '+1242', '+1246', '+1441', '+1284', '+1345',
+      '+1767', '+1809', '+1829', '+1849', '+1473', '+1671', '+1876', '+1664',
+      '+1787', '+1939', '+1869', '+1758', '+1784', '+1868', '+1649', '+1340',
+      // 4-digit codes
+      '+993', '+994', '+995', '+996', '+998', '+992', // Central Asia
+      '+380', '+375', '+374', '+373', '+371', '+370', // Eastern Europe
+      '+353', '+354', '+358', '+359', '+351', '+352', // Western Europe
+      '+852', '+853', '+886', '+880', '+855', '+856', // East Asia
+      // 3-digit codes
+      '+90', '+91', '+92', '+93', '+94', '+95', '+98', // Asia
+      '+20', '+27', '+30', '+31', '+32', '+33', '+34', '+36', '+39', // Europe
+      '+40', '+41', '+43', '+44', '+45', '+46', '+47', '+48', '+49', // Europe
+      '+51', '+52', '+53', '+54', '+55', '+56', '+57', '+58', // Americas
+      '+60', '+61', '+62', '+63', '+64', '+65', '+66', // Asia-Pacific
+      '+81', '+82', '+84', '+86', // East Asia
+      // 2-digit and 1-digit codes
+      '+7', '+1', // Russia/Kazakhstan, NANP
+    ];
 
-        // Return if we have a reasonable split
+    // Try to match known dial codes (longest match first)
+    for (final code in knownDialCodes) {
+      if (e164Phone.startsWith(code)) {
+        final local = e164Phone.substring(code.length);
         if (local.isNotEmpty) {
           return {'dialCode': code, 'localNumber': local};
         }
       }
     }
 
-    // Fallback: assume first 4 characters are dial code (+XXX)
-    if (e164Phone.length > 4) {
-      return {
-        'dialCode': e164Phone.substring(0, 4),
-        'localNumber': e164Phone.substring(4),
-      };
+    // Fallback: try different lengths from longest to shortest
+    for (int len = 4; len >= 1; len--) {
+      if (e164Phone.length > len + 1) {
+        final code = e164Phone.substring(0, len + 1);
+        final local = e164Phone.substring(len + 1);
+        if (local.isNotEmpty && RegExp(r'^\d').hasMatch(local)) {
+          return {'dialCode': code, 'localNumber': local};
+        }
+      }
     }
 
+    // Last resort: assume +993 with remaining as local
     return {'dialCode': '+993', 'localNumber': e164Phone.substring(1)};
   }
 
