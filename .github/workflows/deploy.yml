@@ -70,10 +70,9 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT || 22 }}
-          source: "build/web/*"
-          # FIX: Target the specific subfolder so we don't wipe the root again
+          source: "build/web/*,docker-compose.yml,Dockerfile,nginx.conf"
           target: "/home/main/apps/b2c_app/"
-          rm: true
+          rm: false
 
       # ---------------------------------------------------------
       # STEP 4: RESTART DOCKER
