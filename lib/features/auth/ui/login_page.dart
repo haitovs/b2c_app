@@ -88,7 +88,7 @@ class _LoginPageState extends State<LoginPage> {
                 bottomLeft: Radius.circular(35),
               ),
               image: DecorationImage(
-                image: AssetImage('login_image.png'),
+                image: AssetImage('assets/login_image.png'),
                 fit: BoxFit.cover,
               ),
             ),
@@ -141,7 +141,7 @@ class _LoginPageState extends State<LoginPage> {
                 height: 45,
                 decoration: BoxDecoration(
                   border: Border.all(color: AppColors.inputBorder),
-                  borderRadius: BorderRadius.circular(5),
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: TextField(
                   controller: _usernameController,
@@ -170,7 +170,7 @@ class _LoginPageState extends State<LoginPage> {
                 height: 45,
                 decoration: BoxDecoration(
                   border: Border.all(color: AppColors.inputBorder),
-                  borderRadius: BorderRadius.circular(5),
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: TextField(
                   controller: _passwordController,
