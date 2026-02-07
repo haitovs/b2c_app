@@ -93,7 +93,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
                 bottomLeft: Radius.circular(35),
               ),
               image: DecorationImage(
-                image: AssetImage('assets/registration_image.png'),
+                image: AssetImage('registration_image.png'),
                 fit: BoxFit.cover,
               ),
             ),
