@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../features/auth/services/auth_service.dart';
 import '../features/auth/ui/login_page.dart';
 import '../features/auth/ui/registration_page.dart';
+import '../features/auth/ui/verify_email_page.dart';
 import '../features/contact/ui/contact_us_page.dart';
 import '../features/events/ui/agenda_page.dart';
 import '../features/events/ui/event_calendar_page.dart';
@@ -53,8 +54,12 @@ GoRouter createRouter(AuthService authService) {
       final location = state.uri.toString();
       final isLoggingIn = location == '/login';
       final isSigningUp = location == '/signup';
+      final isVerifyingEmail = location.startsWith('/verify-email');
 
-      if (!isAuthenticated && !isLoggingIn && !isSigningUp) {
+      if (!isAuthenticated &&
+          !isLoggingIn &&
+          !isSigningUp &&
+          !isVerifyingEmail) {
         return '/login';
       }
 
@@ -69,6 +74,13 @@ GoRouter createRouter(AuthService authService) {
       GoRoute(
         path: '/signup',
         builder: (context, state) => const RegistrationPage(),
+      ),
+      GoRoute(
+        path: '/verify-email',
+        builder: (context, state) {
+          final token = state.uri.queryParameters['token'] ?? '';
+          return VerifyEmailPage(token: token);
+        },
       ),
       GoRoute(
         path: '/',
