@@ -74,8 +74,6 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
     try {
       final authService = context.read<AuthService>();
       final token = await authService.getToken();
-      debugPrint('[EventMenu] Checking registration status...');
-      debugPrint('[EventMenu] Token: ${token?.substring(0, 20)}...');
 
       final response = await http.get(
         Uri.parse(
@@ -87,15 +85,12 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
         },
       );
 
-      debugPrint('[EventMenu] Response status: ${response.statusCode}');
-      debugPrint('[EventMenu] Response body: ${response.body}');
-
       if (!mounted) return;
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final status = data['status'];
-        debugPrint('[EventMenu] Registration status: $status');
+
         setState(() {
           // Accept SUBMITTED, APPROVED/ACCEPTED as registered
           _isRegistered =
@@ -103,10 +98,8 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
               status == 'APPROVED' ||
               status == 'SUBMITTED';
           _isCheckingRegistration = false;
-          debugPrint('[EventMenu] _isRegistered set to: $_isRegistered');
         });
       } else {
-        debugPrint('[EventMenu] Non-200 response, setting _isRegistered=false');
         setState(() {
           _isRegistered = false;
           _isCheckingRegistration = false;
@@ -127,7 +120,6 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
     try {
       final authService = context.read<AuthService>();
       final token = await authService.getToken();
-      debugPrint('[EventMenu] Checking terms acceptance status...');
 
       // Check if user is a participant by trying participant profile endpoint
       final response = await http.get(
@@ -140,14 +132,12 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
         },
       );
 
-      debugPrint('[EventMenu] Terms check status: ${response.statusCode}');
-
       if (!mounted) return;
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final termsAccepted = data['is_terms_accepted'] ?? false;
-        debugPrint('[EventMenu] is_terms_accepted: $termsAccepted');
+
         setState(() {
           _termsAccepted = termsAccepted;
           _isCheckingTerms = false;
@@ -155,7 +145,7 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
         });
       } else {
         // Not a participant, use default (regular user flow)
-        debugPrint('[EventMenu] Not a participant, using regular flow');
+
         setState(() {
           _termsAccepted = true; // Regular users don't need this gate
           _isCheckingTerms = false;

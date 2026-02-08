@@ -46,9 +46,6 @@ class EventContextService extends ChangeNotifier {
       _siteId = prefs.getInt(_siteIdKey);
       _eventId = prefs.getInt(_eventIdKey);
       _isInitialized = true;
-      debugPrint(
-        'EventContextService initialized: eventId=$_eventId, siteId=$_siteId',
-      );
     } catch (e) {
       debugPrint('EventContextService init error: $e');
       _isInitialized = true; // Mark as initialized even on error

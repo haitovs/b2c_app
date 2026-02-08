@@ -215,9 +215,7 @@ class _EventCalendarPageState extends State<EventCalendarPage> {
                                     title: event['title'] ?? 'No Title',
                                     date: event['date_str'] ?? '',
                                     location: event['location'] ?? '',
-                                    imageUrl:
-                                        event['image_url'] ??
-                                        "assets/event_calendar/event1.png",
+                                    imageUrl: event['image_url'] ?? '',
                                     logoUrl: event['logo_url'],
                                     eventStartTime:
                                         DateTime.tryParse(
