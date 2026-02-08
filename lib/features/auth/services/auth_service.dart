@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/config/app_config.dart';
@@ -157,16 +158,21 @@ class AuthService extends ChangeNotifier {
   }
 
   /// Verify email with token. Returns null on success, or error message.
+  /// Note: Backend returns HTML on success, not JSON, so we check status code directly.
   Future<String?> verifyEmail(String token) async {
-    final result = await apiClient.get<Map<String, dynamic>>(
-      '/api/v1/auth/verify-email?token=$token',
-      auth: false,
-    );
+    try {
+      final uri = Uri.parse(
+        '${apiClient.baseUrl}/api/v1/auth/verify-email?token=$token',
+      );
+      final response = await http.get(uri);
 
-    if (result.isSuccess) {
-      return null;
-    } else {
-      return result.error?.message ?? 'Failed to verify email';
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return null; // Success
+      } else {
+        return 'Verification failed (${response.statusCode})';
+      }
+    } catch (e) {
+      return 'Network error: $e';
     }
   }
 }
