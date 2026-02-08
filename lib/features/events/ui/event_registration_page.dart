@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart' as legacy_provider;
 
 import '../../../../core/services/registration_data_service.dart';
+import '../../../../core/widgets/app_text_field.dart';
 import '../../../../core/widgets/custom_app_bar.dart';
 import '../../auth/services/auth_service.dart';
 import '../../notifications/ui/notification_drawer.dart';
@@ -1274,44 +1275,16 @@ class _EventRegistrationPageState extends ConsumerState<EventRegistrationPage> {
     String placeholder,
     TextEditingController controller, {
     bool isOptional = false,
+    TextInputType? keyboardType,
   }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: GoogleFonts.inter(
-            fontWeight: FontWeight.w500,
-            fontSize: 18,
-            color: Colors.black,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          height: 50,
-          decoration: BoxDecoration(
-            border: Border.all(color: const Color(0xFFB7B7B7)),
-            borderRadius: BorderRadius.circular(5),
-          ),
-          child: TextField(
-            controller: controller,
-            style: GoogleFonts.inter(fontSize: 16),
-            decoration: InputDecoration(
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 15,
-                vertical: 14,
-              ),
-              hintText: placeholder,
-              hintStyle: GoogleFonts.inter(
-                fontWeight: FontWeight.w400,
-                fontSize: 16,
-                color: Colors.black.withValues(alpha: 0.5),
-              ),
-            ),
-          ),
-        ),
-      ],
+    return AppTextField(
+      labelText: label.replaceAll(':', ''),
+      hintText: placeholder,
+      controller: controller,
+      required: !isOptional,
+      keyboardType: keyboardType,
+      height: 50,
+      borderRadius: 5,
     );
   }
 
@@ -1319,26 +1292,38 @@ class _EventRegistrationPageState extends ConsumerState<EventRegistrationPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Mobile number:',
-          style: GoogleFonts.inter(
-            fontWeight: FontWeight.w500,
-            fontSize: 18,
-            color: Colors.black,
+        Padding(
+          padding: const EdgeInsets.only(bottom: 6, left: 4),
+          child: RichText(
+            text: const TextSpan(
+              text: 'Mobile number',
+              style: TextStyle(
+                fontFamily: 'Roboto',
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFF151938),
+              ),
+              children: [
+                TextSpan(
+                  text: ' *',
+                  style: TextStyle(color: Colors.red, fontSize: 14),
+                ),
+              ],
+            ),
           ),
         ),
-        const SizedBox(height: 8),
         Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Country code picker
             Container(
-              height: 50,
+              height: 48,
               decoration: BoxDecoration(
-                color: const Color(0xFFE6E5E5),
-                border: Border.all(color: const Color(0xFFADADAD)),
+                color: Colors.white,
+                border: Border.all(color: const Color(0xFFE0E0E0)),
                 borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(5),
-                  bottomLeft: Radius.circular(5),
+                  topLeft: Radius.circular(8),
+                  bottomLeft: Radius.circular(8),
                 ),
               ),
               child: CountryCodePicker(
@@ -1351,38 +1336,65 @@ class _EventRegistrationPageState extends ConsumerState<EventRegistrationPage> {
                 showOnlyCountryWhenClosed: false,
                 alignLeft: false,
                 padding: EdgeInsets.zero,
-                textStyle: GoogleFonts.inter(fontSize: 16),
+                textStyle: const TextStyle(
+                  fontFamily: 'Roboto',
+                  fontSize: 16,
+                  color: Color(0xFF151938),
+                ),
                 showFlagMain: true,
                 showDropDownButton: false,
               ),
             ),
 
-            // Phone number input
+            // Phone number input using AppTextField style
             Expanded(
-              child: Container(
-                height: 50,
-                decoration: BoxDecoration(
-                  border: Border.all(color: const Color(0xFFB7B7B7)),
-                  borderRadius: const BorderRadius.only(
-                    topRight: Radius.circular(5),
-                    bottomRight: Radius.circular(5),
-                  ),
-                ),
-                child: TextField(
+              child: SizedBox(
+                height: 48,
+                child: TextFormField(
                   controller: _mobileController,
                   keyboardType: TextInputType.phone,
-                  style: GoogleFonts.inter(fontSize: 16),
+                  style: const TextStyle(
+                    fontFamily: 'Roboto',
+                    fontSize: 16,
+                    color: Color(0xFF151938),
+                  ),
+                  textAlignVertical: TextAlignVertical.center,
                   decoration: InputDecoration(
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 15,
-                      vertical: 14,
-                    ),
                     hintText: 'Enter your mobile number',
-                    hintStyle: GoogleFonts.inter(
-                      fontWeight: FontWeight.w400,
+                    hintStyle: TextStyle(
+                      fontFamily: 'Roboto',
                       fontSize: 16,
-                      color: Colors.black.withValues(alpha: 0.5),
+                      color: const Color(0xFF151938).withValues(alpha: 0.5),
+                    ),
+                    filled: true,
+                    fillColor: Colors.white,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    border: const OutlineInputBorder(
+                      borderRadius: BorderRadius.only(
+                        topRight: Radius.circular(8),
+                        bottomRight: Radius.circular(8),
+                      ),
+                      borderSide: BorderSide(color: Color(0xFFE0E0E0)),
+                    ),
+                    enabledBorder: const OutlineInputBorder(
+                      borderRadius: BorderRadius.only(
+                        topRight: Radius.circular(8),
+                        bottomRight: Radius.circular(8),
+                      ),
+                      borderSide: BorderSide(color: Color(0xFFE0E0E0)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: const BorderRadius.only(
+                        topRight: Radius.circular(8),
+                        bottomRight: Radius.circular(8),
+                      ),
+                      borderSide: BorderSide(
+                        color: const Color(0xFF5460CD),
+                        width: 2,
+                      ),
                     ),
                   ),
                 ),

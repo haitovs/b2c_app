@@ -137,6 +137,9 @@ class _EventCalendarPageState extends State<EventCalendarPage> {
                         ), // Same color as text for hint
                       ),
                       border: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      disabledBorder: InputBorder.none,
                       contentPadding:
                           EdgeInsets.zero, // Important for fitting in height
                     ),
