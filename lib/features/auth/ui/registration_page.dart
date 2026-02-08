@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/app_theme.dart';
+import '../../../core/widgets/app_text_field.dart';
 import '../services/auth_service.dart';
 import 'verification_pending_page.dart';
 
@@ -439,100 +440,114 @@ class _RegistrationPageState extends State<RegistrationPage> {
     bool isPassword = false,
     bool isRequired = true,
   }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 10),
-          child: RichText(
-            overflow: TextOverflow.ellipsis,
-            text: TextSpan(
-              text: label,
-              style: AppTextStyles.label,
+    // For phone number field with country code picker, use special layout
+    if (hasFlag) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 8),
+            child: RichText(
+              overflow: TextOverflow.ellipsis,
+              text: TextSpan(
+                text: label,
+                style: AppTextStyles.label,
+                children: [
+                  if (isRequired)
+                    const TextSpan(
+                      text: ' *',
+                      style: TextStyle(color: Colors.red, fontSize: 14),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          SizedBox(
+            height: 50,
+            child: Row(
               children: [
-                if (isRequired)
-                  const TextSpan(
-                    text: ' *',
-                    style: TextStyle(color: Colors.red, fontSize: 14),
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(12),
+                      bottomLeft: Radius.circular(12),
+                    ),
+                    border: Border.all(color: AppColors.inputBorder),
                   ),
+                  height: 50,
+                  alignment: Alignment.center,
+                  child: CountryCodePicker(
+                    onChanged: (country) {
+                      setState(() {
+                        _countryCode = country.dialCode ?? "+993";
+                      });
+                    },
+                    initialSelection: 'TM',
+                    favorite: const ['TM', 'RU', 'US'],
+                    showCountryOnly: false,
+                    showOnlyCountryWhenClosed: false,
+                    alignLeft: false,
+                    padding: EdgeInsets.zero,
+                    textStyle: AppTextStyles.inputText,
+                    showFlagMain: true,
+                    showDropDownButton: false,
+                  ),
+                ),
+                Expanded(
+                  child: TextFormField(
+                    controller: controller,
+                    style: AppTextStyles.inputText,
+                    decoration: InputDecoration(
+                      hintText: placeholder,
+                      hintStyle: AppTextStyles.placeholder,
+                      filled: true,
+                      fillColor: Colors.white,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
+                      border: const OutlineInputBorder(
+                        borderRadius: BorderRadius.only(
+                          topRight: Radius.circular(12),
+                          bottomRight: Radius.circular(12),
+                        ),
+                        borderSide: BorderSide(color: AppColors.inputBorder),
+                      ),
+                      enabledBorder: const OutlineInputBorder(
+                        borderRadius: BorderRadius.only(
+                          topRight: Radius.circular(12),
+                          bottomRight: Radius.circular(12),
+                        ),
+                        borderSide: BorderSide(color: AppColors.inputBorder),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: const BorderRadius.only(
+                          topRight: Radius.circular(12),
+                          bottomRight: Radius.circular(12),
+                        ),
+                        borderSide: BorderSide(
+                          color: AppColors.buttonBackground,
+                          width: 2,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
-        ),
-        const SizedBox(height: 6),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.center, // Vertically centered
-          children: [
-            if (hasFlag) ...[
-              Container(
-                decoration: const BoxDecoration(
-                  color: AppColors.flagBackground,
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(5),
-                    bottomLeft: Radius.circular(5),
-                  ),
-                  border: Border(
-                    top: BorderSide(color: Color(0xFFADADAD)),
-                    left: BorderSide(color: Color(0xFFADADAD)),
-                    bottom: BorderSide(color: Color(0xFFADADAD)),
-                  ),
-                ),
-                height: 45,
-                alignment: Alignment.center, // Center contents
-                child: CountryCodePicker(
-                  onChanged: (country) {
-                    setState(() {
-                      _countryCode = country.dialCode ?? "+993";
-                    });
-                  },
-                  initialSelection: 'TM',
-                  favorite: const ['TM', 'RU', 'US'],
-                  showCountryOnly: false,
-                  showOnlyCountryWhenClosed: false,
-                  alignLeft: false,
-                  padding: EdgeInsets.zero,
-                  textStyle: AppTextStyles.inputText,
-                  showFlagMain: true,
-                  showDropDownButton: false,
-                ),
-              ),
-            ],
-            Expanded(
-              child: Container(
-                height: 45,
-                alignment: Alignment.centerLeft, // Center text vertically
-                decoration: BoxDecoration(
-                  border: Border.all(color: AppColors.inputBorder),
-                  borderRadius: hasFlag
-                      ? const BorderRadius.only(
-                          topRight: Radius.circular(5),
-                          bottomRight: Radius.circular(5),
-                        )
-                      : BorderRadius.circular(5),
-                ),
-                child: TextField(
-                  controller: controller,
-                  obscureText: isPassword,
-                  style: AppTextStyles.inputText,
-                  textAlignVertical:
-                      TextAlignVertical.center, // Important for alignment
-                  decoration: InputDecoration(
-                    border: InputBorder.none,
-                    isDense: true,
-                    // Adjusted contentPadding to ensure vertical centering
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 14, // Adjusted for 45px height and ~14px font
-                    ),
-                    hintText: placeholder,
-                    hintStyle: AppTextStyles.placeholder,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ],
+        ],
+      );
+    }
+
+    // For regular fields, use AppTextField
+    return AppTextField(
+      labelText: label,
+      hintText: placeholder,
+      controller: controller,
+      obscureText: isPassword,
+      required: isRequired,
     );
   }
 }

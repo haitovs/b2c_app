@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/app_theme.dart';
+import '../../../core/widgets/app_text_field.dart';
 import '../services/auth_service.dart';
 import 'verification_pending_page.dart';
 
@@ -130,62 +131,20 @@ class _LoginPageState extends State<LoginPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Username Field
-              Text(
-                AppLocalizations.of(context)!.usernamePlaceholder,
-                style: AppTextStyles.placeholder.copyWith(
-                  color: AppColors.textPlaceholder,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                height: 45,
-                decoration: BoxDecoration(
-                  border: Border.all(color: AppColors.inputBorder),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: TextField(
-                  controller: _usernameController,
-                  textInputAction: TextInputAction.next,
-                  style: AppTextStyles.inputText,
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 12,
-                    ),
-                  ),
-                ),
+              AppTextField(
+                labelText: AppLocalizations.of(context)!.usernamePlaceholder,
+                controller: _usernameController,
+                textInputAction: TextInputAction.next,
               ),
               const SizedBox(height: 15),
 
               // Password Field
-              Text(
-                AppLocalizations.of(context)!.passwordPlaceholder,
-                style: AppTextStyles.placeholder.copyWith(
-                  color: AppColors.textPlaceholder,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                height: 45,
-                decoration: BoxDecoration(
-                  border: Border.all(color: AppColors.inputBorder),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: TextField(
-                  controller: _passwordController,
-                  obscureText: true,
-                  textInputAction: TextInputAction.done,
-                  onSubmitted: (_) => _login(),
-                  style: AppTextStyles.inputText,
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 12,
-                    ),
-                  ),
-                ),
+              AppTextField(
+                labelText: AppLocalizations.of(context)!.passwordPlaceholder,
+                controller: _passwordController,
+                obscureText: true,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => _login(),
               ),
               const SizedBox(height: 25),
 
