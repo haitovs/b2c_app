@@ -297,7 +297,7 @@ class _EditParticipantPageState extends State<EditParticipantPage> {
                               PhoneInputField(
                                 initialPhone: _mobileE164,
                                 labelText: 'Mobile Number',
-                                hintText: '62436999',
+                                hintText: '61444555',
                                 onChanged: (e164) {
                                   setState(() => _mobileE164 = e164);
                                 },

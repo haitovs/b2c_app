@@ -64,7 +64,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get websiteLabel => 'Company Website:';
 
   @override
-  String get websitePlaceholder => 'company@gmail.com';
+  String get websitePlaceholder => 'mycompany.com';
 
   @override
   String get companyNameLabel => 'Company Name:';

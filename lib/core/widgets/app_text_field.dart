@@ -36,8 +36,8 @@ class AppTextField extends StatelessWidget {
     this.enabled = true,
     this.textInputAction,
     this.onSubmitted,
-    this.borderRadius = 12,
-    this.height = 50,
+    this.borderRadius = 8, // Changed from 12 to 8 for smaller radius
+    this.height = 48, // Slightly smaller height
     this.fillColor,
     this.showBorder = true,
   });
@@ -49,7 +49,7 @@ class AppTextField extends StatelessWidget {
       children: [
         if (labelText != null)
           Padding(
-            padding: const EdgeInsets.only(bottom: 8, left: 4),
+            padding: const EdgeInsets.only(bottom: 6, left: 4),
             child: RichText(
               text: TextSpan(
                 text: labelText,
@@ -85,8 +85,8 @@ class AppTextField extends StatelessWidget {
               filled: true,
               fillColor: fillColor ?? Colors.white,
               contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 14,
+                horizontal: 14,
+                vertical: 12,
               ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(borderRadius),
@@ -127,5 +127,140 @@ class AppTextField extends StatelessWidget {
       return '$labelText is required';
     }
     return null;
+  }
+}
+
+/// Password field with visibility toggle
+class AppPasswordField extends StatefulWidget {
+  final String? labelText;
+  final String? hintText;
+  final TextEditingController? controller;
+  final String? Function(String?)? validator;
+  final bool required;
+  final void Function(String)? onChanged;
+  final bool enabled;
+  final TextInputAction? textInputAction;
+  final void Function(String)? onSubmitted;
+  final double borderRadius;
+  final double height;
+
+  const AppPasswordField({
+    super.key,
+    this.labelText,
+    this.hintText,
+    this.controller,
+    this.validator,
+    this.required = false,
+    this.onChanged,
+    this.enabled = true,
+    this.textInputAction,
+    this.onSubmitted,
+    this.borderRadius = 8,
+    this.height = 48,
+  });
+
+  @override
+  State<AppPasswordField> createState() => _AppPasswordFieldState();
+}
+
+class _AppPasswordFieldState extends State<AppPasswordField> {
+  bool _obscureText = true;
+
+  void _toggleVisibility() {
+    setState(() {
+      _obscureText = !_obscureText;
+    });
+  }
+
+  String? _defaultValidator(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return '${widget.labelText} is required';
+    }
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (widget.labelText != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6, left: 4),
+            child: RichText(
+              text: TextSpan(
+                text: widget.labelText,
+                style: AppTextStyles.label,
+                children: [
+                  if (widget.required)
+                    const TextSpan(
+                      text: ' *',
+                      style: TextStyle(color: Colors.red, fontSize: 14),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        SizedBox(
+          height: widget.height,
+          child: TextFormField(
+            controller: widget.controller,
+            validator:
+                widget.validator ??
+                (widget.required ? _defaultValidator : null),
+            obscureText: _obscureText,
+            onChanged: widget.onChanged,
+            enabled: widget.enabled,
+            textInputAction: widget.textInputAction,
+            onFieldSubmitted: widget.onSubmitted,
+            style: AppTextStyles.inputText,
+            textAlignVertical: TextAlignVertical.center,
+            decoration: InputDecoration(
+              hintText: widget.hintText,
+              hintStyle: AppTextStyles.placeholder,
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscureText
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
+                  color: AppColors.textPlaceholder,
+                  size: 20,
+                ),
+                onPressed: _toggleVisibility,
+              ),
+              filled: true,
+              fillColor: Colors.white,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 12,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(widget.borderRadius),
+                borderSide: BorderSide(color: AppColors.inputBorder, width: 1),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(widget.borderRadius),
+                borderSide: BorderSide(color: AppColors.inputBorder, width: 1),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(widget.borderRadius),
+                borderSide: BorderSide(
+                  color: AppColors.buttonBackground,
+                  width: 2,
+                ),
+              ),
+              errorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(widget.borderRadius),
+                borderSide: const BorderSide(color: Colors.red, width: 1),
+              ),
+              focusedErrorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(widget.borderRadius),
+                borderSide: const BorderSide(color: Colors.red, width: 2),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }

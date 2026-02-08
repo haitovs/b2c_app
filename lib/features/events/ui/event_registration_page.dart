@@ -1346,7 +1346,7 @@ class _EventRegistrationPageState extends ConsumerState<EventRegistrationPage> {
                   setState(() => _countryCode = country.dialCode ?? "+993");
                 },
                 initialSelection: 'TM',
-                favorite: const ['TM', 'RU', 'US'],
+                favorite: const ['TM', 'CN'],
                 showCountryOnly: false,
                 showOnlyCountryWhenClosed: false,
                 alignLeft: false,

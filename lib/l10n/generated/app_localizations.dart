@@ -205,7 +205,7 @@ abstract class AppLocalizations {
   /// No description provided for @websitePlaceholder.
   ///
   /// In en, this message translates to:
-  /// **'company@gmail.com'**
+  /// **'mycompany.com'**
   String get websitePlaceholder;
 
   /// No description provided for @companyNameLabel.

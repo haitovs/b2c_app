@@ -47,7 +47,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
           builder: (context, constraints) {
             final isMobile = constraints.maxWidth < 1000;
             // Centralized card, fitting screen
-            final cardWidth = isMobile ? constraints.maxWidth * 0.95 : 900.0;
+            final cardWidth = isMobile ? constraints.maxWidth * 0.95 : 1050.0;
 
             return Center(
               child: SingleChildScrollView(
@@ -182,23 +182,13 @@ class _RegistrationPageState extends State<RegistrationPage> {
               ),
               const SizedBox(height: 15),
 
-              // Mobile & Website row
-              _buildDualField(
+              // Mobile Number (Full width)
+              _buildField(
                 context,
-                field1: _buildFieldData(
-                  label: AppLocalizations.of(context)!.mobileLabel,
-                  placeholder: AppLocalizations.of(context)!.mobilePlaceholder,
-                  controller: _mobileController,
-                  hasFlag: true, // Triggers Country Code Picker
-                ),
-                field2: _buildFieldData(
-                  label: AppLocalizations.of(context)!.websiteLabel,
-                  placeholder: AppLocalizations.of(context)!.websitePlaceholder,
-                  controller: _websiteController,
-                  isRequired:
-                      false, // Website not strictly required? Or everything required per user? User said "all fields are required... show with red *" but let's assume website might be optional, or just make it required per request "all fields".
-                  // User said "also all fields are required", so I'll set isRequired to true for all.
-                ),
+                label: AppLocalizations.of(context)!.mobileLabel,
+                placeholder: AppLocalizations.of(context)!.mobilePlaceholder,
+                controller: _mobileController,
+                hasFlag: true, // Triggers Country Code Picker
               ),
               const SizedBox(height: 15),
 
@@ -440,13 +430,23 @@ class _RegistrationPageState extends State<RegistrationPage> {
     bool isPassword = false,
     bool isRequired = true,
   }) {
+    // For password fields, use AppPasswordField with visibility toggle
+    if (isPassword) {
+      return AppPasswordField(
+        labelText: label,
+        hintText: placeholder,
+        controller: controller,
+        required: isRequired,
+      );
+    }
+
     // For phone number field with country code picker, use special layout
     if (hasFlag) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.only(left: 4, bottom: 8),
+            padding: const EdgeInsets.only(left: 4, bottom: 6),
             child: RichText(
               overflow: TextOverflow.ellipsis,
               text: TextSpan(
@@ -463,19 +463,25 @@ class _RegistrationPageState extends State<RegistrationPage> {
             ),
           ),
           SizedBox(
-            height: 50,
+            height: 48, // Match AppTextField height
             child: Row(
               children: [
                 Container(
+                  width: 110, // Width to show flag + dial code properly
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(12),
-                      bottomLeft: Radius.circular(12),
+                      topLeft: Radius.circular(8),
+                      bottomLeft: Radius.circular(8),
                     ),
-                    border: Border.all(color: AppColors.inputBorder),
+                    // make border only for left top bottom
+                    border: Border(
+                      top: BorderSide(color: AppColors.inputBorder),
+                      left: BorderSide(color: AppColors.inputBorder),
+                      bottom: BorderSide(color: AppColors.inputBorder),
+                    ),
                   ),
-                  height: 50,
+                  height: 48,
                   alignment: Alignment.center,
                   child: CountryCodePicker(
                     onChanged: (country) {
@@ -484,7 +490,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
                       });
                     },
                     initialSelection: 'TM',
-                    favorite: const ['TM', 'RU', 'US'],
+                    favorite: const ['TM', 'CN'],
                     showCountryOnly: false,
                     showOnlyCountryWhenClosed: false,
                     alignLeft: false,
@@ -495,40 +501,47 @@ class _RegistrationPageState extends State<RegistrationPage> {
                   ),
                 ),
                 Expanded(
-                  child: TextFormField(
-                    controller: controller,
-                    style: AppTextStyles.inputText,
-                    decoration: InputDecoration(
-                      hintText: placeholder,
-                      hintStyle: AppTextStyles.placeholder,
-                      filled: true,
-                      fillColor: Colors.white,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 14,
-                      ),
-                      border: const OutlineInputBorder(
-                        borderRadius: BorderRadius.only(
-                          topRight: Radius.circular(12),
-                          bottomRight: Radius.circular(12),
+                  child: SizedBox(
+                    height: 48,
+                    child: TextFormField(
+                      controller: controller,
+                      style: AppTextStyles.inputText,
+                      textAlignVertical: TextAlignVertical.center,
+                      keyboardType: TextInputType.phone,
+                      decoration: InputDecoration(
+                        hintText: placeholder,
+                        hintStyle: AppTextStyles.placeholder,
+                        filled: true,
+                        fillColor: Colors.white,
+                        contentPadding: const EdgeInsets.only(
+                          left: 8,
+                          right: 12,
+                          top: 12,
+                          bottom: 12,
                         ),
-                        borderSide: BorderSide(color: AppColors.inputBorder),
-                      ),
-                      enabledBorder: const OutlineInputBorder(
-                        borderRadius: BorderRadius.only(
-                          topRight: Radius.circular(12),
-                          bottomRight: Radius.circular(12),
+                        border: const OutlineInputBorder(
+                          borderRadius: BorderRadius.only(
+                            topRight: Radius.circular(8),
+                            bottomRight: Radius.circular(8),
+                          ),
+                          borderSide: BorderSide(color: AppColors.inputBorder),
                         ),
-                        borderSide: BorderSide(color: AppColors.inputBorder),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: const BorderRadius.only(
-                          topRight: Radius.circular(12),
-                          bottomRight: Radius.circular(12),
+                        enabledBorder: const OutlineInputBorder(
+                          borderRadius: BorderRadius.only(
+                            topRight: Radius.circular(8),
+                            bottomRight: Radius.circular(8),
+                          ),
+                          borderSide: BorderSide(color: AppColors.inputBorder),
                         ),
-                        borderSide: BorderSide(
-                          color: AppColors.buttonBackground,
-                          width: 2,
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: const BorderRadius.only(
+                            topRight: Radius.circular(8),
+                            bottomRight: Radius.circular(8),
+                          ),
+                          borderSide: BorderSide(
+                            color: AppColors.buttonBackground,
+                            width: 2,
+                          ),
                         ),
                       ),
                     ),
@@ -546,7 +559,6 @@ class _RegistrationPageState extends State<RegistrationPage> {
       labelText: label,
       hintText: placeholder,
       controller: controller,
-      obscureText: isPassword,
       required: isRequired,
     );
   }

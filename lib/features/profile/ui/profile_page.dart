@@ -39,7 +39,7 @@ class _ProfilePageState extends State<ProfilePage>
   XFile? _selectedImage;
   Uint8List? _selectedImageBytes; // Store image bytes for upload
   String? _profilePhotoUrl; // Profile photo URL from user data
-  String _mobileE164 = ''; // Store mobile in E.164 format (e.g., +99362436999)
+  String _mobileE164 = ''; // Store mobile in E.164 format (e.g., +99361444555)
 
   // Button highlight animation
   late AnimationController _highlightController;
@@ -1390,7 +1390,7 @@ class _ProfilePageState extends State<ProfilePage>
               onChanged: (e164Phone) {
                 _mobileE164 = e164Phone;
               },
-              hintText: "62436999",
+              hintText: "61444555",
             )
           else
             // View mode: Display formatted phone number

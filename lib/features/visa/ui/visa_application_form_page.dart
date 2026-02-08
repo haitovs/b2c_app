@@ -784,7 +784,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
                   PhoneInputField(
                     initialPhone: _phoneNumberE164,
                     labelText: 'Phone number:',
-                    hintText: '62436999',
+                    hintText: '61444555',
                     onChanged: (e164) {
                       setState(() => _phoneNumberE164 = e164);
                     },
@@ -956,7 +956,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
         PhoneInputField(
           initialPhone: _phoneNumberE164,
           labelText: 'Phone number:',
-          hintText: '62436999',
+          hintText: '61444555',
           onChanged: (e164) {
             setState(() => _phoneNumberE164 = e164);
           },

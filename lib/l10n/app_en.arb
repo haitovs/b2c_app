@@ -17,7 +17,7 @@
   "mobileLabel": "Mobile Number:",
   "mobilePlaceholder": "",
   "websiteLabel": "Company Website:",
-  "websitePlaceholder": "company@gmail.com",
+  "websitePlaceholder": "mycompany.com",
   "companyNameLabel": "Company Name:",
   "companyNamePlaceholder": "Company Name",
   "registrationButton": "Registration",

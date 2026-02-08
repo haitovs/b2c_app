@@ -7,7 +7,7 @@ import '../utils/phone_number_util.dart';
 /// Stores and returns phone numbers in E.164 format (+[country][number])
 /// Displays split view: Country picker + Local number input
 class PhoneInputField extends StatefulWidget {
-  /// Initial phone in E.164 format (e.g., "+99362436999")
+  /// Initial phone in E.164 format (e.g., "+99361444555")
   final String? initialPhone;
 
   /// Callback when phone changes (returns E.164 format)
@@ -118,7 +118,7 @@ class _PhoneInputFieldState extends State<PhoneInputField> {
                 controller: _localNumberController,
                 keyboardType: TextInputType.phone,
                 decoration: InputDecoration(
-                  hintText: widget.hintText ?? '62436999',
+                  hintText: widget.hintText ?? '61444555',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),

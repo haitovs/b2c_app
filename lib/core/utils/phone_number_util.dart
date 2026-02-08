@@ -5,7 +5,7 @@ class PhoneNumberUtil {
   ///
   /// Example:
   /// ```dart
-  /// toE164('+993', '62436999') // Returns: '+99362436999'
+  /// toE164('+993', '61444555') // Returns: '+99361444555'
   /// ```
   static String toE164(String dialCode, String localNumber) {
     // Remove all non-digit characters from local number
@@ -21,8 +21,8 @@ class PhoneNumberUtil {
   ///
   /// Example:
   /// ```dart
-  /// fromE164('+99362436999')
-  /// // Returns: {'dialCode': '+993', 'localNumber': '62436999'}
+  /// fromE164('+99361444555')
+  /// // Returns: {'dialCode': '+993', 'localNumber': '61444555'}
   /// ```
   static Map<String, String> fromE164(String e164Phone) {
     if (!e164Phone.startsWith('+')) {

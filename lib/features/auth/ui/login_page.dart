@@ -39,8 +39,8 @@ class _LoginPageState extends State<LoginPage> {
             // Ensure card fits within screen with limited max width
             final cardWidth = isMobile
                 ? constraints.maxWidth * 0.95
-                : (constraints.maxWidth > 900
-                      ? 900.0
+                : (constraints.maxWidth > 950
+                      ? 950.0
                       : constraints.maxWidth * 0.95);
 
             return Center(
@@ -139,10 +139,9 @@ class _LoginPageState extends State<LoginPage> {
               const SizedBox(height: 15),
 
               // Password Field
-              AppTextField(
+              AppPasswordField(
                 labelText: AppLocalizations.of(context)!.passwordPlaceholder,
                 controller: _passwordController,
-                obscureText: true,
                 textInputAction: TextInputAction.done,
                 onSubmitted: (_) => _login(),
               ),
