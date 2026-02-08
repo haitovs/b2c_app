@@ -105,9 +105,7 @@ class _EventCalendarPageState extends State<EventCalendarPage> {
                   height: searchBarHeight,
                   constraints: BoxConstraints(maxWidth: screenWidth * 0.92),
                   decoration: BoxDecoration(
-                    color: const Color(
-                      0xFFF1F1F6,
-                    ).withValues(alpha: 0.2), // Slightly more transparent
+                    color: const Color(0xFFF1F1F6).withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   alignment: Alignment.center,
@@ -124,6 +122,7 @@ class _EventCalendarPageState extends State<EventCalendarPage> {
                         TextAlignVertical.center, // Vertically center text
                     decoration: InputDecoration(
                       isDense: true,
+                      filled: false,
                       prefixIcon: Icon(
                         Icons.search,
                         color: const Color(0xFFF1F1F6),

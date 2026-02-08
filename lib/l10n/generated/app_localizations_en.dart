@@ -15,7 +15,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get loginButton => 'Login';
 
   @override
-  String get usernamePlaceholder => 'Name, Phone Number or Email Address';
+  String get usernamePlaceholder => 'Number or Email Address';
 
   @override
   String get passwordPlaceholder => 'Password';

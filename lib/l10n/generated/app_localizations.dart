@@ -109,7 +109,7 @@ abstract class AppLocalizations {
   /// No description provided for @usernamePlaceholder.
   ///
   /// In en, this message translates to:
-  /// **'Name, Phone Number or Email Address'**
+  /// **'Number or Email Address'**
   String get usernamePlaceholder;
 
   /// No description provided for @passwordPlaceholder.

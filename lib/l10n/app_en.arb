@@ -1,7 +1,7 @@
 {
   "loginTitle": "Login",
   "loginButton": "Login",
-  "usernamePlaceholder": "Name, Phone Number or Email Address",
+  "usernamePlaceholder": "Number or Email Address",
   "passwordPlaceholder": "Password",
   "rememberMe": "Remember me",
   "dontHaveAccount": "Don't have an account? Sign up",
