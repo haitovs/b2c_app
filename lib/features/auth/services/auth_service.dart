@@ -158,7 +158,7 @@ class AuthService extends ChangeNotifier {
 
   /// Verify email with token. Returns null on success, or error message.
   Future<String?> verifyEmail(String token) async {
-    final result = await apiClient.post<Map<String, dynamic>>(
+    final result = await apiClient.get<Map<String, dynamic>>(
       '/api/v1/auth/verify-email?token=$token',
       auth: false,
     );
