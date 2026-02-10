@@ -29,6 +29,52 @@ class AuthService extends ChangeNotifier {
     return prefs.getString('auth_token');
   }
 
+  /// Parse and make error messages user-friendly
+  String _getUserFriendlyError(String errorMessage) {
+    // Convert backend error messages to user-friendly ones
+    final lowerError = errorMessage.toLowerCase();
+
+    if (lowerError.contains('email already exists') ||
+        lowerError.contains('user with this email')) {
+      return 'This email is already registered. Please use a different email or try logging in.';
+    }
+
+    if (lowerError.contains('mobile') &&
+        (lowerError.contains('already exists') ||
+            lowerError.contains('number already exists'))) {
+      return 'This mobile number is already registered. Please use a different number.';
+    }
+
+    if (lowerError.contains('incorrect email') ||
+        lowerError.contains('incorrect password') ||
+        lowerError.contains('incorrect') && lowerError.contains('password')) {
+      return 'Incorrect email or password. Please try again.';
+    }
+
+    if (lowerError.contains('invalid email')) {
+      return 'Please enter a valid email address.';
+    }
+
+    if (lowerError.contains('password') && lowerError.contains('short')) {
+      return 'Password is too short. Please use at least 8 characters.';
+    }
+
+    if (lowerError.contains('inactive user')) {
+      return 'Your account has been deactivated. Please contact support.';
+    }
+
+    if (lowerError.contains('network') || lowerError.contains('connection')) {
+      return 'Network error. Please check your internet connection and try again.';
+    }
+
+    if (lowerError.contains('timeout')) {
+      return 'Request timed out. Please try again.';
+    }
+
+    // Return the original error message if no match found
+    return errorMessage;
+  }
+
   /// Login user and return null on success, or error message on failure.
   Future<String?> login(
     String username,
@@ -56,7 +102,7 @@ class AuthService extends ChangeNotifier {
       if (error.code == 'EMAIL_NOT_VERIFIED') {
         return 'EMAIL_NOT_VERIFIED';
       }
-      return error.message;
+      return _getUserFriendlyError(error.message);
     }
   }
 
@@ -132,7 +178,7 @@ class AuthService extends ChangeNotifier {
     if (result.isSuccess) {
       return null;
     } else {
-      return result.error!.message;
+      return _getUserFriendlyError(result.error!.message);
     }
   }
 
@@ -150,7 +196,7 @@ class AuthService extends ChangeNotifier {
       notifyListeners();
       return null;
     } else {
-      return result.error!.message;
+      return _getUserFriendlyError(result.error!.message);
     }
   }
 
@@ -164,7 +210,9 @@ class AuthService extends ChangeNotifier {
     if (result.isSuccess) {
       return null;
     } else {
-      return result.error?.message ?? 'Failed to resend verification email';
+      return _getUserFriendlyError(
+        result.error?.message ?? 'Failed to resend verification email',
+      );
     }
   }
 
@@ -180,10 +228,10 @@ class AuthService extends ChangeNotifier {
       if (response.statusCode >= 200 && response.statusCode < 300) {
         return null; // Success
       } else {
-        return 'Verification failed (${response.statusCode})';
+        return 'Verification failed. Please request a new verification email.';
       }
     } catch (e) {
-      return 'Network error: $e';
+      return 'Network error. Please check your connection and try again.';
     }
   }
 }

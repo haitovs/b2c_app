@@ -25,6 +25,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
   final _websiteController = TextEditingController();
   final _companyNameController = TextEditingController();
   bool _rememberMe = false;
+  bool _isLoading = false;
 
   String _countryCode = "+993"; // Default code
 
@@ -244,15 +245,38 @@ class _RegistrationPageState extends State<RegistrationPage> {
               const SizedBox(height: 20),
 
               // Registration Button with Hover Effect
+              // Registration Button with Loading State
               MouseRegion(
-                cursor: SystemMouseCursors.click,
+                cursor: _isLoading
+                    ? SystemMouseCursors.wait
+                    : SystemMouseCursors.click,
                 child: GestureDetector(
-                  onTap: _register,
-                  child: _HoverContainer(
-                    child: Text(
-                      AppLocalizations.of(context)!.registrationButton,
-                      style: AppTextStyles.buttonText,
+                  onTap: _isLoading ? null : _register, // Disable when loading
+                  child: Container(
+                    width: double.infinity,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: _isLoading
+                          ? AppColors.buttonBackground.withOpacity(0.6)
+                          : AppColors.buttonBackground,
+                      borderRadius: BorderRadius.circular(45),
                     ),
+                    alignment: Alignment.center,
+                    child: _isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
+                            ),
+                          )
+                        : Text(
+                            AppLocalizations.of(context)!.registrationButton,
+                            style: AppTextStyles.buttonText,
+                          ),
                   ),
                 ),
               ),
@@ -325,47 +349,154 @@ class _RegistrationPageState extends State<RegistrationPage> {
   }
 
   Future<void> _register() async {
+    // Prevent multiple submissions
+    if (_isLoading) return;
+
+    // Validate passwords match
     if (_passwordController.text != _confirmPasswordController.text) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Passwords do not match")));
+      _showError("Passwords do not match");
       return;
     }
 
-    // Combine country code with mobile
-    final fullMobile = "$_countryCode${_mobileController.text}";
-
-    final errorMessage = await _authService.register(
-      email: _emailController.text,
-      password: _passwordController.text,
-      firstName: _nameController.text,
-      lastName: _surnameController.text,
-      mobile: fullMobile,
-      companyName: _companyNameController.text,
-      website: _websiteController.text,
-    );
-
-    if (!mounted) return;
-
-    if (errorMessage == null) {
-      // Registration successful - redirect to verification page
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Registration Successful! Please check your email."),
-          backgroundColor: Colors.green,
-        ),
-      );
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => VerificationPendingPage(email: _emailController.text),
-        ),
-      );
-    } else {
-      // Show detailed error message
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
-      );
+    // Validate required fields
+    if (_nameController.text.trim().isEmpty) {
+      _showError("Please enter your first name");
+      return;
     }
+    if (_surnameController.text.trim().isEmpty) {
+      _showError("Please enter your last name");
+      return;
+    }
+    if (_emailController.text.trim().isEmpty) {
+      _showError("Please enter your email");
+      return;
+    }
+    if (_passwordController.text.isEmpty) {
+      _showError("Please enter a password");
+      return;
+    }
+    if (_passwordController.text.length < 8) {
+      _showError("Password must be at least 8 characters long");
+      return;
+    }
+    if (_mobileController.text.trim().isEmpty) {
+      _showError("Please enter your mobile number");
+      return;
+    }
+
+    // Basic email validation
+    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+    if (!emailRegex.hasMatch(_emailController.text.trim())) {
+      _showError("Please enter a valid email address");
+      return;
+    }
+
+    // Set loading state
+    setState(() => _isLoading = true);
+
+    try {
+      // Combine country code with mobile
+      final fullMobile = "$_countryCode${_mobileController.text.trim()}";
+
+      final errorMessage = await _authService.register(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+        firstName: _nameController.text.trim(),
+        lastName: _surnameController.text.trim(),
+        mobile: fullMobile,
+        companyName: _companyNameController.text.trim().isNotEmpty
+            ? _companyNameController.text.trim()
+            : null,
+        website: _websiteController.text.trim().isNotEmpty
+            ? _websiteController.text.trim()
+            : null,
+      );
+
+      if (!mounted) return;
+
+      if (errorMessage == null) {
+        // Registration successful - show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              "Registration successful! Please check your email to verify your account.",
+            ),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 4),
+          ),
+        );
+
+        // Navigate to verification pending page
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) =>
+                VerificationPendingPage(email: _emailController.text.trim()),
+          ),
+        );
+      } else {
+        // Show error message
+        // Strip error codes (e.g. "Error 400: ")
+        final cleanError = errorMessage.replaceFirst(
+          RegExp(r'^(?:Error\s*)?\d+\s*:\s*'),
+          '',
+        );
+        _showError(cleanError);
+      }
+    } catch (e) {
+      // Handle unexpected errors
+      if (mounted) {
+        _showError("An unexpected error occurred. Please try again.");
+      }
+    } finally {
+      // Always reset loading state
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 4),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Widget _buildRegisterButton() {
+    return MouseRegion(
+      cursor: _isLoading ? SystemMouseCursors.wait : SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: _isLoading ? null : _register, // Disable when loading
+        child: Container(
+          width: double.infinity,
+          height: 48,
+          decoration: BoxDecoration(
+            color: _isLoading
+                ? AppColors.buttonBackground.withOpacity(0.6)
+                : AppColors.buttonBackground,
+            borderRadius: BorderRadius.circular(45),
+          ),
+          alignment: Alignment.center,
+          child: _isLoading
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                )
+              : Text(
+                  AppLocalizations.of(context)!.registrationButton,
+                  style: AppTextStyles.buttonText,
+                ),
+        ),
+      ),
+    );
   }
 
   _FieldData _buildFieldData({

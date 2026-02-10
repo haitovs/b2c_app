@@ -19,6 +19,7 @@ class _LoginPageState extends State<LoginPage> {
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _rememberMe = false;
+  bool _isLoading = false;
 
   @override
   Widget build(BuildContext context) {
@@ -191,18 +192,7 @@ class _LoginPageState extends State<LoginPage> {
               const SizedBox(height: 25),
 
               // Login Button
-              MouseRegion(
-                cursor: SystemMouseCursors.click,
-                child: GestureDetector(
-                  onTap: _login,
-                  child: _HoverContainer(
-                    child: Text(
-                      AppLocalizations.of(context)!.loginButton,
-                      style: AppTextStyles.buttonTextLarge,
-                    ),
-                  ),
-                ),
-              ),
+              _buildLoginButton(),
             ],
           ),
         ),
@@ -273,35 +263,110 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _login() async {
-    final errorMessage = await context.read<AuthService>().login(
-      _usernameController.text,
-      _passwordController.text,
-      rememberMe: _rememberMe,
-    );
-    if (!mounted) return;
+    // Prevent multiple submissions
+    if (_isLoading) return;
 
-    if (errorMessage == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Login Successful")));
-      context.go('/');
-    } else if (errorMessage == 'EMAIL_NOT_VERIFIED') {
-      // Redirect to verification pending page
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) =>
-              VerificationPendingPage(email: _usernameController.text),
-        ),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(errorMessage), // Show detailed error
-          backgroundColor: Colors.red,
-        ),
-      );
+    // Validate required fields
+    if (_usernameController.text.trim().isEmpty) {
+      _showError("Please enter your email or mobile number");
+      return;
     }
+    if (_passwordController.text.isEmpty) {
+      _showError("Please enter your password");
+      return;
+    }
+
+    // Set loading state
+    setState(() => _isLoading = true);
+
+    try {
+      final errorMessage = await context.read<AuthService>().login(
+        _usernameController.text.trim(),
+        _passwordController.text,
+        rememberMe: _rememberMe,
+      );
+
+      if (!mounted) return;
+
+      if (errorMessage == null) {
+        // Login successful
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Login successful!"),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+        context.go('/');
+      } else if (errorMessage == 'EMAIL_NOT_VERIFIED') {
+        // Redirect to verification pending page
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) =>
+                VerificationPendingPage(email: _usernameController.text.trim()),
+          ),
+        );
+      } else {
+        // Show error message
+        _showError(errorMessage);
+      }
+    } catch (e) {
+      // Handle unexpected errors
+      if (mounted) {
+        _showError("An unexpected error occurred. Please try again.");
+      }
+    } finally {
+      // Always reset loading state
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  // Helper method to show error messages
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 4),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Widget _buildLoginButton() {
+    return MouseRegion(
+      cursor: _isLoading ? SystemMouseCursors.wait : SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: _isLoading ? null : _login, // Disable when loading
+        child: Container(
+          width: double.infinity,
+          height: 50,
+          decoration: BoxDecoration(
+            color: _isLoading
+                ? AppColors.buttonBackground.withOpacity(0.6)
+                : AppColors.buttonBackground,
+            borderRadius: BorderRadius.circular(45),
+          ),
+          alignment: Alignment.center,
+          child: _isLoading
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                )
+              : Text(
+                  AppLocalizations.of(context)!.loginButton,
+                  style: AppTextStyles.buttonTextLarge,
+                ),
+        ),
+      ),
+    );
   }
 }
 
