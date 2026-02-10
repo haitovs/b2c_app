@@ -213,7 +213,7 @@ class _EditParticipantPageState extends State<EditParticipantPage> {
       } else {
         final errorBody = jsonDecode(response.body);
         final errorMessage =
-            errorBody['detail'] ?? 'Failed to update participant';
+            errorBody['message'] ?? errorBody['detail'] ?? 'Failed to update participant';
         throw Exception(errorMessage);
       }
     } catch (e) {

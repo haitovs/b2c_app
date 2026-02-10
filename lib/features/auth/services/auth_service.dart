@@ -99,7 +99,8 @@ class AuthService extends ChangeNotifier {
       return null; // Success
     } else {
       final error = result.error!;
-      if (error.code == 'EMAIL_NOT_VERIFIED') {
+      if (error.code == 'EMAIL_NOT_VERIFIED' ||
+          error.message == 'EMAIL_NOT_VERIFIED') {
         return 'EMAIL_NOT_VERIFIED';
       }
       return _getUserFriendlyError(error.message);

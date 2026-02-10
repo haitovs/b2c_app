@@ -35,7 +35,7 @@ class VisaService {
     }
 
     final error = jsonDecode(response.body);
-    throw Exception(error['detail'] ?? 'Failed to load visa application');
+    throw Exception(error['message'] ?? error['detail'] ?? 'Failed to load visa application');
   }
 
   /// Update visa application with form data
@@ -60,7 +60,7 @@ class VisaService {
     }
 
     final error = jsonDecode(response.body);
-    throw Exception(error['detail'] ?? 'Failed to update visa application');
+    throw Exception(error['message'] ?? error['detail'] ?? 'Failed to update visa application');
   }
 
   /// Submit visa application for review
@@ -78,7 +78,7 @@ class VisaService {
     }
 
     final error = jsonDecode(response.body);
-    throw Exception(error['detail'] ?? 'Failed to submit visa application');
+    throw Exception(error['message'] ?? error['detail'] ?? 'Failed to submit visa application');
   }
 
   /// Validate visa application without submitting
@@ -96,7 +96,7 @@ class VisaService {
     }
 
     final error = jsonDecode(response.body);
-    throw Exception(error['detail'] ?? 'Failed to validate visa application');
+    throw Exception(error['message'] ?? error['detail'] ?? 'Failed to validate visa application');
   }
 
   /// Upload visa photo to server

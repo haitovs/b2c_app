@@ -419,7 +419,7 @@ class _ProfilePageState extends State<ProfilePage>
                         ScaffoldMessenger.of(this.context).showSnackBar(
                           SnackBar(
                             content: Text(
-                              error['detail'] ?? 'Failed to change password',
+                              error['message'] ?? error['detail'] ?? 'Failed to change password',
                             ),
                             backgroundColor: Colors.red,
                           ),

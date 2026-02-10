@@ -171,7 +171,7 @@ class _AddParticipantFormPageState extends State<AddParticipantFormPage> {
         }
       } else {
         final errorBody = jsonDecode(response.body);
-        final errorMessage = errorBody['detail'] ?? 'Failed to add participant';
+        final errorMessage = errorBody['message'] ?? errorBody['detail'] ?? 'Failed to add participant';
 
         throw Exception(errorMessage);
       }
