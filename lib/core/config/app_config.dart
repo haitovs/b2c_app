@@ -1,14 +1,14 @@
 /// App configuration constants loaded from environment
 class AppConfig {
-  // Tourism Backend URL
+  // Tourism Backend URL (main tourism site)
   static const String tourismApiBaseUrl = String.fromEnvironment(
     'TOURISM_API_URL',
-    defaultValue: 'http://localhost:8000',
+    defaultValue: 'https://api.turkmenchina.com', // Your working config
   );
 
-  // B2C Backend URL
+  // B2C Backend URL (registration/booking system)
   static const String b2cApiBaseUrl = String.fromEnvironment(
     'B2C_API_URL',
-    defaultValue: 'http://localhost:8001',
+    defaultValue: 'https://b2c.oguzforum.com',
   );
 }

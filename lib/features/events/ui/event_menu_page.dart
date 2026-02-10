@@ -52,6 +52,7 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
   // For endless scrolling carousel
   late ScrollController _sponsorScrollController;
   Timer? _sponsorScrollTimer;
+  Timer? _sponsorRefreshTimer; // Refresh sponsors every 2 minutes
 
   @override
   void initState() {
@@ -65,9 +66,17 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
     // This handles direct navigation and page refreshes
     await eventContextService.ensureEventContext(widget.eventId);
     _fetchEvent();
-    _fetchSponsors();
+    _fetchSponsors(); // Initial fetch
+    _startPeriodicSponsorRefresh(); // Start periodic refresh
     _checkRegistrationStatus();
     _checkTermsAcceptance();
+  }
+
+  void _startPeriodicSponsorRefresh() {
+    // Refresh sponsors every 2 minutes
+    _sponsorRefreshTimer = Timer.periodic(const Duration(minutes: 2), (_) {
+      _fetchSponsors();
+    });
   }
 
   Future<void> _checkRegistrationStatus() async {
@@ -185,6 +194,7 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
   @override
   void dispose() {
     _sponsorScrollTimer?.cancel();
+    _sponsorRefreshTimer?.cancel(); // Stop periodic refresh
     _sponsorScrollController.dispose();
     super.dispose();
   }
