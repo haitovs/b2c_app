@@ -173,11 +173,6 @@ class _AddParticipantFormPageState extends State<AddParticipantFormPage> {
         final errorBody = jsonDecode(response.body);
         final errorMessage = errorBody['detail'] ?? 'Failed to add participant';
 
-        // Log full error for debugging
-        // Log full error for debugging
-        // debugPrint('Participant creation error: ${response.statusCode}');
-        // debugPrint('Error body: ${response.body}');
-
         throw Exception(errorMessage);
       }
     } catch (e) {

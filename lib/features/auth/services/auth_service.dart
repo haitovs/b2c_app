@@ -104,17 +104,28 @@ class AuthService extends ChangeNotifier {
     String? companyName,
     String? website,
   }) async {
+    // Build request body, only including non-empty values
+    final Map<String, dynamic> body = {
+      'email': email,
+      'password': password,
+      'first_name': firstName,
+      'last_name': lastName,
+    };
+
+    // Only add optional fields if they have values
+    if (mobile != null && mobile.isNotEmpty) {
+      body['mobile'] = mobile;
+    }
+    if (companyName != null && companyName.isNotEmpty) {
+      body['company_name'] = companyName;
+    }
+    if (website != null && website.isNotEmpty) {
+      body['website'] = website;
+    }
+
     final result = await apiClient.post<Map<String, dynamic>>(
       '/api/v1/auth/signup',
-      body: {
-        'email': email,
-        'password': password,
-        'first_name': firstName,
-        'last_name': lastName,
-        'mobile': mobile,
-        'company_name': companyName,
-        'website': website,
-      },
+      body: body,
       auth: false,
     );
 
