@@ -1,13 +1,17 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../core/widgets/phone_input_field.dart';
+import '../../auth/services/auth_service.dart';
 import '../services/visa_service.dart';
 
 /// Visa Application Form Page matching Figma design
@@ -225,9 +229,10 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
         }
       }
 
-      // Photo
-      // Note: We don't display the photo URL in the file picker, but we could show a preview if exists?
-      // Currently the UI doesn't clearly support showing existing remote photo, but we can add that later.
+      // Pre-fill from participant data if visa fields are empty (new application)
+      if (_nameController.text.isEmpty && _surnameController.text.isEmpty) {
+        await _prefillFromParticipant();
+      }
 
       setState(() {
         _isLoading = false;
@@ -239,6 +244,43 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
           _isLoading = false;
         });
       }
+    }
+  }
+
+  /// Fetch participant data and pre-fill available fields into the visa form
+  Future<void> _prefillFromParticipant() async {
+    try {
+      final authService = context.read<AuthService>();
+      final token = await authService.getToken();
+
+      final response = await http.get(
+        Uri.parse(
+          '${AppConfig.b2cApiBaseUrl}/api/v1/participants/${widget.participantId}',
+        ),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final participant = jsonDecode(response.body) as Map<String, dynamic>;
+
+        if (_nameController.text.isEmpty) {
+          _nameController.text = participant['first_name'] ?? '';
+        }
+        if (_surnameController.text.isEmpty) {
+          _surnameController.text = participant['last_name'] ?? '';
+        }
+        if (_phoneNumberE164.isEmpty) {
+          _phoneNumberE164 = participant['mobile'] ?? '';
+        }
+        if (_employerNameController.text.isEmpty) {
+          _employerNameController.text = participant['company_name'] ?? '';
+        }
+      }
+    } catch (e) {
+      debugPrint('Error pre-filling from participant data: $e');
     }
   }
 
