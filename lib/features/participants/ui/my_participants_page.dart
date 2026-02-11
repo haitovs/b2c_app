@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 
@@ -356,38 +357,47 @@ class _MyParticipantsPageState extends State<MyParticipantsPage> {
     bool isMobile,
   ) {
     final horizontalPadding = isDesktop ? 50.0 : (isTablet ? 30.0 : 20.0);
-    final height = isDesktop ? 64.0 : (isTablet ? 56.0 : 48.0);
-    final iconSize = isDesktop ? 36.0 : (isTablet ? 32.0 : 28.0);
+    final height = isDesktop ? 56.0 : (isTablet ? 50.0 : 46.0);
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
       child: Container(
         height: height,
-        padding: EdgeInsets.symmetric(
-          horizontal: isDesktop ? 24 : 16,
-          vertical: isDesktop ? 14 : 10,
-        ),
         decoration: BoxDecoration(
-          color: const Color(0xFFF1F1F6).withValues(alpha: 0.3),
-          borderRadius: BorderRadius.circular(20),
+          color: const Color(0xFFF1F1F6).withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(12),
         ),
-        child: Row(
-          children: [
-            Icon(Icons.search, color: const Color(0xFFF1F1F6), size: iconSize),
-            const SizedBox(width: 20),
-            Expanded(
-              child: TextField(
-                controller: _searchController,
-                onChanged: (value) => setState(() => _searchQuery = value),
-                style: const TextStyle(color: Color(0xFFF1F1F6), fontSize: 16),
-                decoration: const InputDecoration(
-                  hintText: 'Search...',
-                  hintStyle: TextStyle(color: Color(0xFFF1F1F6)),
-                  border: InputBorder.none,
-                ),
-              ),
+        alignment: Alignment.center,
+        child: TextField(
+          controller: _searchController,
+          onChanged: (value) => setState(() => _searchQuery = value),
+          cursorColor: const Color(0xFFF1F1F6),
+          style: GoogleFonts.roboto(
+            fontSize: isMobile ? 16 : 18,
+            color: const Color(0xFFF1F1F6),
+            fontWeight: FontWeight.w500,
+          ),
+          textAlignVertical: TextAlignVertical.center,
+          decoration: InputDecoration(
+            isDense: true,
+            filled: false,
+            prefixIcon: Icon(
+              Icons.search,
+              color: const Color(0xFFF1F1F6),
+              size: isMobile ? 24 : 28,
             ),
-          ],
+            hintText: 'Search participants...',
+            hintStyle: GoogleFonts.roboto(
+              fontWeight: FontWeight.w500,
+              fontSize: isMobile ? 16 : 18,
+              color: const Color(0xFFF1F1F6),
+            ),
+            border: InputBorder.none,
+            focusedBorder: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            disabledBorder: InputBorder.none,
+            contentPadding: EdgeInsets.zero,
+          ),
         ),
       ),
     );

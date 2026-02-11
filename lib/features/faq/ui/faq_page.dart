@@ -133,42 +133,42 @@ class _FAQPageState extends State<FAQPage> {
             Padding(
               padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
               child: Container(
-                height: 64,
+                height: isMobile ? 46 : 56,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF1F1F6).withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(20),
+                  color: const Color(0xFFF1F1F6).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: Row(
-                  children: [
-                    const SizedBox(width: 24),
-                    const Icon(
+                alignment: Alignment.center,
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: _filterFAQs,
+                  cursorColor: const Color(0xFFF1F1F6),
+                  style: GoogleFonts.roboto(
+                    fontSize: isMobile ? 16 : 18,
+                    color: const Color(0xFFF1F1F6),
+                    fontWeight: FontWeight.w500,
+                  ),
+                  textAlignVertical: TextAlignVertical.center,
+                  decoration: InputDecoration(
+                    isDense: true,
+                    filled: false,
+                    prefixIcon: Icon(
                       Icons.search,
-                      color: Color(0xFFF1F1F6),
-                      size: 28,
+                      color: const Color(0xFFF1F1F6),
+                      size: isMobile ? 24 : 28,
                     ),
-                    const SizedBox(width: 20),
-                    Expanded(
-                      child: TextField(
-                        controller: _searchController,
-                        onChanged: _filterFAQs,
-                        style: GoogleFonts.roboto(
-                          color: const Color(0xFFF1F1F6),
-                          fontSize: 18,
-                        ),
-                        decoration: InputDecoration(
-                          hintText: 'Search questions...',
-                          hintStyle: GoogleFonts.roboto(
-                            color: const Color(
-                              0xFFF1F1F6,
-                            ).withValues(alpha: 0.6),
-                            fontSize: 18,
-                          ),
-                          border: InputBorder.none,
-                        ),
-                      ),
+                    hintText: 'Search questions...',
+                    hintStyle: GoogleFonts.roboto(
+                      fontWeight: FontWeight.w500,
+                      fontSize: isMobile ? 16 : 18,
+                      color: const Color(0xFFF1F1F6),
                     ),
-                    const SizedBox(width: 24),
-                  ],
+                    border: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    disabledBorder: InputBorder.none,
+                    contentPadding: EdgeInsets.zero,
+                  ),
                 ),
               ),
             ),

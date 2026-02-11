@@ -300,43 +300,42 @@ class _NewsPageState extends ConsumerState<NewsPage> {
 
   Widget _buildSearchBar(bool isMobile) {
     return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: isMobile ? 16 : 24,
-        vertical: isMobile ? 10 : 14,
-      ),
+      height: isMobile ? 46 : 56,
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(20),
+        color: const Color(0xFFF1F1F6).withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(12),
       ),
-      child: Row(
-        children: [
-          Icon(
+      alignment: Alignment.center,
+      child: TextField(
+        controller: _searchController,
+        cursorColor: const Color(0xFFF1F1F6),
+        style: GoogleFonts.roboto(
+          fontSize: isMobile ? 16 : 18,
+          color: const Color(0xFFF1F1F6),
+          fontWeight: FontWeight.w500,
+        ),
+        textAlignVertical: TextAlignVertical.center,
+        decoration: InputDecoration(
+          isDense: true,
+          filled: false,
+          prefixIcon: Icon(
             Icons.search,
-            color: Colors.white.withValues(alpha: 0.8),
-            size: isMobile ? 24 : 36,
+            color: const Color(0xFFF1F1F6),
+            size: isMobile ? 24 : 28,
           ),
-          SizedBox(width: isMobile ? 12 : 20),
-          Expanded(
-            child: TextField(
-              controller: _searchController,
-              style: GoogleFonts.roboto(
-                color: Colors.white,
-                fontSize: isMobile ? 14 : 16,
-              ),
-              decoration: InputDecoration(
-                hintText: 'Search news...',
-                hintStyle: GoogleFonts.roboto(
-                  color: Colors.white.withValues(alpha: 0.6),
-                  fontSize: isMobile ? 14 : 16,
-                ),
-                border: InputBorder.none,
-                isDense: true,
-                contentPadding: EdgeInsets.zero,
-              ),
-              onChanged: _filterNews,
-            ),
+          hintText: 'Search news...',
+          hintStyle: GoogleFonts.roboto(
+            fontWeight: FontWeight.w500,
+            fontSize: isMobile ? 16 : 18,
+            color: const Color(0xFFF1F1F6),
           ),
-        ],
+          border: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          disabledBorder: InputBorder.none,
+          contentPadding: EdgeInsets.zero,
+        ),
+        onChanged: _filterNews,
       ),
     );
   }

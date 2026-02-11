@@ -593,39 +593,45 @@ class _MeetingsPageState extends ConsumerState<MeetingsPage> {
   }
 
   Widget _buildSearchBar() {
+    final isMobile = MediaQuery.of(context).size.width < 600;
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      height: isMobile ? 46 : 56,
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(20),
+        color: const Color(0xFFF1F1F6).withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(12),
       ),
-      child: Row(
-        children: [
-          Icon(
+      alignment: Alignment.center,
+      child: TextField(
+        controller: _searchController,
+        cursorColor: const Color(0xFFF1F1F6),
+        style: GoogleFonts.roboto(
+          fontSize: isMobile ? 16 : 18,
+          color: const Color(0xFFF1F1F6),
+          fontWeight: FontWeight.w500,
+        ),
+        textAlignVertical: TextAlignVertical.center,
+        decoration: InputDecoration(
+          isDense: true,
+          filled: false,
+          prefixIcon: Icon(
             Icons.search,
-            color: Colors.white.withValues(alpha: 0.8),
-            size: 28,
+            color: const Color(0xFFF1F1F6),
+            size: isMobile ? 24 : 28,
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: TextField(
-              controller: _searchController,
-              style: GoogleFonts.roboto(color: Colors.white, fontSize: 16),
-              decoration: InputDecoration(
-                hintText: 'Search by event name',
-                hintStyle: GoogleFonts.roboto(
-                  color: Colors.white.withValues(alpha: 0.6),
-                  fontSize: 16,
-                ),
-                border: InputBorder.none,
-                isDense: true,
-                contentPadding: EdgeInsets.zero,
-              ),
-              onChanged: _onSearchChanged,
-            ),
+          hintText: 'Search meetings...',
+          hintStyle: GoogleFonts.roboto(
+            fontWeight: FontWeight.w500,
+            fontSize: isMobile ? 16 : 18,
+            color: const Color(0xFFF1F1F6),
           ),
-        ],
+          border: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          disabledBorder: InputBorder.none,
+          contentPadding: EdgeInsets.zero,
+        ),
+        onChanged: _onSearchChanged,
       ),
     );
   }

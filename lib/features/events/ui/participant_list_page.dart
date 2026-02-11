@@ -409,39 +409,42 @@ class _ParticipantListPageState extends ConsumerState<ParticipantListPage> {
 
   Widget _buildSearchBar(bool isMobile) {
     return Container(
-      height: isMobile ? 50 : 64,
+      height: isMobile ? 46 : 56,
       decoration: BoxDecoration(
-        color: const Color(0xFFF1F1F6).withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(20),
+        color: const Color(0xFFF1F1F6).withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(12),
       ),
-      child: Row(
-        children: [
-          SizedBox(width: isMobile ? 16 : 24),
-          Icon(
+      alignment: Alignment.center,
+      child: TextField(
+        controller: _searchController,
+        onChanged: _onSearchChanged,
+        cursorColor: const Color(0xFFF1F1F6),
+        style: GoogleFonts.roboto(
+          fontSize: isMobile ? 16 : 18,
+          color: const Color(0xFFF1F1F6),
+          fontWeight: FontWeight.w500,
+        ),
+        textAlignVertical: TextAlignVertical.center,
+        decoration: InputDecoration(
+          isDense: true,
+          filled: false,
+          prefixIcon: Icon(
             Icons.search,
             color: const Color(0xFFF1F1F6),
-            size: isMobile ? 28 : 36,
+            size: isMobile ? 24 : 28,
           ),
-          SizedBox(width: isMobile ? 12 : 20),
-          Expanded(
-            child: TextField(
-              controller: _searchController,
-              onChanged: _onSearchChanged,
-              style: GoogleFonts.roboto(
-                fontSize: isMobile ? 16 : 20,
-                color: const Color(0xFFF1F1F6),
-              ),
-              decoration: InputDecoration(
-                hintText: 'Search by name',
-                hintStyle: GoogleFonts.roboto(
-                  fontSize: isMobile ? 16 : 20,
-                  color: const Color(0xFFF1F1F6),
-                ),
-                border: InputBorder.none,
-              ),
-            ),
+          hintText: 'Search by name',
+          hintStyle: GoogleFonts.roboto(
+            fontWeight: FontWeight.w500,
+            fontSize: isMobile ? 16 : 18,
+            color: const Color(0xFFF1F1F6),
           ),
-        ],
+          border: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          disabledBorder: InputBorder.none,
+          contentPadding: EdgeInsets.zero,
+        ),
       ),
     );
   }
