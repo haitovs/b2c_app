@@ -17,7 +17,6 @@ import '../../../../l10n/generated/app_localizations.dart';
 import '../../auth/services/auth_service.dart';
 import '../../notifications/ui/notification_drawer.dart';
 import 'widgets/profile_dropdown.dart';
-import 'widgets/terms_compliance_modal.dart';
 
 class EventMenuPage extends ConsumerStatefulWidget {
   final int eventId;
@@ -42,10 +41,6 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
   bool _isRegistered = false;
   bool _isCheckingRegistration = true;
 
-  // Terms & Conditions acceptance status (for participants)
-  bool _termsAccepted = false;
-  bool _isCheckingTerms = true;
-
   // Registration button highlight
   bool _showRegistrationHighlight = false;
 
@@ -69,7 +64,7 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
     _fetchSponsors(); // Initial fetch
     _startPeriodicSponsorRefresh(); // Start periodic refresh
     _checkRegistrationStatus();
-    _checkTermsAcceptance();
+    _checkParticipantAutoRegistration();
   }
 
   void _startPeriodicSponsorRefresh() {
@@ -125,12 +120,12 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
     }
   }
 
-  Future<void> _checkTermsAcceptance() async {
+  /// Check if user is a participant (auto-registered, no registration form needed)
+  Future<void> _checkParticipantAutoRegistration() async {
     try {
       final authService = context.read<AuthService>();
       final token = await authService.getToken();
 
-      // Check if user is a participant by trying participant profile endpoint
       final response = await http.get(
         Uri.parse(
           '${AppConfig.b2cApiBaseUrl}/api/v1/participant-auth/my-profile',
@@ -144,30 +139,13 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
       if (!mounted) return;
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final termsAccepted = data['is_terms_accepted'] ?? false;
-
+        // User is a participant - they are auto-registered
         setState(() {
-          _termsAccepted = termsAccepted;
-          _isCheckingTerms = false;
-          _isRegistered = true; // Participants are auto-registered
-        });
-      } else {
-        // Not a participant, use default (regular user flow)
-
-        setState(() {
-          _termsAccepted = true; // Regular users don't need this gate
-          _isCheckingTerms = false;
+          _isRegistered = true;
         });
       }
     } catch (e) {
-      debugPrint('[EventMenu] Error checking terms: $e');
-      if (mounted) {
-        setState(() {
-          _termsAccepted = true; // Fail open for regular users
-          _isCheckingTerms = false;
-        });
-      }
+      debugPrint('[EventMenu] Error checking participant status: $e');
     }
   }
 
@@ -261,23 +239,6 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
         _isProfileOpen = false;
       });
     }
-  }
-
-  void _showTermsModal() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => TermsComplianceModal(
-        onAccepted: () {
-          Navigator.of(context).pop();
-          setState(() {
-            _termsAccepted = true;
-          });
-          // Refresh to update button states
-          _checkTermsAcceptance();
-        },
-      ),
-    );
   }
 
   void _onExitEvent() {
@@ -715,16 +676,12 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
                                   final requiresAgreement =
                                       item['requiresAgreement'] == true;
 
-                                  // Two-gate system:
-                                  // Gate 1: Registration (for guests)
-                                  // Gate 2: Terms acceptance (for participants)
+                                  // Items requiring registration are disabled until registered
+                                  // Agreement check happens on tap via redirect to Profile
                                   final isDisabled =
                                       requiresRegistration &&
-                                      (!_isRegistered ||
-                                          (requiresAgreement &&
-                                              !_termsAccepted)) &&
-                                      !_isCheckingRegistration &&
-                                      !_isCheckingTerms;
+                                      !_isRegistered &&
+                                      !_isCheckingRegistration;
 
                                   // Build the menu card content
                                   Widget cardContent = Container(
@@ -853,15 +810,7 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
                                       onTap: () {
                                         // Handle disabled button tap
                                         if (isDisabled) {
-                                          // Check if it's a terms issue (participant without T&C)
-                                          if (_isRegistered &&
-                                              !_termsAccepted) {
-                                            // Participant needs to accept terms
-                                            _showTermsModal();
-                                            return;
-                                          }
-
-                                          // Regular registration required
+                                          // Registration required
                                           ScaffoldMessenger.of(
                                             context,
                                           ).showSnackBar(
