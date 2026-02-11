@@ -144,7 +144,6 @@ class _EventRegistrationPageState extends ConsumerState<EventRegistrationPage> {
       }
 
       final regId = regData['id'] as String;
-      final status = regData['status'] as String?;
       _registrationId = regId;
 
       // Step 2: Save Phase 1 - Contact info
@@ -204,14 +203,8 @@ class _EventRegistrationPageState extends ConsumerState<EventRegistrationPage> {
         }
       }
 
-      // Step 5: Submit registration (only if it's a draft)
-      if (status == 'draft') {
-        final submitSuccess = await service.submitRegistration(regId);
-        if (!submitSuccess) {
-          _showError('Failed to submit registration');
-          return;
-        }
-      }
+      // Registration is auto-submitted by backend on creation
+      // No separate submit step needed
 
       // Success! Show confirmation
       if (mounted) {

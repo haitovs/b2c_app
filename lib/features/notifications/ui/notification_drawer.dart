@@ -90,6 +90,12 @@ class _NotificationDrawerState extends State<NotificationDrawer>
       case 'MEETING_MODIFIED':
         GoRouter.of(context).push('/events/$eventId/meetings');
         break;
+      case 'REGISTRATION_SUBMITTED':
+      case 'REGISTRATION_APPROVED':
+      case 'REGISTRATION_REJECTED':
+        // Navigate to event menu or registration page
+        GoRouter.of(context).push('/events/$eventId');
+        break;
       case 'TICKET':
       case 'TICKET_RESPONSE':
         GoRouter.of(context).push('/events/$eventId/contact-us');
@@ -109,6 +115,12 @@ class _NotificationDrawerState extends State<NotificationDrawer>
       case 'MEETING_CANCELLED':
       case 'MEETING_MODIFIED':
         return Icons.handshake;
+      case 'REGISTRATION_SUBMITTED':
+        return Icons.app_registration;
+      case 'REGISTRATION_APPROVED':
+        return Icons.check_circle;
+      case 'REGISTRATION_REJECTED':
+        return Icons.cancel;
       case 'TICKET_RESPONSE':
         return Icons.support_agent;
       case 'ROLE_CHANGED':
@@ -137,6 +149,12 @@ class _NotificationDrawerState extends State<NotificationDrawer>
         return const Color(0xFFF44336);
       case 'MEETING_MODIFIED':
         return const Color(0xFFFF9800);
+      case 'REGISTRATION_SUBMITTED':
+        return const Color(0xFFFF9800);
+      case 'REGISTRATION_APPROVED':
+        return const Color(0xFF4CAF50);
+      case 'REGISTRATION_REJECTED':
+        return const Color(0xFFF44336);
       case 'TICKET_RESPONSE':
         return const Color(0xFF9C27B0);
       case 'ROLE_CHANGED':

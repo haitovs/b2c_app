@@ -190,17 +190,5 @@ class RegistrationDataService {
     return false;
   }
 
-  /// Submit registration for approval
-  Future<bool> submitRegistration(String registrationId) async {
-    final result = await _api.post<Map<String, dynamic>>(
-      '/api/v1/registrations/$registrationId/submit',
-    );
-
-    if (result.isSuccess) {
-      debugPrint('Registration submitted successfully');
-      return true;
-    }
-    debugPrint('Failed to submit registration: ${result.error?.message}');
-    return false;
-  }
+  // submitRegistration() removed — backend auto-submits on creation
 }

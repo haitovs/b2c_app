@@ -2,7 +2,7 @@ import '../../../core/services/api_client.dart';
 import '../../auth/services/auth_service.dart';
 
 /// Registration status enum matching backend
-enum RegistrationStatus { draft, submitted, approved, rejected, cancelled }
+enum RegistrationStatus { submitted, approved, rejected }
 
 /// Service for managing user registrations
 class RegistrationService {
@@ -48,7 +48,7 @@ class RegistrationService {
       final statusStr = reg['status']?.toString().toLowerCase() ?? '';
       return RegistrationStatus.values.firstWhere(
         (s) => s.name == statusStr,
-        orElse: () => RegistrationStatus.draft,
+        orElse: () => RegistrationStatus.submitted,
       );
     } catch (e) {
       return null;
