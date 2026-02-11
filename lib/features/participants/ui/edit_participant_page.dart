@@ -208,7 +208,7 @@ class _EditParticipantPageState extends State<EditParticipantPage> {
       if (response.statusCode == 200) {
         if (context.mounted) {
           AppSnackBar.showSuccess(context, 'Participant updated successfully!');
-          context.go('/events/${widget.eventId}/my-participants');
+          context.pop(true);
         }
       } else {
         final errorBody = jsonDecode(response.body);

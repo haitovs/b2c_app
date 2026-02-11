@@ -439,7 +439,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
         ),
       );
 
-      context.pop();
+      context.pop(true);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

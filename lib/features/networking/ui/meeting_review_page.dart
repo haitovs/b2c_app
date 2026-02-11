@@ -127,7 +127,7 @@ class _MeetingReviewPageState extends ConsumerState<MeetingReviewPage> {
             backgroundColor: Colors.green,
           ),
         );
-        context.pop();
+        context.pop(true);
       }
     } catch (e) {
       if (mounted) {
@@ -193,7 +193,7 @@ class _MeetingReviewPageState extends ConsumerState<MeetingReviewPage> {
             backgroundColor: Colors.orange,
           ),
         );
-        context.pop();
+        context.pop(true);
       }
     } catch (e) {
       if (mounted) {

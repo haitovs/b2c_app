@@ -1067,7 +1067,9 @@ class _MyParticipantsPageState extends State<MyParticipantsPage> {
         route = '/events/${widget.eventId}/visa/form/$participantId';
     }
 
-    context.push(route);
+    context.push(route).then((result) {
+      _loadParticipants();
+    });
   }
 
   void _handleMenuAction(
@@ -1087,7 +1089,11 @@ class _MyParticipantsPageState extends State<MyParticipantsPage> {
   void _editParticipant(Map<String, dynamic> participant) {
     context.push(
       '/events/${widget.eventId}/participants/edit/${participant['id']}',
-    );
+    ).then((result) {
+      if (result == true || result == null) {
+        _loadParticipants();
+      }
+    });
   }
 
   Future<void> _deleteParticipant(Map<String, dynamic> participant) async {

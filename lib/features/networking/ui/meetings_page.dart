@@ -385,7 +385,11 @@ class _MeetingsPageState extends ConsumerState<MeetingsPage> {
     context.push(
       '/events/${widget.eventId}/meetings/${meeting['id']}/edit',
       extra: meeting,
-    );
+    ).then((result) {
+      if (result == true) {
+        _fetchData();
+      }
+    });
   }
 
   Future<void> _respondToMeeting(String meetingId, String action) async {

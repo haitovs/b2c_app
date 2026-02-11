@@ -167,7 +167,7 @@ class _AddParticipantFormPageState extends State<AddParticipantFormPage> {
       if (response.statusCode == 200 || response.statusCode == 201) {
         if (context.mounted) {
           AppSnackBar.showSuccess(context, 'Participant added successfully!');
-          context.go('/events/${widget.eventId}/my-participants');
+          context.pop(true);
         }
       } else {
         final errorBody = jsonDecode(response.body);
