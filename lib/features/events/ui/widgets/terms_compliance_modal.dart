@@ -37,12 +37,10 @@ class _TermsComplianceModalState extends State<TermsComplianceModal> {
     try {
       final authService = context.read<AuthService>();
       final token = await authService.getToken();
-      // Get participant ID from auth service
-      final participantId = authService.currentUser?['id']?.toString() ?? '';
 
       final response = await http.post(
         Uri.parse(
-          '${AppConfig.b2cApiBaseUrl}/api/v1/participant-auth/accept-terms?participant_id=$participantId',
+          '${AppConfig.b2cApiBaseUrl}/api/v1/participant-auth/accept-terms',
         ),
         headers: {
           'Authorization': 'Bearer $token',
