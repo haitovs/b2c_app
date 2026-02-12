@@ -257,7 +257,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
                     height: 48,
                     decoration: BoxDecoration(
                       color: _isLoading
-                          ? AppColors.buttonBackground.withOpacity(0.6)
+                          ? AppColors.buttonBackground.withValues(alpha: 0.6)
                           : AppColors.buttonBackground,
                       borderRadius: BorderRadius.circular(45),
                     ),
@@ -462,39 +462,6 @@ class _RegistrationPageState extends State<RegistrationPage> {
         backgroundColor: Colors.red,
         duration: const Duration(seconds: 4),
         behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
-
-  Widget _buildRegisterButton() {
-    return MouseRegion(
-      cursor: _isLoading ? SystemMouseCursors.wait : SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: _isLoading ? null : _register, // Disable when loading
-        child: Container(
-          width: double.infinity,
-          height: 48,
-          decoration: BoxDecoration(
-            color: _isLoading
-                ? AppColors.buttonBackground.withOpacity(0.6)
-                : AppColors.buttonBackground,
-            borderRadius: BorderRadius.circular(45),
-          ),
-          alignment: Alignment.center,
-          child: _isLoading
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                  ),
-                )
-              : Text(
-                  AppLocalizations.of(context)!.registrationButton,
-                  style: AppTextStyles.buttonText,
-                ),
-        ),
       ),
     );
   }

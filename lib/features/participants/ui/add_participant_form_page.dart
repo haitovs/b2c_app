@@ -31,7 +31,6 @@ class _AddParticipantFormPageState extends State<AddParticipantFormPage> {
   final _emailController = TextEditingController();
   final _companyController = TextEditingController();
   String _mobileE164 = ''; // Store phone in E.164 format
-  final String _websiteUrl = ''; // Store website in https:// format
   final ImagePicker _imagePicker = ImagePicker();
 
   bool _isSubmitting = false;

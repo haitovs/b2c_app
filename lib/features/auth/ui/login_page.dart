@@ -346,7 +346,7 @@ class _LoginPageState extends State<LoginPage> {
           height: 50,
           decoration: BoxDecoration(
             color: _isLoading
-                ? AppColors.buttonBackground.withOpacity(0.6)
+                ? AppColors.buttonBackground.withValues(alpha: 0.6)
                 : AppColors.buttonBackground,
             borderRadius: BorderRadius.circular(45),
           ),
