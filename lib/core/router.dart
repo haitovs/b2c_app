@@ -2,8 +2,10 @@ import 'package:b2c_app/features/profile/ui/profile_page.dart';
 import 'package:go_router/go_router.dart';
 
 import '../features/auth/services/auth_service.dart';
+import '../features/auth/ui/forgot_password_page.dart';
 import '../features/auth/ui/login_page.dart';
 import '../features/auth/ui/registration_page.dart';
+import '../features/auth/ui/verification_code_page.dart';
 import '../features/auth/ui/verify_email_page.dart';
 import '../features/contact/ui/contact_us_page.dart';
 import '../features/events/ui/agenda_page.dart';
@@ -54,12 +56,18 @@ GoRouter createRouter(AuthService authService) {
       final location = state.uri.toString();
       final isLoggingIn = location == '/login';
       final isSigningUp = location == '/signup';
+      final isVerifyingCode = location.startsWith('/verify-code');
       final isVerifyingEmail = location.startsWith('/verify-email');
+      final isForgotPassword = location.startsWith('/forgot-password');
+      final isResetPassword = location.startsWith('/reset-password');
 
       if (!isAuthenticated &&
           !isLoggingIn &&
           !isSigningUp &&
-          !isVerifyingEmail) {
+          !isVerifyingCode &&
+          !isVerifyingEmail &&
+          !isForgotPassword &&
+          !isResetPassword) {
         return '/login';
       }
 
@@ -72,8 +80,19 @@ GoRouter createRouter(AuthService authService) {
     routes: [
       GoRoute(path: '/login', builder: (context, state) => const LoginPage()),
       GoRoute(
+        path: '/forgot-password',
+        builder: (context, state) => const ForgotPasswordPage(),
+      ),
+      GoRoute(
         path: '/signup',
         builder: (context, state) => const RegistrationPage(),
+      ),
+      GoRoute(
+        path: '/verify-code',
+        builder: (context, state) {
+          final email = state.uri.queryParameters['email'] ?? '';
+          return VerificationCodePage(email: email);
+        },
       ),
       GoRoute(
         path: '/verify-email',

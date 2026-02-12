@@ -217,7 +217,100 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  /// Verify email with token. Returns null on success, or error message.
+  /// Verify email with verification code. Returns null on success, or error message.
+  Future<String?> verifyCode(String email, String code) async {
+    final result = await apiClient.post<Map<String, dynamic>>(
+      '/api/v1/auth/verify-code',
+      body: {'email': email, 'code': code},
+      auth: false,
+    );
+
+    if (result.isSuccess) {
+      return null;
+    } else {
+      return _getUserFriendlyError(
+        result.error?.message ?? 'Invalid verification code',
+      );
+    }
+  }
+
+  /// Resend verification code to email. Returns null on success, or error message.
+  Future<String?> resendCode(String email) async {
+    final result = await apiClient.post<Map<String, dynamic>>(
+      '/api/v1/auth/resend-code',
+      body: {'email': email},
+      auth: false,
+    );
+
+    if (result.isSuccess) {
+      return null;
+    } else {
+      return _getUserFriendlyError(
+        result.error?.message ?? 'Failed to resend verification code',
+      );
+    }
+  }
+
+  /// Send forgot password recovery code. Returns null on success, or error message.
+  Future<String?> forgotPassword(String email) async {
+    final result = await apiClient.post<Map<String, dynamic>>(
+      '/api/v1/auth/forgot-password',
+      body: {'email': email},
+      auth: false,
+    );
+
+    if (result.isSuccess) {
+      return null;
+    } else {
+      return _getUserFriendlyError(
+        result.error?.message ?? 'Failed to send recovery email',
+      );
+    }
+  }
+
+  /// Verify password reset code. Returns null on success, or error message.
+  Future<String?> verifyResetCode(String email, String code) async {
+    final result = await apiClient.post<Map<String, dynamic>>(
+      '/api/v1/auth/verify-reset-code',
+      body: {'email': email, 'code': code},
+      auth: false,
+    );
+
+    if (result.isSuccess) {
+      return null;
+    } else {
+      return _getUserFriendlyError(
+        result.error?.message ?? 'Invalid verification code',
+      );
+    }
+  }
+
+  /// Reset password with code. Returns null on success, or error message.
+  Future<String?> resetPassword(
+    String email,
+    String code,
+    String newPassword,
+  ) async {
+    final result = await apiClient.post<Map<String, dynamic>>(
+      '/api/v1/auth/reset-password',
+      body: {
+        'email': email,
+        'code': code,
+        'new_password': newPassword,
+      },
+      auth: false,
+    );
+
+    if (result.isSuccess) {
+      return null;
+    } else {
+      return _getUserFriendlyError(
+        result.error?.message ?? 'Failed to reset password',
+      );
+    }
+  }
+
+  /// Verify email with token (legacy). Returns null on success, or error message.
   /// Note: Backend returns HTML on success, not JSON, so we check status code directly.
   Future<String?> verifyEmail(String token) async {
     try {

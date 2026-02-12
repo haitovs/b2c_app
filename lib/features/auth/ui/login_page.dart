@@ -7,6 +7,9 @@ import '../../../core/app_theme.dart';
 import '../../../core/widgets/app_text_field.dart';
 import '../services/auth_service.dart';
 import 'verification_pending_page.dart';
+import 'widgets/auth_page_layout.dart';
+import 'widgets/auth_button.dart';
+import 'widgets/hover_text.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -23,95 +26,13 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [AppColors.gradientStart, AppColors.gradientEnd],
-          ),
-        ),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final isMobile = constraints.maxWidth < 800;
-            // Ensure card fits within screen with limited max width
-            final cardWidth = isMobile
-                ? constraints.maxWidth * 0.95
-                : (constraints.maxWidth > 950
-                      ? 950.0
-                      : constraints.maxWidth * 0.95);
-
-            return Center(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(vertical: 20),
-                child: Container(
-                  width: cardWidth,
-                  decoration: BoxDecoration(
-                    color: AppColors.cardBackground,
-                    borderRadius: BorderRadius.circular(35),
-                  ),
-                  child: isMobile
-                      ? _buildMobileLayout()
-                      : _buildDesktopLayout(cardWidth),
-                ),
-              ),
-            );
-          },
-        ),
-      ),
+    return AuthPageLayout(
+      desktopCardHeight: 620,
+      child: _buildFormContent(),
     );
   }
 
-  Widget _buildMobileLayout() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 40),
-      child: _buildFormContent(isMobile: true),
-    );
-  }
-
-  Widget _buildDesktopLayout(double cardWidth) {
-    // FIX: Using SizedBox with fixed height to prevent IntrinsicHeight crashes
-    return SizedBox(
-      height: 600, // Fixed height for Login Page (shorter than registration)
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Image Section
-          Container(
-            width: cardWidth * 0.45, // Proportional width
-            decoration: const BoxDecoration(
-              color: Colors.grey, // Placeholder for image
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(35),
-                bottomLeft: Radius.circular(35),
-              ),
-              image: DecorationImage(
-                image: AssetImage('login_image.png'),
-                fit: BoxFit.cover,
-              ),
-            ),
-          ),
-
-          // Login Form Section
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 30, // Reduced padding
-                vertical: 40,
-              ),
-              child: Center(child: _buildFormContent(isMobile: false)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFormContent({required bool isMobile}) {
+  Widget _buildFormContent() {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -120,20 +41,18 @@ class _LoginPageState extends State<LoginPage> {
         // Login Title
         Text(
           AppLocalizations.of(context)!.loginTitle,
-          style: isMobile
-              ? AppTextStyles.titleLargeMobile
-              : AppTextStyles.titleLargeDesktop,
+          style: AppTextStyles.titleLargeDesktop,
         ),
         const SizedBox(height: 25),
 
         SizedBox(
-          width: 320, // Constrained width
+          width: 320,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Username Field
               AppTextField(
-                labelText: AppLocalizations.of(context)!.usernamePlaceholder,
+                labelText: "Name, phone number or email address",
                 controller: _usernameController,
                 textInputAction: TextInputAction.next,
               ),
@@ -146,34 +65,55 @@ class _LoginPageState extends State<LoginPage> {
                 textInputAction: TextInputAction.done,
                 onSubmitted: (_) => _login(),
               ),
-              const SizedBox(height: 25),
+              const SizedBox(height: 20),
 
-              // Remember Me
+              // Remember Me + Forgot Password row
               Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  SizedBox(
-                    width: 17,
-                    height: 18,
-                    child: Checkbox(
-                      value: _rememberMe,
-                      onChanged: (val) => setState(() => _rememberMe = val!),
-                      activeColor: AppColors.checkboxActive,
-                      side: const BorderSide(
-                        color: AppColors.checkboxActive,
-                        width: 1.5,
+                  // Remember me
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: 17,
+                        height: 18,
+                        child: Checkbox(
+                          value: _rememberMe,
+                          onChanged: (val) =>
+                              setState(() => _rememberMe = val!),
+                          activeColor: AppColors.checkboxActive,
+                          side: const BorderSide(
+                            color: AppColors.checkboxActive,
+                            width: 1.5,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        AppLocalizations.of(context)!.rememberMe,
+                        style: AppTextStyles.rememberMe.copyWith(fontSize: 14),
+                      ),
+                    ],
+                  ),
+                  // Forgot Password
+                  MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: GestureDetector(
+                      onTap: () => context.push('/forgot-password'),
+                      child: HoverText(
+                        text: "Forgot Password?",
+                        baseStyle: AppTextStyles.rememberMe.copyWith(
+                          fontSize: 14,
+                          decoration: TextDecoration.underline,
+                        ),
+                        hoverColor: AppColors.buttonBackground,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Text(
-                    AppLocalizations.of(context)!.rememberMe,
-                    style: AppTextStyles.rememberMe.copyWith(
-                      fontSize: 16,
-                    ), // Adjusted size
-                  ),
                 ],
               ),
-              const SizedBox(height: 15),
+              const SizedBox(height: 12),
 
               // Don't have account
               Center(
@@ -181,10 +121,20 @@ class _LoginPageState extends State<LoginPage> {
                   cursor: SystemMouseCursors.click,
                   child: GestureDetector(
                     onTap: () => context.push('/signup'),
-                    child: _HoverText(
-                      text: AppLocalizations.of(context)!.dontHaveAccount,
-                      baseStyle: AppTextStyles.dontHaveAccount,
-                      hoverColor: AppColors.buttonBackground,
+                    child: RichText(
+                      text: TextSpan(
+                        text: "Don't have an account? ",
+                        style: AppTextStyles.dontHaveAccount,
+                        children: [
+                          TextSpan(
+                            text: "Sign up",
+                            style: AppTextStyles.dontHaveAccount.copyWith(
+                              decoration: TextDecoration.underline,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -192,81 +142,21 @@ class _LoginPageState extends State<LoginPage> {
               const SizedBox(height: 25),
 
               // Login Button
-              _buildLoginButton(),
+              AuthButton(
+                text: AppLocalizations.of(context)!.loginButton,
+                isLoading: _isLoading,
+                onTap: _login,
+              ),
             ],
           ),
         ),
-        const SizedBox(height: 40),
-
-        // Footer
-        _buildFooter(),
       ],
     );
   }
 
-  Widget _buildFooter() {
-    return LayoutBuilder(
-      builder: (context, footerConstraints) {
-        return Wrap(
-          alignment: WrapAlignment.center,
-          runSpacing: 5,
-          spacing: 10,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            Text("All rights reserved", style: AppTextStyles.footer),
-            Container(width: 1, height: 12, color: AppColors.textFooter),
-            // Privacy Policy
-            MouseRegion(
-              cursor: SystemMouseCursors.click,
-              child: GestureDetector(
-                onTap: () {},
-                child: _HoverText(
-                  text: AppLocalizations.of(
-                    context,
-                  )!.privacyPolicy.split('|')[1].trim(), // "Privacy Policy"
-                  baseStyle: AppTextStyles.footer,
-                  hoverColor: AppColors.buttonBackground,
-                ),
-              ),
-            ),
-            Container(width: 1, height: 12, color: AppColors.textFooter),
-            // Terms of Use
-            MouseRegion(
-              cursor: SystemMouseCursors.click,
-              child: GestureDetector(
-                onTap: () {},
-                child: _HoverText(
-                  text: AppLocalizations.of(context)!.terms,
-                  baseStyle: AppTextStyles.footer,
-                  hoverColor: AppColors.buttonBackground,
-                ),
-              ),
-            ),
-            Container(width: 1, height: 12, color: AppColors.textFooter),
-            // Powered By
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _HoverText(
-                  text: "Powered by",
-                  baseStyle: AppTextStyles.footer,
-                  hoverColor: AppColors.buttonBackground,
-                ),
-                const SizedBox(width: 5),
-                Image.asset("assets/rotating-logo.gif", width: 24, height: 24),
-              ],
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   Future<void> _login() async {
-    // Prevent multiple submissions
     if (_isLoading) return;
 
-    // Validate required fields
     if (_usernameController.text.trim().isEmpty) {
       _showError("Please enter your email or mobile number");
       return;
@@ -276,7 +166,6 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
 
-    // Set loading state
     setState(() => _isLoading = true);
 
     try {
@@ -289,7 +178,6 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) return;
 
       if (errorMessage == null) {
-        // Login successful
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text("Login successful!"),
@@ -299,32 +187,28 @@ class _LoginPageState extends State<LoginPage> {
         );
         context.go('/');
       } else if (errorMessage == 'EMAIL_NOT_VERIFIED') {
-        // Redirect to verification pending page
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) =>
-                VerificationPendingPage(email: _usernameController.text.trim()),
+            builder: (_) => VerificationPendingPage(
+              email: _usernameController.text.trim(),
+            ),
           ),
         );
       } else {
-        // Show error message
         _showError(errorMessage);
       }
     } catch (e) {
-      // Handle unexpected errors
       if (mounted) {
         _showError("An unexpected error occurred. Please try again.");
       }
     } finally {
-      // Always reset loading state
       if (mounted) {
         setState(() => _isLoading = false);
       }
     }
   }
 
-  // Helper method to show error messages
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -332,107 +216,6 @@ class _LoginPageState extends State<LoginPage> {
         backgroundColor: Colors.red,
         duration: const Duration(seconds: 4),
         behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
-
-  Widget _buildLoginButton() {
-    return MouseRegion(
-      cursor: _isLoading ? SystemMouseCursors.wait : SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: _isLoading ? null : _login, // Disable when loading
-        child: Container(
-          width: double.infinity,
-          height: 50,
-          decoration: BoxDecoration(
-            color: _isLoading
-                ? AppColors.buttonBackground.withValues(alpha: 0.6)
-                : AppColors.buttonBackground,
-            borderRadius: BorderRadius.circular(45),
-          ),
-          alignment: Alignment.center,
-          child: _isLoading
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                  ),
-                )
-              : Text(
-                  AppLocalizations.of(context)!.loginButton,
-                  style: AppTextStyles.buttonTextLarge,
-                ),
-        ),
-      ),
-    );
-  }
-}
-
-// Simple Hover Text Widget (Duplicated to avoid extra file for now, ideally in widgets/common)
-class _HoverText extends StatefulWidget {
-  final String text;
-  final TextStyle baseStyle;
-  final Color hoverColor;
-
-  const _HoverText({
-    required this.text,
-    required this.baseStyle,
-    required this.hoverColor,
-  });
-
-  @override
-  State<_HoverText> createState() => _HoverTextState();
-}
-
-class _HoverTextState extends State<_HoverText> {
-  bool _isHovering = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHovering = true),
-      onExit: (_) => setState(() => _isHovering = false),
-      child: Text(
-        widget.text,
-        style: widget.baseStyle.copyWith(
-          color: _isHovering ? widget.hoverColor : widget.baseStyle.color,
-        ),
-      ),
-    );
-  }
-}
-
-// Hover Container Widget for Button
-class _HoverContainer extends StatefulWidget {
-  final Widget child;
-
-  const _HoverContainer({required this.child});
-
-  @override
-  State<_HoverContainer> createState() => _HoverContainerState();
-}
-
-class _HoverContainerState extends State<_HoverContainer> {
-  bool _isHovering = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHovering = true),
-      onExit: (_) => setState(() => _isHovering = false),
-      child: Container(
-        width: double.infinity,
-        height: 50, // 50 for login
-        decoration: BoxDecoration(
-          color: _isHovering
-              ? AppColors.buttonBackground.withValues(alpha: 0.9)
-              : AppColors.buttonBackground,
-          borderRadius: BorderRadius.circular(45),
-        ),
-        alignment: Alignment.center,
-        child: widget.child,
       ),
     );
   }
