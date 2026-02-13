@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:csc_picker_plus/csc_picker_plus.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -14,6 +15,7 @@ import '../../../core/config/app_config.dart';
 import '../../../core/widgets/phone_input_field.dart';
 import '../../../shared/widgets/legal_bottom_sheet.dart';
 import '../../auth/services/auth_service.dart';
+import '../models/social_network.dart';
 
 class ProfilePage extends StatefulWidget {
   final int initialTab;
@@ -55,15 +57,13 @@ class _ProfilePageState extends State<ProfilePage>
   late TextEditingController _emailController;
   late TextEditingController _mobileController;
 
-  late TextEditingController _countryController;
-  late TextEditingController _cityController;
+  String _selectedCountry = '';
+  String _selectedCity = '';
 
   late TextEditingController _companyNameController;
   late TextEditingController _websiteController;
 
-  late TextEditingController _instagramController;
-  late TextEditingController _whatsappController;
-  late TextEditingController _facebookController;
+  List<SocialLinkEntry> _socialLinks = [];
 
   @override
   void initState() {
@@ -119,15 +119,8 @@ class _ProfilePageState extends State<ProfilePage>
     _emailController = TextEditingController();
     _mobileController = TextEditingController();
 
-    _countryController = TextEditingController();
-    _cityController = TextEditingController();
-
     _companyNameController = TextEditingController();
     _websiteController = TextEditingController();
-
-    _instagramController = TextEditingController();
-    _whatsappController = TextEditingController();
-    _facebookController = TextEditingController();
   }
 
   @override
@@ -138,13 +131,11 @@ class _ProfilePageState extends State<ProfilePage>
     _surnameController.dispose();
     _emailController.dispose();
     _mobileController.dispose();
-    _countryController.dispose();
-    _cityController.dispose();
     _companyNameController.dispose();
     _websiteController.dispose();
-    _instagramController.dispose();
-    _whatsappController.dispose();
-    _facebookController.dispose();
+    for (final entry in _socialLinks) {
+      entry.dispose();
+    }
     super.dispose();
   }
 
@@ -165,8 +156,8 @@ class _ProfilePageState extends State<ProfilePage>
       // Store mobile in E.164 format for PhoneInputField
       _mobileE164 = user['mobile'] ?? '';
 
-      _countryController.text = user['country'] ?? '';
-      _cityController.text = user['city'] ?? '';
+      _selectedCountry = user['country'] ?? '';
+      _selectedCity = user['city'] ?? '';
 
       _companyNameController.text = user['company_name'] ?? '';
       _websiteController.text = user['website'] ?? '';
@@ -176,16 +167,20 @@ class _ProfilePageState extends State<ProfilePage>
         _agreedToTerms = true;
       }
 
+      // Load social links
       if (user['social_links'] != null) {
+        // Dispose old entries first
+        for (final entry in _socialLinks) {
+          entry.dispose();
+        }
+        _socialLinks = [];
         for (var link in user['social_links']) {
-          if (link['network'] == 'INSTAGRAM') {
-            _instagramController.text = link['handle'];
-          }
-          if (link['network'] == 'WHATSAPP') {
-            _whatsappController.text = link['handle'];
-          }
-          if (link['network'] == 'FACEBOOK') {
-            _facebookController.text = link['handle'];
+          final network = SocialNetwork.fromKey(link['network'] ?? '');
+          if (network != null) {
+            _socialLinks.add(SocialLinkEntry(
+              network: network,
+              initialValue: link['handle'] ?? '',
+            ));
           }
         }
       }
@@ -1073,31 +1068,16 @@ class _ProfilePageState extends State<ProfilePage>
                       final updates = {
                         'first_name': _nameController.text,
                         'last_name': _surnameController.text,
-                        'mobile':
-                            _mobileE164, // Use E.164 format from PhoneInputField
-                        'country': _countryController.text,
-                        'city': _cityController.text,
+                        'mobile': _mobileE164,
+                        'country': _selectedCountry,
+                        'city': _selectedCity,
                         'company_name': _companyNameController.text,
                         'website': _websiteController.text,
-                        // Include photo URL if uploaded
                         if (photoUrl != null) 'photo_url': photoUrl,
-                        'social_links': [
-                          if (_instagramController.text.isNotEmpty)
-                            {
-                              'network': 'INSTAGRAM',
-                              'handle': _instagramController.text,
-                            },
-                          if (_whatsappController.text.isNotEmpty)
-                            {
-                              'network': 'WHATSAPP',
-                              'handle': _whatsappController.text,
-                            },
-                          if (_facebookController.text.isNotEmpty)
-                            {
-                              'network': 'FACEBOOK',
-                              'handle': _facebookController.text,
-                            },
-                        ],
+                        'social_links': _socialLinks
+                            .where((e) => e.controller.text.isNotEmpty)
+                            .map((e) => e.toJson())
+                            .toList(),
                       };
 
                       final error = await context
@@ -1165,12 +1145,15 @@ class _ProfilePageState extends State<ProfilePage>
               _buildField("Surname", _surnameController),
               _buildField("E-mail address", _emailController),
               _buildMobilePhoneField(),
-              _buildField("Country", _countryController),
-              _buildField("City", _cityController),
               _buildField("Company Name", _companyNameController),
               _buildField("Company Website", _websiteController),
             ],
           ),
+
+          const SizedBox(height: 30),
+
+          // Country / City
+          _buildCountryCitySection(),
 
           const SizedBox(height: 50),
 
@@ -1181,15 +1164,7 @@ class _ProfilePageState extends State<ProfilePage>
 
           const SizedBox(height: 30),
 
-          Wrap(
-            spacing: 20,
-            runSpacing: 30,
-            children: [
-              _buildSocialField("Instagram", _instagramController),
-              _buildSocialField("WhatsApp", _whatsappController),
-              _buildSocialField("Facebook", _facebookController),
-            ],
-          ),
+          _buildSocialLinksSection(),
 
           const SizedBox(height: 50),
 
@@ -1329,14 +1304,69 @@ class _ProfilePageState extends State<ProfilePage>
     );
   }
 
-  Widget _buildSocialField(String label, TextEditingController controller) {
+  // ============== Country / City Section ==============
+
+  Widget _buildCountryCitySection() {
+    if (_isEditing) {
+      return CSCPickerPlus(
+        showStates: false,
+        showCities: true,
+        currentCountry: _selectedCountry.isNotEmpty ? _selectedCountry : null,
+        currentCity: _selectedCity.isNotEmpty ? _selectedCity : null,
+        countryDropdownLabel: _selectedCountry.isNotEmpty
+            ? _selectedCountry
+            : 'Select Country',
+        cityDropdownLabel:
+            _selectedCity.isNotEmpty ? _selectedCity : 'Select City',
+        dropdownDecoration: BoxDecoration(
+          border: Border.all(color: const Color(0xFFB7B7B7)),
+          borderRadius: BorderRadius.circular(5),
+        ),
+        disabledDropdownDecoration: BoxDecoration(
+          border: Border.all(color: const Color(0xFFE0E0E0)),
+          borderRadius: BorderRadius.circular(5),
+          color: const Color(0xFFF5F5F5),
+        ),
+        selectedItemStyle: GoogleFonts.inter(fontSize: 16),
+        dropdownHeadingStyle: GoogleFonts.inter(
+          fontWeight: FontWeight.w500,
+          fontSize: 18,
+          color: Colors.black,
+        ),
+        onCountryChanged: (country) {
+          setState(() {
+            _selectedCountry = country;
+            _selectedCity = '';
+          });
+        },
+        onStateChanged: (_) {},
+        onCityChanged: (city) {
+          setState(() {
+            _selectedCity = city ?? '';
+          });
+        },
+      );
+    }
+
+    // View mode: show as read-only text fields
+    return Wrap(
+      spacing: 20,
+      runSpacing: 30,
+      children: [
+        _buildReadOnlyField('Country', _selectedCountry),
+        _buildReadOnlyField('City', _selectedCity),
+      ],
+    );
+  }
+
+  Widget _buildReadOnlyField(String label, String value) {
     return SizedBox(
       width: 394,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            label,
+            "$label:",
             style: GoogleFonts.inter(
               fontWeight: FontWeight.w500,
               fontSize: 18,
@@ -1352,29 +1382,212 @@ class _ProfilePageState extends State<ProfilePage>
             ),
             padding: const EdgeInsets.symmetric(horizontal: 10),
             alignment: Alignment.centerLeft,
-            child: _isEditing
-                ? TextField(
-                    controller: controller,
-                    decoration: const InputDecoration(
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      isDense: true,
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                    style: GoogleFonts.inter(fontSize: 16),
-                  )
-                : Text(
-                    controller.text,
-                    style: GoogleFonts.inter(
-                      fontSize: 16,
-                      color: const Color.fromRGBO(0, 0, 0, 0.5),
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
+            child: Text(
+              value,
+              style: GoogleFonts.inter(
+                fontSize: 16,
+                color: const Color.fromRGBO(0, 0, 0, 0.5),
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ],
       ),
     );
+  }
+
+  // ============== Dynamic Social Links Section ==============
+
+  Widget _buildSocialLinksSection() {
+    if (_isEditing) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Existing social link entries
+          ..._socialLinks.asMap().entries.map((mapEntry) {
+            final index = mapEntry.key;
+            final entry = mapEntry.value;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 20),
+              child: SizedBox(
+                width: 394,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(entry.network.icon,
+                            size: 20, color: const Color(0xFF3C4494)),
+                        const SizedBox(width: 8),
+                        Text(
+                          entry.network.label,
+                          style: GoogleFonts.inter(
+                            fontWeight: FontWeight.w500,
+                            fontSize: 18,
+                            color: Colors.black,
+                          ),
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          icon: const Icon(Icons.close,
+                              size: 20, color: Colors.red),
+                          onPressed: () {
+                            setState(() {
+                              _socialLinks.removeAt(index).dispose();
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      height: 50,
+                      decoration: BoxDecoration(
+                        border: Border.all(color: const Color(0xFFB7B7B7)),
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      alignment: Alignment.centerLeft,
+                      child: TextField(
+                        controller: entry.controller,
+                        decoration: InputDecoration(
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          isDense: true,
+                          contentPadding: EdgeInsets.zero,
+                          hintText: entry.network.hintText,
+                          hintStyle: GoogleFonts.inter(
+                            fontSize: 16,
+                            color: const Color.fromRGBO(0, 0, 0, 0.25),
+                          ),
+                        ),
+                        style: GoogleFonts.inter(fontSize: 16),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
+
+          // "+ Add New" button
+          if (_availableNetworks.isNotEmpty)
+            PopupMenuButton<SocialNetwork>(
+              onSelected: (network) {
+                setState(() {
+                  _socialLinks.add(SocialLinkEntry(network: network));
+                });
+              },
+              itemBuilder: (context) => _availableNetworks
+                  .map((network) => PopupMenuItem(
+                        value: network,
+                        child: Row(
+                          children: [
+                            Icon(network.icon,
+                                size: 20, color: const Color(0xFF3C4494)),
+                            const SizedBox(width: 10),
+                            Text(network.label),
+                          ],
+                        ),
+                      ))
+                  .toList(),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  border: Border.all(color: const Color(0xFF3C4494)),
+                  borderRadius: BorderRadius.circular(5),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.add,
+                        size: 18, color: Color(0xFF3C4494)),
+                    const SizedBox(width: 6),
+                    Text(
+                      "Add New",
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        color: const Color(0xFF3C4494),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      );
+    }
+
+    // View mode: only show social links that have values
+    final filledLinks =
+        _socialLinks.where((e) => e.controller.text.isNotEmpty).toList();
+    if (filledLinks.isEmpty) {
+      return Text(
+        'No social links added.',
+        style: GoogleFonts.inter(
+          fontSize: 16,
+          color: const Color.fromRGBO(0, 0, 0, 0.5),
+        ),
+      );
+    }
+
+    return Wrap(
+      spacing: 20,
+      runSpacing: 30,
+      children: filledLinks.map((entry) {
+        return SizedBox(
+          width: 394,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(entry.network.icon,
+                      size: 20, color: const Color(0xFF3C4494)),
+                  const SizedBox(width: 8),
+                  Text(
+                    entry.network.label,
+                    style: GoogleFonts.inter(
+                      fontWeight: FontWeight.w500,
+                      fontSize: 18,
+                      color: Colors.black,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 15),
+              Container(
+                height: 50,
+                decoration: BoxDecoration(
+                  border: Border.all(color: const Color(0xFFB7B7B7)),
+                  borderRadius: BorderRadius.circular(5),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  entry.controller.text,
+                  style: GoogleFonts.inter(
+                    fontSize: 16,
+                    color: const Color.fromRGBO(0, 0, 0, 0.5),
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  /// Networks not yet added to the social links list
+  List<SocialNetwork> get _availableNetworks {
+    final usedKeys = _socialLinks.map((e) => e.network).toSet();
+    return SocialNetwork.values
+        .where((n) => !usedKeys.contains(n))
+        .toList();
   }
 }
