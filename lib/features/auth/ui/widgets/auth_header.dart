@@ -53,7 +53,8 @@ class _LanguageSelector extends StatefulWidget {
 }
 
 class _LanguageSelectorState extends State<_LanguageSelector> {
-  bool _isOpen = false;
+  final LayerLink _layerLink = LayerLink();
+  OverlayEntry? _overlayEntry;
   late String _selected;
 
   @override
@@ -63,77 +64,111 @@ class _LanguageSelectorState extends State<_LanguageSelector> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        // Current language button
-        MouseRegion(
-          cursor: SystemMouseCursors.click,
-          child: GestureDetector(
-            onTap: () => setState(() => _isOpen = !_isOpen),
-            child: Text(
-              _selected,
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: Colors.black,
-                decoration: TextDecoration.underline,
-              ),
+  void dispose() {
+    _removeOverlay();
+    super.dispose();
+  }
+
+  void _removeOverlay() {
+    _overlayEntry?.remove();
+    _overlayEntry = null;
+  }
+
+  void _toggleDropdown() {
+    if (_overlayEntry != null) {
+      _removeOverlay();
+    } else {
+      _overlayEntry = _createOverlayEntry();
+      Overlay.of(context).insert(_overlayEntry!);
+    }
+    setState(() {});
+  }
+
+  OverlayEntry _createOverlayEntry() {
+    final options = widget.languages.where((lang) => lang != _selected).toList();
+
+    return OverlayEntry(
+      builder: (context) => Stack(
+        children: [
+          // Invisible backdrop to close dropdown on outside tap
+          Positioned.fill(
+            child: GestureDetector(
+              onTap: () {
+                _removeOverlay();
+                setState(() {});
+              },
+              behavior: HitTestBehavior.opaque,
+              child: const SizedBox.expand(),
             ),
           ),
-        ),
-        // Dropdown options
-        if (_isOpen)
-          Container(
-            margin: const EdgeInsets.only(top: 4),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(4),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.1),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: widget.languages
-                  .where((lang) => lang != _selected)
-                  .map(
-                    (lang) => MouseRegion(
-                      cursor: SystemMouseCursors.click,
-                      child: GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _selected = lang;
-                            _isOpen = false;
-                          });
-                          widget.onChanged?.call(lang);
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          child: Text(
-                            lang,
-                            style: GoogleFonts.inter(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.black,
+          // Dropdown positioned directly below the button
+          Positioned(
+            width: 60,
+            child: CompositedTransformFollower(
+              link: _layerLink,
+              showWhenUnlinked: false,
+              offset: const Offset(0, 24),
+              child: Material(
+                elevation: 4,
+                borderRadius: BorderRadius.circular(4),
+                color: Colors.white,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: options
+                      .map(
+                        (lang) => InkWell(
+                          onTap: () {
+                            setState(() => _selected = lang);
+                            _removeOverlay();
+                            widget.onChanged?.call(lang);
+                          },
+                          child: Container(
+                            width: 60,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            child: Text(
+                              lang,
+                              style: GoogleFonts.inter(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.black,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    ),
-                  )
-                  .toList(),
+                      )
+                      .toList(),
+                ),
+              ),
             ),
           ),
-      ],
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return CompositedTransformTarget(
+      link: _layerLink,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: _toggleDropdown,
+          child: Text(
+            _selected,
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: Colors.black,
+              decoration: TextDecoration.underline,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
