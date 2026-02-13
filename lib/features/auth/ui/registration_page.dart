@@ -153,11 +153,11 @@ class _RegistrationPageState extends State<RegistrationPage> {
                   child: RichText(
                     text: TextSpan(
                       text: "Already have an account? ",
-                      style: AppTextStyles.bodySmall.copyWith(color: Colors.grey[600]),
+                      style: AppTextStyles.dontHaveAccount,
                       children: [
                         TextSpan(
                           text: "Sign In",
-                          style: AppTextStyles.bodySmall.copyWith(
+                          style: AppTextStyles.dontHaveAccount.copyWith(
                             color: AppColors.buttonBackground,
                             fontWeight: FontWeight.bold,
                             decoration: TextDecoration.underline,
