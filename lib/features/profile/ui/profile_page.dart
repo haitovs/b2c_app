@@ -62,6 +62,7 @@ class _ProfilePageState extends State<ProfilePage>
 
   late TextEditingController _companyNameController;
   late TextEditingController _websiteController;
+  late TextEditingController _positionController;
 
   List<SocialLinkEntry> _socialLinks = [];
 
@@ -121,6 +122,7 @@ class _ProfilePageState extends State<ProfilePage>
 
     _companyNameController = TextEditingController();
     _websiteController = TextEditingController();
+    _positionController = TextEditingController();
   }
 
   @override
@@ -133,6 +135,7 @@ class _ProfilePageState extends State<ProfilePage>
     _mobileController.dispose();
     _companyNameController.dispose();
     _websiteController.dispose();
+    _positionController.dispose();
     for (final entry in _socialLinks) {
       entry.dispose();
     }
@@ -161,6 +164,7 @@ class _ProfilePageState extends State<ProfilePage>
 
       _companyNameController.text = user['company_name'] ?? '';
       _websiteController.text = user['website'] ?? '';
+      _positionController.text = user['position'] ?? '';
 
       // Set agreement checkbox from user's saved status
       if (user['has_agreed_terms'] == true) {
@@ -1014,7 +1018,7 @@ class _ProfilePageState extends State<ProfilePage>
           ElevatedButton.icon(
             onPressed: _pickImage,
             icon: const Icon(Icons.upload, size: 18),
-            label: const Text("Upload Photo"),
+            label: const Text("Upload Photo (5:6)"),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF3C4494),
               foregroundColor: Colors.white,
@@ -1073,6 +1077,7 @@ class _ProfilePageState extends State<ProfilePage>
                         'city': _selectedCity,
                         'company_name': _companyNameController.text,
                         'website': _websiteController.text,
+                        'position': _positionController.text,
                         if (photoUrl != null) 'photo_url': photoUrl,
                         'social_links': _socialLinks
                             .where((e) => e.controller.text.isNotEmpty)
@@ -1137,6 +1142,7 @@ class _ProfilePageState extends State<ProfilePage>
 
           const SizedBox(height: 30),
 
+          // Personal info fields
           Wrap(
             spacing: 20,
             runSpacing: 30,
@@ -1145,15 +1151,26 @@ class _ProfilePageState extends State<ProfilePage>
               _buildField("Surname", _surnameController),
               _buildField("E-mail address", _emailController),
               _buildMobilePhoneField(),
-              _buildField("Company Name", _companyNameController),
-              _buildField("Company Website", _websiteController),
             ],
           ),
 
           const SizedBox(height: 30),
 
-          // Country / City
+          // Country / City (city depends on selected country)
           _buildCountryCitySection(),
+
+          const SizedBox(height: 30),
+
+          // Company info fields
+          Wrap(
+            spacing: 20,
+            runSpacing: 30,
+            children: [
+              _buildField("Company Name", _companyNameController),
+              _buildField("Company Website", _websiteController),
+              _buildField("Position", _positionController),
+            ],
+          ),
 
           const SizedBox(height: 50),
 
