@@ -134,6 +134,8 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
             duration: Duration(seconds: 4),
           ),
         );
+        // Clear the entire Material navigator stack and go to login via GoRouter
+        Navigator.of(context).popUntil((route) => route.isFirst);
         context.go('/login');
       } else {
         _showError(error);
