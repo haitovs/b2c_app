@@ -64,7 +64,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
                   Expanded(
                     child: AppTextField(
                       labelText: loc.nameLabel,
-                      hintText: "Leyli",
+                      hintText: "Name",
                       controller: _nameController,
                       required: true,
                     ),
@@ -73,7 +73,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
                   Expanded(
                     child: AppTextField(
                       labelText: loc.surnameLabel,
-                      hintText: "Leyli",
+                      hintText: "Surname",
                       controller: _surnameController,
                       required: true,
                     ),
@@ -99,7 +99,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
                   Expanded(
                     child: AppPasswordField(
                       labelText: loc.passwordLabel,
-                      hintText: "Leyli",
+                      hintText: "very secret password",
                       controller: _passwordController,
                       required: true,
                     ),
@@ -108,7 +108,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
                   Expanded(
                     child: AppPasswordField(
                       labelText: loc.confirmPasswordLabel,
-                      hintText: "Leyli",
+                      hintText: "very secret password",
                       controller: _confirmPasswordController,
                       required: true,
                     ),
@@ -216,7 +216,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
                     textAlignVertical: TextAlignVertical.center,
                     keyboardType: TextInputType.phone,
                     decoration: InputDecoration(
-                      hintText: "+993-xx-xx-xx-xx",
+                      hintText: "xx-xx-xx-xx",
                       hintStyle: AppTextStyles.placeholder,
                       filled: true,
                       fillColor: Colors.white,
@@ -333,9 +333,8 @@ class _RegistrationPageState extends State<RegistrationPage> {
 
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (_) => VerificationCodePage(
-              email: _emailController.text.trim(),
-            ),
+            builder: (_) =>
+                VerificationCodePage(email: _emailController.text.trim()),
           ),
         );
       } else {

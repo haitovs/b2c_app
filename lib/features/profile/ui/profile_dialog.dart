@@ -60,7 +60,7 @@ class ProfileDialog extends StatelessWidget {
                     const SizedBox(width: 11),
                     // Name
                     Text(
-                      "Leyli Ashyrberdiyeva", // Placeholder
+                      "Name Surname", // Placeholder
                       style: GoogleFonts.montserrat(
                         fontWeight: FontWeight.w500,
                         fontSize: 14,
