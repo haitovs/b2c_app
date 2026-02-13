@@ -144,6 +144,30 @@ class _RegistrationPageState extends State<RegistrationPage> {
                 onTap: _register,
                 height: 48,
               ),
+              const SizedBox(height: 16),
+
+              // Return to login
+              Center(
+                child: GestureDetector(
+                  onTap: () => Navigator.of(context).pop(),
+                  child: RichText(
+                    text: TextSpan(
+                      text: "Already have an account? ",
+                      style: AppTextStyles.bodySmall.copyWith(color: Colors.grey[600]),
+                      children: [
+                        TextSpan(
+                          text: "Sign In",
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: AppColors.buttonBackground,
+                            fontWeight: FontWeight.bold,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
