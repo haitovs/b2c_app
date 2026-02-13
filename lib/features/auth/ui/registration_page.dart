@@ -357,8 +357,10 @@ class _RegistrationPageState extends State<RegistrationPage> {
 
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (_) =>
-                VerificationCodePage(email: _emailController.text.trim()),
+            builder: (_) => VerificationCodePage(
+              email: _emailController.text.trim(),
+              password: _passwordController.text,
+            ),
           ),
         );
       } else {

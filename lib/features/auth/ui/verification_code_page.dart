@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 
 import '../../../core/app_theme.dart';
 import '../services/auth_service.dart';
@@ -13,8 +14,9 @@ import 'widgets/hover_text.dart';
 /// sent to their email.
 class VerificationCodePage extends StatefulWidget {
   final String email;
+  final String? password;
 
-  const VerificationCodePage({super.key, required this.email});
+  const VerificationCodePage({super.key, required this.email, this.password});
 
   @override
   State<VerificationCodePage> createState() => _VerificationCodePageState();
@@ -215,6 +217,21 @@ class _VerificationCodePageState extends State<VerificationCodePage> {
       if (!mounted) return;
 
       if (error == null) {
+        // Auto-login if we have the password from registration
+        if (widget.password != null) {
+          final authService = Provider.of<AuthService>(context, listen: false);
+          final loginError = await authService.login(widget.email, widget.password!);
+
+          if (!mounted) return;
+
+          if (loginError == null) {
+            context.go('/');
+            return;
+          }
+        }
+
+        // Fallback: redirect to login if auto-login not possible
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text("Email verified successfully! Please login."),
