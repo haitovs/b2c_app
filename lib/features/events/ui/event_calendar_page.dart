@@ -26,6 +26,53 @@ class _EventCalendarPageState extends State<EventCalendarPage> {
 
   bool _isProfileOpen = false;
 
+  // Cached event state
+  List<dynamic> _allEvents = [];
+  List<dynamic> _filteredEvents = [];
+  bool _isLoading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(_filterEvents);
+    _loadEvents();
+  }
+
+  Future<void> _loadEvents() async {
+    try {
+      final events = await context.read<EventService>().fetchEvents();
+      if (mounted) {
+        setState(() {
+          _allEvents = events;
+          _filteredEvents = events;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  void _filterEvents() {
+    final query = _searchController.text.trim().toLowerCase();
+    setState(() {
+      if (query.isEmpty) {
+        _filteredEvents = _allEvents;
+      } else {
+        _filteredEvents = _allEvents.where((event) {
+          final title = (event['title'] ?? '').toString().toLowerCase();
+          return title.contains(query);
+        }).toList();
+      }
+    });
+  }
+
   void _toggleProfile() {
     setState(() {
       _isProfileOpen = !_isProfileOpen;
@@ -49,6 +96,7 @@ class _EventCalendarPageState extends State<EventCalendarPage> {
 
   @override
   void dispose() {
+    _searchController.removeListener(_filterEvents);
     _searchController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -73,192 +121,181 @@ class _EventCalendarPageState extends State<EventCalendarPage> {
       key: _scaffoldKey,
       backgroundColor: const Color(0xFF3C4494),
       endDrawer: const NotificationDrawer(),
-      // Wrap Stack in GestureDetector to handle clicks outside profile
-      body: GestureDetector(
-        onTap: _closeProfile,
-        behavior: HitTestBehavior.translucent,
-        child: Stack(
-          children: [
-            // 1. Navigation Header
-            Positioned(
-              top: navbarTopPadding,
-              left: isMobile ? 20 : 40,
-              right: isMobile ? 20 : 40,
-              child: CustomAppBar(
-                onProfileTap: _toggleProfile,
-                onNotificationTap: () {
-                  _closeProfile();
-                  _scaffoldKey.currentState?.openEndDrawer();
-                },
-                isMobile: isMobile,
-              ),
+      body: Stack(
+        children: [
+          // 1. Navigation Header
+          Positioned(
+            top: navbarTopPadding,
+            left: isMobile ? 20 : 40,
+            right: isMobile ? 20 : 40,
+            child: CustomAppBar(
+              onProfileTap: _toggleProfile,
+              onNotificationTap: () {
+                _closeProfile();
+                _scaffoldKey.currentState?.openEndDrawer();
+              },
+              isMobile: isMobile,
             ),
+          ),
 
-            // 2. Search Bar
-            Positioned(
-              top: searchBarTop,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: Container(
-                  width: 1310,
-                  height: searchBarHeight,
-                  constraints: BoxConstraints(maxWidth: screenWidth * 0.92),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF1F1F6).withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(12),
+          // 2. Search Bar
+          Positioned(
+            top: searchBarTop,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Container(
+                width: 1310,
+                height: searchBarHeight,
+                constraints: BoxConstraints(maxWidth: screenWidth * 0.92),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F1F6).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                alignment: Alignment.center,
+                child: TextField(
+                  controller: _searchController,
+                  onTap: _closeProfile,
+                  cursorColor: const Color(0xFFF1F1F6),
+                  style: GoogleFonts.roboto(
+                    fontSize: isMobile ? 16 : 18,
+                    color: const Color(0xFFF1F1F6),
+                    fontWeight: FontWeight.w500,
                   ),
-                  alignment: Alignment.center,
-                  child: TextField(
-                    controller: _searchController,
-                    onTap: _closeProfile, // accessing search closes profile
-                    cursorColor: const Color(0xFFF1F1F6),
-                    style: GoogleFonts.roboto(
+                  textAlignVertical: TextAlignVertical.center,
+                  decoration: InputDecoration(
+                    isDense: true,
+                    filled: false,
+                    prefixIcon: Icon(
+                      Icons.search,
+                      color: const Color(0xFFF1F1F6),
+                      size: isMobile ? 24 : 28,
+                    ),
+                    hintText: "Search by event name",
+                    hintStyle: GoogleFonts.roboto(
+                      fontWeight: FontWeight.w500,
                       fontSize: isMobile ? 16 : 18,
                       color: const Color(0xFFF1F1F6),
-                      fontWeight: FontWeight.w500,
                     ),
-                    textAlignVertical:
-                        TextAlignVertical.center, // Vertically center text
-                    decoration: InputDecoration(
-                      isDense: true,
-                      filled: false,
-                      prefixIcon: Icon(
-                        Icons.search,
-                        color: const Color(0xFFF1F1F6),
-                        size: isMobile ? 24 : 28,
-                      ),
-                      hintText: "Search by event name",
-                      hintStyle: GoogleFonts.roboto(
-                        fontWeight: FontWeight.w500,
-                        fontSize: isMobile ? 16 : 18,
-                        color: const Color(
-                          0xFFF1F1F6,
-                        ), // Same color as text for hint
-                      ),
-                      border: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      disabledBorder: InputBorder.none,
-                      contentPadding:
-                          EdgeInsets.zero, // Important for fitting in height
-                    ),
+                    border: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    disabledBorder: InputBorder.none,
+                    contentPadding: EdgeInsets.zero,
                   ),
                 ),
               ),
             ),
+          ),
 
-            // 3. Scrollable Event List
+          // 3. Scrollable Event List
+          Positioned.fill(
+            top: listTop,
+            child: _buildEventList(isMobile),
+          ),
+
+          // 4. Click-outside overlay (above content, below dropdown)
+          if (_isProfileOpen)
             Positioned.fill(
-              top: listTop,
               child: GestureDetector(
                 onTap: _closeProfile,
-                child: FutureBuilder<List<dynamic>>(
-                  future: context.read<EventService>().fetchEvents(),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    } else if (snapshot.hasError) {
-                      return Center(
-                        child: Text(
-                          "Error: ${snapshot.error}",
-                          style: const TextStyle(color: Colors.white),
-                        ),
-                      );
-                    } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                      return const Center(
-                        child: Text(
-                          "No events found",
-                          style: TextStyle(color: Colors.white),
-                        ),
-                      );
-                    }
-
-                    final events = snapshot.data!;
-
-                    // We need a ScrollController for the Scrollbar to work
-                    // Create a ScrollController (make sure to dispose if stateful, or use PrimaryScrollController)
-                    // Since specific styling is needed, we should provide an explicit controller.
-                    // However, creating it inside buider causes re-creation.
-                    // Ideally, we move `_scrollController` to State class.
-                    // For now, let's use PrimaryScrollController if possible or just use a local one for structure,
-                    // BUT: The bug states "Scrollbar attempted to use PrimaryScrollController...".
-                    // Best fix: Add 'controller' to State, pass it to both Scrollbar and SingleChildScrollView.
-
-                    return Theme(
-                      data: ThemeData(
-                        scrollbarTheme: ScrollbarThemeData(
-                          thumbColor: WidgetStateProperty.all(
-                            const Color(0xFFF1F1F6).withValues(alpha: 0.2),
-                          ),
-                          trackColor: WidgetStateProperty.all(
-                            Colors.transparent,
-                          ),
-                          radius: const Radius.circular(12),
-                          thickness: WidgetStateProperty.all(isMobile ? 4 : 8),
-                        ),
-                      ),
-                      child: Scrollbar(
-                        controller: _scrollController, // <--- ASSIGNED HERE
-                        thumbVisibility: true,
-                        thickness: isMobile ? 4 : 8,
-                        radius: const Radius.circular(12),
-                        child: SingleChildScrollView(
-                          controller: _scrollController, // <--- ASSIGNED HERE
-                          physics: const BouncingScrollPhysics(),
-                          padding: const EdgeInsets.only(bottom: 50, right: 10),
-                          child: Column(
-                            children: events.map((event) {
-                              return Column(
-                                children: [
-                                  EventCard(
-                                    title: event['title'] ?? 'No Title',
-                                    date: event['date_str'] ?? '',
-                                    location: event['location'] ?? '',
-                                    imageUrl: event['image_url'] ?? '',
-                                    logoUrl: event['logo_url'],
-                                    eventStartTime:
-                                        DateTime.tryParse(
-                                          event['start_time'] ?? '',
-                                        ) ??
-                                        DateTime.now(),
-                                    onTap: () {
-                                      final id = event['id'];
-                                      if (id != null) {
-                                        context.go('/events/$id');
-                                      } else {
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          const SnackBar(
-                                            content: Text("Event ID missing"),
-                                          ),
-                                        );
-                                      }
-                                    },
-                                  ),
-                                  const SizedBox(height: 25),
-                                ],
-                              );
-                            }).toList(),
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
+                behavior: HitTestBehavior.opaque,
+                child: const SizedBox.expand(),
               ),
             ),
 
-            // 4. Profile Dropdown Overlay
-            if (_isProfileOpen)
-              Positioned(
-                top: navbarTopPadding + navbarHeight + 5,
-                right: isMobile ? 20 : 65,
-                left: isMobile ? 20 : null,
-                child: ProfileDropdown(onLogout: _logout),
+          // 5. Profile Dropdown Overlay
+          if (_isProfileOpen)
+            Positioned(
+              top: navbarTopPadding + navbarHeight + 5,
+              right: isMobile ? 20 : 65,
+              left: isMobile ? 20 : null,
+              child: ProfileDropdown(
+                onLogout: _logout,
+                onClose: _closeProfile,
               ),
-          ],
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEventList(bool isMobile) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_error != null) {
+      return Center(
+        child: Text(
+          "Error: $_error",
+          style: const TextStyle(color: Colors.white),
+        ),
+      );
+    }
+
+    if (_filteredEvents.isEmpty) {
+      return Center(
+        child: Text(
+          _searchController.text.trim().isEmpty
+              ? "No events found"
+              : "No events match your search",
+          style: const TextStyle(color: Colors.white),
+        ),
+      );
+    }
+
+    return Theme(
+      data: ThemeData(
+        scrollbarTheme: ScrollbarThemeData(
+          thumbColor: WidgetStateProperty.all(
+            const Color(0xFFF1F1F6).withValues(alpha: 0.2),
+          ),
+          trackColor: WidgetStateProperty.all(Colors.transparent),
+          radius: const Radius.circular(12),
+          thickness: WidgetStateProperty.all(isMobile ? 4 : 8),
+        ),
+      ),
+      child: Scrollbar(
+        controller: _scrollController,
+        thumbVisibility: true,
+        thickness: isMobile ? 4 : 8,
+        radius: const Radius.circular(12),
+        child: SingleChildScrollView(
+          controller: _scrollController,
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.only(bottom: 50, right: 10),
+          child: Column(
+            children: _filteredEvents.map((event) {
+              return Column(
+                children: [
+                  EventCard(
+                    title: event['title'] ?? 'No Title',
+                    date: event['date_str'] ?? '',
+                    location: event['location'] ?? '',
+                    imageUrl: event['image_url'] ?? '',
+                    logoUrl: event['logo_url'],
+                    eventStartTime:
+                        DateTime.tryParse(event['start_time'] ?? '') ??
+                        DateTime.now(),
+                    onTap: () {
+                      final id = event['id'];
+                      if (id != null) {
+                        context.go('/events/$id');
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text("Event ID missing"),
+                          ),
+                        );
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 25),
+                ],
+              );
+            }).toList(),
+          ),
         ),
       ),
     );
