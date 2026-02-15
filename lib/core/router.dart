@@ -38,6 +38,7 @@ import '../features/transfer/ui/transfer_page.dart';
 import '../features/visa/ui/visa_application_form_page.dart';
 import '../features/visa/ui/visa_status_page.dart';
 import '../features/visa/ui/visa_details_page.dart';
+import '../shared/widgets/legal_document_page.dart';
 import 'error_page.dart';
 
 GoRouter createRouter(AuthService authService) {
@@ -60,6 +61,7 @@ GoRouter createRouter(AuthService authService) {
       final isVerifyingEmail = location.startsWith('/verify-email');
       final isForgotPassword = location.startsWith('/forgot-password');
       final isResetPassword = location.startsWith('/reset-password');
+      final isLegalPage = location.startsWith('/legal');
 
       if (!isAuthenticated &&
           !isLoggingIn &&
@@ -67,7 +69,8 @@ GoRouter createRouter(AuthService authService) {
           !isVerifyingCode &&
           !isVerifyingEmail &&
           !isForgotPassword &&
-          !isResetPassword) {
+          !isResetPassword &&
+          !isLegalPage) {
         return '/login';
       }
 
@@ -78,6 +81,11 @@ GoRouter createRouter(AuthService authService) {
       return null;
     },
     routes: [
+      GoRoute(
+        path: '/legal/:docType',
+        builder: (context, state) =>
+            LegalDocumentPage(docType: state.pathParameters['docType']!),
+      ),
       GoRoute(path: '/login', builder: (context, state) => const LoginPage()),
       GoRoute(
         path: '/forgot-password',

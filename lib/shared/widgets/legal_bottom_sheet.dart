@@ -74,6 +74,8 @@ class _LegalBottomSheetState extends State<LegalBottomSheet> {
         return 'Privacy Policy';
       case 'REFUND':
         return 'Refund Policy';
+      case 'COOKIES':
+        return 'Cookies Policy';
       default:
         return 'Legal Document';
     }

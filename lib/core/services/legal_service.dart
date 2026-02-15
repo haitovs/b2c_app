@@ -25,14 +25,14 @@ class LegalDocument {
   }
 }
 
-/// Service for fetching legal documents (Terms, Privacy, Refund) from the API.
+/// Service for fetching legal documents (Terms, Privacy, Refund, Cookies) from the API.
 class LegalService {
   final ApiClient _api;
 
   LegalService(AuthService authService) : _api = ApiClient(authService);
 
   /// Fetch a legal document by type.
-  /// [docType] should be one of: TERMS, PRIVACY, REFUND
+  /// [docType] should be one of: TERMS, PRIVACY, REFUND, COOKIES
   Future<LegalDocument?> getDocument(String docType) async {
     final result = await _api.get<Map<String, dynamic>>(
       '/api/v1/legal/${docType.toUpperCase()}',

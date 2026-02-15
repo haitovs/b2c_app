@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/app_theme.dart';
 import 'hover_text.dart';
@@ -20,7 +21,7 @@ class AuthFooter extends StatelessWidget {
         MouseRegion(
           cursor: SystemMouseCursors.click,
           child: GestureDetector(
-            onTap: () {},
+            onTap: () => context.push('/legal/PRIVACY'),
             child: HoverText(
               text: "Privacy Policy",
               baseStyle: AppTextStyles.footer,
@@ -32,7 +33,7 @@ class AuthFooter extends StatelessWidget {
         MouseRegion(
           cursor: SystemMouseCursors.click,
           child: GestureDetector(
-            onTap: () {},
+            onTap: () => context.push('/legal/COOKIES'),
             child: HoverText(
               text: "Cookies",
               baseStyle: AppTextStyles.footer,
