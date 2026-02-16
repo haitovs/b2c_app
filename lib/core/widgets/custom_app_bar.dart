@@ -117,7 +117,7 @@ class CustomAppBar extends StatelessWidget {
             height: isMobile ? 40 : 50,
             alignment: Alignment.centerLeft,
             child: Image.asset(
-              'assets/login.png',
+              'assets/logo.png',
               fit: BoxFit.contain,
               errorBuilder: (context, error, stackTrace) =>
                   const Icon(Icons.error, color: Colors.white),
