@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 class EventCard extends StatefulWidget {
   final String title;
@@ -100,13 +101,13 @@ class _EventCardState extends State<EventCard> {
     );
   }
 
-  Widget _buildInfoRow(IconData icon, String text) {
+  Widget _buildInfoRow(String iconPath, String text) {
     return Row(
       children: [
-        Icon(
-          icon,
-          size: 20,
-          color: const Color(0xFF5460CD), // Primary Blue/Purple color
+        SvgPicture.asset(
+          iconPath,
+          width: 20,
+          height: 20,
         ),
         const SizedBox(width: 10),
         Expanded(
@@ -186,9 +187,9 @@ class _EventCardState extends State<EventCard> {
                   ],
                 ),
                 const SizedBox(height: 20),
-                _buildInfoRow(Icons.calendar_today_outlined, widget.date),
+                _buildInfoRow('assets/event_calendar/date.svg', widget.date),
                 const SizedBox(height: 10),
-                _buildInfoRow(Icons.location_on_outlined, widget.location),
+                _buildInfoRow('assets/event_calendar/location.svg', widget.location),
               ],
             ),
           ),
@@ -319,9 +320,9 @@ class _EventCardState extends State<EventCard> {
                 ],
               ),
               const SizedBox(height: 20),
-              _buildInfoRow(Icons.calendar_today_outlined, widget.date),
+              _buildInfoRow('assets/event_calendar/date.svg', widget.date),
               const SizedBox(height: 10),
-              _buildInfoRow(Icons.location_on_outlined, widget.location),
+              _buildInfoRow('assets/event_calendar/location.svg', widget.location),
             ],
           ),
         ),
