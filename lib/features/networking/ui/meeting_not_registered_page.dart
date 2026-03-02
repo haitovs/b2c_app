@@ -145,8 +145,8 @@ class _MeetingNotRegisteredPageState extends State<MeetingNotRegisteredPage> {
           // Optional: Button to go to registration
           OutlinedButton(
             onPressed: () {
-              // Navigate to registration page
-              context.push('/events/${widget.eventId}/registration');
+              // Navigate to visa application page (temporarily replaces registration)
+              context.push('/events/${widget.eventId}/visa-apply');
             },
             style: OutlinedButton.styleFrom(
               foregroundColor: const Color(0xFF3C4494),
@@ -157,7 +157,7 @@ class _MeetingNotRegisteredPageState extends State<MeetingNotRegisteredPage> {
               padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 14),
             ),
             child: Text(
-              'Go to Registration',
+              'Go to Visa Application',
               style: GoogleFonts.roboto(
                 fontSize: 16,
                 fontWeight: FontWeight.w500,

@@ -273,11 +273,11 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
 
     // Menu Items - Registration first, then items requiring registration, then always-available items
     final menuItems = [
-      // REGISTRATION - First position, always accessible
+      // VISA APPLICATION - First position, always accessible (temporarily replaces Registration)
       {
         'icon': 'registration.png',
-        'label': l10n.registration,
-        'route': '/events/${widget.eventId}/registration',
+        'label': 'Visa Application',
+        'route': '/events/${widget.eventId}/visa-apply',
         'isRegistrationButton': true,
       },
       // Items requiring registration

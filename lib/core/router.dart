@@ -291,12 +291,22 @@ GoRouter createRouter(AuthService authService) {
             builder: (context, state) =>
                 FeedbackPage(eventId: state.pathParameters['id']!),
           ),
-          // Registration route
+          // Registration route (kept for backward compatibility)
           GoRoute(
             path: 'registration',
             builder: (context, state) {
               final idStr = state.pathParameters['id']!;
               return EventRegistrationPage(eventId: int.tryParse(idStr) ?? 0);
+            },
+          ),
+          // Visa Application standalone route (temporary - replaces registration button)
+          GoRoute(
+            path: 'visa-apply',
+            builder: (context, state) {
+              final idStr = state.pathParameters['id']!;
+              return VisaApplicationFormPage(
+                eventId: int.tryParse(idStr) ?? 0,
+              );
             },
           ),
           // Transfer route
