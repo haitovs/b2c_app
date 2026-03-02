@@ -272,16 +272,40 @@ class VisaDetailsPage extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
                     _buildDetailRow(
+                      'Gender',
+                      visa['gender']?.toString() ?? 'N/A',
+                    ),
+                    _buildDetailRow(
+                      "Father's Name",
+                      visa['father_name']?.toString() ?? 'N/A',
+                    ),
+                    _buildDetailRow(
+                      'Surname at Birth',
+                      visa['surname_at_birth']?.toString() ?? 'N/A',
+                    ),
+                    _buildDetailRow(
                       'Place of Birth',
                       visa['place_of_birth']?.toString() ?? 'N/A',
+                    ),
+                    _buildDetailRow(
+                      'Country of Birth',
+                      visa['country_of_birth']?.toString() ?? 'N/A',
                     ),
                     _buildDetailRow(
                       'Citizenship',
                       visa['citizenship']?.toString() ?? 'N/A',
                     ),
                     _buildDetailRow(
+                      'Email',
+                      visa['email']?.toString() ?? 'N/A',
+                    ),
+                    _buildDetailRow(
                       'Phone Number',
                       visa['phone_number']?.toString() ?? 'N/A',
+                    ),
+                    _buildDetailRow(
+                      'Type of Passport',
+                      visa['type_of_passport']?.toString() ?? 'N/A',
                     ),
                     _buildDetailRow(
                       'Passport Number',
@@ -294,6 +318,10 @@ class VisaDetailsPage extends StatelessWidget {
                     _buildDetailRow(
                       'Marital Status',
                       visa['marital_status']?.toString() ?? 'N/A',
+                    ),
+                    _buildDetailRow(
+                      'Planned Residential Address',
+                      visa['planned_residential_address']?.toString() ?? 'N/A',
                     ),
                     const SizedBox(height: 24),
 

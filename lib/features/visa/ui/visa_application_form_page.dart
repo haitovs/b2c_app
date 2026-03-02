@@ -17,12 +17,12 @@ import '../services/visa_service.dart';
 /// Visa Application Form Page matching Figma design
 class VisaApplicationFormPage extends StatefulWidget {
   final int eventId;
-  final String participantId;
+  final String? participantId;
 
   const VisaApplicationFormPage({
     super.key,
     required this.eventId,
-    required this.participantId,
+    this.participantId,
   });
 
   @override
@@ -41,44 +41,46 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
   // Personal Information Controllers
   final _nameController = TextEditingController();
   final _surnameController = TextEditingController();
+  final _fatherNameController = TextEditingController();
+  final _surnameAtBirthController = TextEditingController();
   final _placeOfBirthController = TextEditingController();
+  final _countryOfBirthController = TextEditingController();
   final _citizenshipController = TextEditingController();
-  final _passportSeriesController = TextEditingController();
-  final _passportDateIssueController = TextEditingController();
+  final _emailController = TextEditingController();
+  String _phoneNumberE164 = '';
+  String? _gender;
+
+  // Passport Controllers
+  final _typeOfPassportController = TextEditingController();
+  final _passportNumberController = TextEditingController();
+  final _passportIssuingCountryController = TextEditingController();
+
+  // Professional/Academic Controllers
   final _educationController = TextEditingController();
   final _specialtyController = TextEditingController();
-  final _homeAddressController = TextEditingController();
-  String _phoneNumberE164 = ''; // Store phone in E.164 format
-  final _passportNumberController = TextEditingController();
   final _placeOfStudyController = TextEditingController();
   final _jobTitleController = TextEditingController();
-
-  // NEW: Missing backend fields
-  final _homeCityController = TextEditingController();
-  final _homeCountryController = TextEditingController();
-  final _homePostalCodeController = TextEditingController();
-  final _passportIssuingCountryController = TextEditingController();
   final _employerNameController = TextEditingController();
 
+  // Residential Controllers
+  final _homeAddressController = TextEditingController();
+  final _plannedResidentialAddressController = TextEditingController();
+
+  // Date fields
   DateTime? _dateOfBirth;
   DateTime? _passportDateIssue;
-  DateTime? _passportExpiry; // Changed from text to date
+  DateTime? _passportExpiry;
+
+  // Photo
   File? _photoFile;
-  Uint8List? _photoBytes; // For web support
+  Uint8List? _photoBytes;
 
   // Submission state
   bool _isSubmitting = false;
 
-  // Marital Status
+  // Marital Status & Relatives
   String _maritalStatus = 'single'; // 'single' or 'married'
-  final _spouseFullNameController = TextEditingController();
-  String _spouseRelationship = 'Wife';
-  final _spousePlaceOfBirthController = TextEditingController();
-  DateTime? _spouseDateOfBirth;
-  final _spouseCitizenshipController = TextEditingController();
-
-  // Children
-  final List<Map<String, dynamic>> _children = [];
+  final List<Map<String, dynamic>> _relatives = [];
 
   bool _confirmationChecked = false;
 
@@ -86,27 +88,30 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
   void dispose() {
     _nameController.dispose();
     _surnameController.dispose();
+    _fatherNameController.dispose();
+    _surnameAtBirthController.dispose();
     _placeOfBirthController.dispose();
+    _countryOfBirthController.dispose();
     _citizenshipController.dispose();
-    _passportSeriesController.dispose();
-    _passportDateIssueController.dispose();
+    _emailController.dispose();
+    _typeOfPassportController.dispose();
+    _passportNumberController.dispose();
+    _passportIssuingCountryController.dispose();
     _educationController.dispose();
     _specialtyController.dispose();
-    _homeAddressController.dispose();
-    // _phoneNumberE164 is a String, no need to dispose
-    _passportNumberController.dispose();
-    // REMOVED DUPLICATE: _passportDateIssueController.dispose();
     _placeOfStudyController.dispose();
     _jobTitleController.dispose();
-    _homeCityController.dispose();
-    _homeCountryController.dispose();
-    _homePostalCodeController.dispose();
-    _passportIssuingCountryController.dispose();
     _employerNameController.dispose();
-    _spouseFullNameController.dispose();
-    _spousePlaceOfBirthController.dispose();
-    _spouseCitizenshipController.dispose();
-    // REMOVED DUPLICATE: _spouseCitizenshipController.dispose();
+    _homeAddressController.dispose();
+    _plannedResidentialAddressController.dispose();
+    for (final rel in _relatives) {
+      (rel['firstName'] as TextEditingController).dispose();
+      (rel['lastName'] as TextEditingController).dispose();
+      (rel['fatherName'] as TextEditingController).dispose();
+      (rel['middleName'] as TextEditingController).dispose();
+      (rel['surnameAtBirth'] as TextEditingController).dispose();
+      (rel['citizenship'] as TextEditingController).dispose();
+    }
     super.dispose();
   }
 
@@ -122,52 +127,53 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
     try {
       if (!mounted) return;
 
+      if (widget.participantId == null) {
+        setState(() => _isLoading = false);
+        return;
+      }
+
       final visaService = context.read<VisaService>();
-      final visa = await visaService.getMyVisa(widget.participantId);
+      final visa = await visaService.getMyVisa(widget.participantId!);
 
       if (!mounted) return;
 
-      // Check status immediately
       final status = visa['status'] as String? ?? 'NOT_STARTED';
 
-      // If status is not FILL_OUT or NOT_STARTED or DECLINED, we should not be here
-      // Redirect to status or details page
       if (status == 'PENDING') {
         if (mounted) {
           context.replace(
-            '/events/${widget.eventId}/visa/status/${widget.participantId}',
+            '/events/${widget.eventId}/visa/status/${widget.participantId!}',
           );
         }
         return;
       }
 
-      if (status == 'APPROVED' ||
-          status == 'DECLINED' && visa['decline_reason'] == null) {
-        // Note: DECLINED usually allows retry, but if we treat it as read-only for now:
-        // For now, allow DECLINED to be edited.
-        if (status == 'APPROVED') {
-          if (mounted) {
-            context.replace(
-              '/events/${widget.eventId}/visa/details/${widget.participantId}',
-            );
-          }
-          return;
+      if (status == 'APPROVED') {
+        if (mounted) {
+          context.replace(
+            '/events/${widget.eventId}/visa/details/${widget.participantId!}',
+          );
         }
+        return;
       }
 
       // Pre-fill form data
-      // Visa applicant's name (separate from participant)
       _nameController.text = visa['first_name'] ?? '';
       _surnameController.text = visa['last_name'] ?? '';
-
-      _citizenshipController.text = visa['citizenship'] ?? '';
+      _fatherNameController.text = visa['father_name'] ?? '';
+      _surnameAtBirthController.text = visa['surname_at_birth'] ?? '';
+      _gender = visa['gender'];
       _placeOfBirthController.text = visa['place_of_birth'] ?? '';
+      _countryOfBirthController.text = visa['country_of_birth'] ?? '';
+      _citizenshipController.text = visa['citizenship'] ?? '';
+      _emailController.text = visa['email'] ?? '';
+      _phoneNumberE164 = visa['phone_number'] ?? '';
       if (visa['date_of_birth'] != null) {
         _dateOfBirth = DateTime.parse(visa['date_of_birth']);
       }
-      _phoneNumberE164 = visa['phone_number'] ?? '';
 
-      _passportSeriesController.text = visa['passport_series'] ?? '';
+      // Passport
+      _typeOfPassportController.text = visa['type_of_passport'] ?? '';
       _passportNumberController.text = visa['passport_number'] ?? '';
       if (visa['passport_date_of_issue'] != null) {
         _passportDateIssue = DateTime.parse(visa['passport_date_of_issue']);
@@ -178,58 +184,73 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
       _passportIssuingCountryController.text =
           visa['passport_issuing_country'] ?? '';
 
+      // Professional
       _educationController.text = visa['education_level'] ?? '';
       _placeOfStudyController.text = visa['place_of_study'] ?? '';
       _specialtyController.text = visa['specialty'] ?? '';
       _jobTitleController.text = visa['job_title'] ?? '';
       _employerNameController.text = visa['employer_name'] ?? '';
 
+      // Residential
       _homeAddressController.text = visa['home_address'] ?? '';
-      _homeCityController.text = visa['home_city'] ?? '';
-      _homeCountryController.text = visa['home_country'] ?? '';
-      _homePostalCodeController.text = visa['home_postal_code'] ?? '';
+      _plannedResidentialAddressController.text =
+          visa['planned_residential_address'] ?? '';
 
       // Marital Status
       if (visa['marital_status'] != null) {
         _maritalStatus = (visa['marital_status'] as String).toLowerCase();
       }
 
-      if (_maritalStatus == 'married') {
-        _spouseFullNameController.text =
-            '${visa['spouse_first_name'] ?? ''} ${visa['spouse_last_name'] ?? ''}'
-                .trim();
-        _spouseRelationship = visa['spouse_relationship'] ?? 'Wife';
-        _spousePlaceOfBirthController.text =
-            visa['spouse_place_of_birth'] ?? '';
-        if (visa['spouse_date_of_birth'] != null) {
-          _spouseDateOfBirth = DateTime.parse(visa['spouse_date_of_birth']);
-        }
-        _spouseCitizenshipController.text = visa['spouse_citizenship'] ?? '';
-      }
-
-      // Children
-      final childrenList = visa['children'] as List<dynamic>?;
-      if (childrenList != null) {
-        for (var child in childrenList) {
-          _children.add({
-            'fullName': TextEditingController(
-              text: '${child['first_name'] ?? ''} ${child['last_name'] ?? ''}'
-                  .trim(),
-            ),
-            'placeOfBirth': TextEditingController(
-              text: child['place_of_birth'] ?? '',
-            ),
-            'citizenship': TextEditingController(
-              text: child['citizenship'] ?? '',
-            ),
-            'dateOfBirth': child['date_of_birth'] != null
-                ? DateTime.parse(child['date_of_birth'])
+      // Load relatives from unified array (with fallback to legacy)
+      final relativesList = visa['relatives'] as List<dynamic>?;
+      if (relativesList != null && relativesList.isNotEmpty) {
+        for (var rel in relativesList) {
+          _relatives.add(_createRelativeEntry(
+            relationship: rel['relationship'] ?? 'Wife',
+            firstName: rel['first_name'] ?? '',
+            lastName: rel['last_name'] ?? '',
+            fatherName: rel['father_name'] ?? '',
+            middleName: rel['middle_name'] ?? '',
+            surnameAtBirth: rel['surname_at_birth'] ?? '',
+            citizenship: rel['citizenship'] ?? '',
+            dateOfBirth: rel['date_of_birth'] != null
+                ? DateTime.parse(rel['date_of_birth'])
                 : null,
-          });
+          ));
+        }
+      } else if (_maritalStatus == 'married') {
+        // Fallback: construct from legacy spouse fields
+        final spouseFirst = visa['spouse_first_name'] ?? '';
+        final spouseLast = visa['spouse_last_name'] ?? '';
+        if (spouseFirst.isNotEmpty || spouseLast.isNotEmpty) {
+          _relatives.add(_createRelativeEntry(
+            relationship: visa['spouse_relationship'] ?? 'Wife',
+            firstName: spouseFirst,
+            lastName: spouseLast,
+            citizenship: visa['spouse_citizenship'] ?? '',
+            dateOfBirth: visa['spouse_date_of_birth'] != null
+                ? DateTime.parse(visa['spouse_date_of_birth'])
+                : null,
+          ));
+        }
+        // Fallback: construct from legacy children
+        final childrenList = visa['children'] as List<dynamic>?;
+        if (childrenList != null) {
+          for (var child in childrenList) {
+            _relatives.add(_createRelativeEntry(
+              relationship: 'Son',
+              firstName: child['first_name'] ?? '',
+              lastName: child['last_name'] ?? '',
+              citizenship: child['citizenship'] ?? '',
+              dateOfBirth: child['date_of_birth'] != null
+                  ? DateTime.parse(child['date_of_birth'])
+                  : null,
+            ));
+          }
         }
       }
 
-      // Pre-fill from participant data if visa fields are empty (new application)
+      // Pre-fill from participant data if visa fields are empty
       if (_nameController.text.isEmpty && _surnameController.text.isEmpty) {
         await _prefillFromParticipant();
       }
@@ -247,7 +268,28 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
     }
   }
 
-  /// Fetch participant data and pre-fill available fields into the visa form
+  Map<String, dynamic> _createRelativeEntry({
+    String relationship = 'Wife',
+    String firstName = '',
+    String lastName = '',
+    String fatherName = '',
+    String middleName = '',
+    String surnameAtBirth = '',
+    String citizenship = '',
+    DateTime? dateOfBirth,
+  }) {
+    return {
+      'relationship': relationship,
+      'firstName': TextEditingController(text: firstName),
+      'lastName': TextEditingController(text: lastName),
+      'fatherName': TextEditingController(text: fatherName),
+      'middleName': TextEditingController(text: middleName),
+      'surnameAtBirth': TextEditingController(text: surnameAtBirth),
+      'citizenship': TextEditingController(text: citizenship),
+      'dateOfBirth': dateOfBirth,
+    };
+  }
+
   Future<void> _prefillFromParticipant() async {
     try {
       final authService = context.read<AuthService>();
@@ -294,13 +336,11 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
 
     if (image != null) {
       if (kIsWeb) {
-        // For web, read as bytes
         final bytes = await image.readAsBytes();
         setState(() {
           _photoBytes = bytes;
         });
       } else {
-        // For mobile, use file
         setState(() {
           _photoFile = File(image.path);
         });
@@ -325,24 +365,22 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
     }
   }
 
-  void addChild() {
+  void _addRelative() {
     setState(() {
-      _children.add({
-        'fullName': TextEditingController(),
-        'relationship': 'Son',
-        'placeOfBirth': TextEditingController(),
-        'dateOfBirth': null,
-        'citizenship': TextEditingController(),
-      });
+      _relatives.add(_createRelativeEntry());
     });
   }
 
-  void removeChild(int index) {
+  void _removeRelative(int index) {
     setState(() {
-      _children[index]['fullName'].dispose();
-      _children[index]['placeOfBirth'].dispose();
-      _children[index]['citizenship'].dispose();
-      _children.removeAt(index);
+      final rel = _relatives[index];
+      (rel['firstName'] as TextEditingController).dispose();
+      (rel['lastName'] as TextEditingController).dispose();
+      (rel['fatherName'] as TextEditingController).dispose();
+      (rel['middleName'] as TextEditingController).dispose();
+      (rel['surnameAtBirth'] as TextEditingController).dispose();
+      (rel['citizenship'] as TextEditingController).dispose();
+      _relatives.removeAt(index);
     });
   }
 
@@ -370,46 +408,40 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
         if (!mounted) return;
         final visaService = context.read<VisaService>();
         photoUrl = await visaService.uploadPhoto(
-          participantId: widget.participantId,
+          participantId: widget.participantId ?? 'self',
           photoData: kIsWeb ? _photoBytes : _photoFile,
         );
       }
 
-      // 2. Prepare data for backend
+      // 2. Prepare data
       if (!mounted) return;
 
-      // Split spouse name
-      final spouseFullName = _spouseFullNameController.text.trim();
-      final spouseNameParts = spouseFullName.split(' ');
-      final spouseFirstName = spouseNameParts.isNotEmpty
-          ? spouseNameParts.first
-          : '';
-      final spouseLastName = spouseNameParts.length > 1
-          ? spouseNameParts.sublist(1).join(' ')
-          : '';
-
       final formData = <String, dynamic>{
-        // Personal Information - Visa Applicant's Name
+        // Personal Information
         'first_name': _nameController.text.trim(),
         'last_name': _surnameController.text.trim(),
-
-        // Personal Information - Other Details
+        'father_name': _fatherNameController.text.trim(),
+        'surname_at_birth': _surnameAtBirthController.text.trim(),
+        'gender': _gender,
         'place_of_birth': _placeOfBirthController.text.trim(),
+        'country_of_birth': _countryOfBirthController.text.trim(),
         if (_dateOfBirth != null)
           'date_of_birth': _dateOfBirth!.toIso8601String().split('T')[0],
         'citizenship': _citizenshipController.text.trim(),
-        'phone_number': _phoneNumberE164, // E.164 format
+        'email': _emailController.text.trim(),
+        'phone_number': _phoneNumberE164,
+
         // Passport Details
-        'passport_series': _passportSeriesController.text.trim(),
+        'type_of_passport': _typeOfPassportController.text.trim(),
         'passport_number': _passportNumberController.text.trim(),
         if (_passportDateIssue != null)
-          'passport_date_of_issue': _passportDateIssue!.toIso8601String().split(
-            'T',
-          )[0],
+          'passport_date_of_issue':
+              _passportDateIssue!.toIso8601String().split('T')[0],
         if (_passportExpiry != null)
-          'passport_expiry': _passportExpiry!.toIso8601String().split('T')[0],
-        'passport_issuing_country': _passportIssuingCountryController.text
-            .trim(),
+          'passport_expiry':
+              _passportExpiry!.toIso8601String().split('T')[0],
+        'passport_issuing_country':
+            _passportIssuingCountryController.text.trim(),
 
         // Professional/Academic
         'education_level': _educationController.text.trim(),
@@ -420,43 +452,32 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
 
         // Residential
         'home_address': _homeAddressController.text.trim(),
-        'home_city': _homeCityController.text.trim(),
-        'home_country': _homeCountryController.text.trim(),
-        'home_postal_code': _homePostalCodeController.text.trim(),
+        'planned_residential_address':
+            _plannedResidentialAddressController.text.trim(),
 
         // Photo
         if (photoUrl != null) 'photo_url': photoUrl,
 
-        // Marital Status (capitalize)
+        // Marital Status
         'marital_status': _maritalStatus == 'single' ? 'Single' : 'Married',
 
-        if (_maritalStatus == 'married') ...{
-          'spouse_first_name': spouseFirstName,
-          'spouse_last_name': spouseLastName,
-          'spouse_relationship': _spouseRelationship,
-          'spouse_place_of_birth': _spousePlaceOfBirthController.text.trim(),
-          if (_spouseDateOfBirth != null)
-            'spouse_date_of_birth': _spouseDateOfBirth!.toIso8601String().split(
-              'T',
-            )[0],
-          'spouse_citizenship': _spouseCitizenshipController.text.trim(),
-        },
-
-        // Children
-        'children': _children.map((child) {
-          final childFullName = child['fullName'].text.trim();
-          final childNameParts = childFullName.split(' ');
+        // Unified relatives array
+        'relatives': _relatives.map((rel) {
           return {
-            'first_name': childNameParts.isNotEmpty ? childNameParts.first : '',
-            'last_name': childNameParts.length > 1
-                ? childNameParts.sublist(1).join(' ')
-                : '',
-            'place_of_birth': child['placeOfBirth'].text.trim(),
-            if (child['dateOfBirth'] != null)
-              'date_of_birth': child['dateOfBirth'].toIso8601String().split(
-                'T',
-              )[0],
-            'citizenship': child['citizenship'].text.trim(),
+            'relationship': rel['relationship'],
+            'first_name': (rel['firstName'] as TextEditingController).text.trim(),
+            'last_name': (rel['lastName'] as TextEditingController).text.trim(),
+            'father_name':
+                (rel['fatherName'] as TextEditingController).text.trim(),
+            'middle_name':
+                (rel['middleName'] as TextEditingController).text.trim(),
+            'surname_at_birth':
+                (rel['surnameAtBirth'] as TextEditingController).text.trim(),
+            'citizenship':
+                (rel['citizenship'] as TextEditingController).text.trim(),
+            if (rel['dateOfBirth'] != null)
+              'date_of_birth':
+                  (rel['dateOfBirth'] as DateTime).toIso8601String().split('T')[0],
           };
         }).toList(),
       };
@@ -465,13 +486,13 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
       if (!mounted) return;
       final visaService = context.read<VisaService>();
       await visaService.updateMyVisa(
-        participantId: widget.participantId,
+        participantId: widget.participantId ?? 'self',
         data: formData,
       );
 
       // 4. Submit for review
       if (!mounted) return;
-      await visaService.submitMyVisa(widget.participantId);
+      await visaService.submitMyVisa(widget.participantId ?? 'self');
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -501,7 +522,6 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Show loading indicator while fetching visa data
     if (_isLoading) {
       return const Scaffold(
         backgroundColor: Color(0xFF3C4494),
@@ -509,7 +529,6 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
       );
     }
 
-    // Show error screen if loading failed
     if (_errorMessage != null) {
       return Scaffold(
         backgroundColor: const Color(0xFF3C4494),
@@ -551,7 +570,6 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
       );
     }
 
-    // Main form UI
     return Scaffold(
       backgroundColor: const Color(0xFF3C4494),
       appBar: AppBar(
@@ -632,14 +650,14 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
                   ),
                   const SizedBox(height: 32),
 
-                  // Personal Information Section
+                  // Form Fields
                   LayoutBuilder(
                     builder: (context, constraints) {
                       final isWide = constraints.maxWidth > 600;
                       if (isWide) {
-                        return buildTwoColumnLayout();
+                        return _buildTwoColumnLayout();
                       } else {
-                        return buildSingleColumnLayout();
+                        return _buildSingleColumnLayout();
                       }
                     },
                   ),
@@ -657,75 +675,69 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Marital Status Selector
-                  Row(
-                    children: [
-                      Expanded(
-                        child: InkWell(
-                          onTap: () =>
-                              setState(() => _maritalStatus = 'single'),
-                          child: Row(
-                            children: [
-                              Radio<String>(
-                                value: 'single',
-                                groupValue: _maritalStatus,
-                                onChanged: (value) {
-                                  setState(() => _maritalStatus = value!);
-                                },
-                              ),
-                              const Text('Single'),
-                            ],
+                  // Yes/No Toggle
+                  RadioGroup<String>(
+                    groupValue: _maritalStatus,
+                    onChanged: (value) {
+                      setState(() => _maritalStatus = value!);
+                    },
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: InkWell(
+                            onTap: () =>
+                                setState(() => _maritalStatus = 'single'),
+                            child: const Row(
+                              children: [
+                                Radio<String>(value: 'single'),
+                                Text('No'),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                      Expanded(
-                        child: InkWell(
-                          onTap: () =>
-                              setState(() => _maritalStatus = 'married'),
-                          child: Row(
-                            children: [
-                              Radio<String>(
-                                value: 'married',
-                                groupValue: _maritalStatus,
-                                onChanged: (value) {
-                                  setState(() => _maritalStatus = value!);
-                                },
-                              ),
-                              const Text('Married'),
-                            ],
+                        Expanded(
+                          child: InkWell(
+                            onTap: () =>
+                                setState(() => _maritalStatus = 'married'),
+                            child: const Row(
+                              children: [
+                                Radio<String>(value: 'married'),
+                                Text('Yes'),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 16),
 
-                  // Show spouse fields only if married
-                  if (_maritalStatus == 'married') buildMaritalStatusSection(),
-
-                  const SizedBox(height: 32),
-
-                  // Children Section
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Children:',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
+                  // Relatives section (shown when married)
+                  if (_maritalStatus == 'married') ...[
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Relatives:',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.add_box_outlined),
-                        onPressed: addChild,
-                        color: const Color(0xFF3C4494),
-                      ),
-                    ],
-                  ),
-                  ..._children.asMap().entries.map((entry) {
-                    return buildChildSection(entry.key, entry.value);
-                  }),
+                        TextButton.icon(
+                          onPressed: _addRelative,
+                          icon: const Icon(Icons.add, size: 18),
+                          label: const Text('Add'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: const Color(0xFF3C4494),
+                          ),
+                        ),
+                      ],
+                    ),
+                    ..._relatives.asMap().entries.map((entry) {
+                      return _buildRelativeSection(entry.key, entry.value);
+                    }),
+                  ],
 
                   const SizedBox(height: 32),
 
@@ -787,28 +799,34 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
     );
   }
 
-  Widget buildTwoColumnLayout() {
+  Widget _buildTwoColumnLayout() {
     return Column(
       children: [
         // Section 1: Personal Information
-        buildSectionHeader('Şahsy maglumatlar / Personal Information'),
+        _buildSectionHeader('Şahsy maglumatlar / Personal Information'),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
               child: Column(
                 children: [
-                  buildTextField('Name:', _nameController, 'John', true),
-                  buildTextField('Surname:', _surnameController, 'Smith', true),
-                  buildTextField(
-                    'Place of birth:',
-                    _placeOfBirthController,
-                    'New York',
+                  _buildTextField('Name:', _nameController, 'John', true),
+                  _buildTextField('Surname:', _surnameController, 'Smith', true),
+                  _buildTextField(
+                    "Father's name:",
+                    _fatherNameController,
+                    'Robert',
                     true,
                   ),
-                  buildTextField(
-                    'Citizenship:',
-                    _citizenshipController,
+                  _buildGenderDropdown(),
+                  _buildTextField(
+                    'Surname at birth:',
+                    _surnameAtBirthController,
+                    'Maiden name (if different)',
+                  ),
+                  _buildTextField(
+                    'Country of birth:',
+                    _countryOfBirthController,
                     'United States',
                     true,
                   ),
@@ -819,17 +837,21 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
             Expanded(
               child: Column(
                 children: [
-                  buildPhotoUpload(),
-                  buildDateField('Date of birth:', null, _dateOfBirth, (date) {
+                  _buildPhotoUpload(),
+                  _buildDateField('Date of birth:', null, _dateOfBirth, (date) {
                     setState(() => _dateOfBirth = date);
                   }, '1990-05-20'),
-                  PhoneInputField(
-                    initialPhone: _phoneNumberE164,
-                    labelText: 'Phone number:',
-                    hintText: '61444555',
-                    onChanged: (e164) {
-                      setState(() => _phoneNumberE164 = e164);
-                    },
+                  _buildTextField(
+                    'Citizenship:',
+                    _citizenshipController,
+                    'United States',
+                    true,
+                  ),
+                  _buildTextField(
+                    'Place of birth (City):',
+                    _placeOfBirthController,
+                    'New York',
+                    true,
                   ),
                 ],
               ),
@@ -838,25 +860,31 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
         ),
 
         // Section 2: Passport Details
-        buildSectionHeader('Passport maglumatlary / Passport Details'),
+        _buildSectionHeader('Passport maglumatlary / Passport Details'),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
               child: Column(
                 children: [
-                  buildTextField(
-                    'Passport series:',
-                    _passportSeriesController,
-                    'AB',
-                    true,
+                  _buildTextField(
+                    'Type of passport:',
+                    _typeOfPassportController,
+                    'Ordinary',
                   ),
-                  buildDateField(
+                  _buildDateField(
                     'Passport date issue:',
-                    _passportDateIssueController,
                     null,
-                    null,
+                    _passportDateIssue,
+                    (date) {
+                      setState(() => _passportDateIssue = date);
+                    },
                     '2020-01-15',
+                  ),
+                  _buildTextField(
+                    'Place of issue (country):',
+                    _passportIssuingCountryController,
+                    'United States',
                   ),
                 ],
               ),
@@ -865,13 +893,13 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
             Expanded(
               child: Column(
                 children: [
-                  buildTextField(
+                  _buildTextField(
                     'Passport number:',
                     _passportNumberController,
                     '1234567',
                     true,
                   ),
-                  buildDateField(
+                  _buildDateField(
                     'Passport validity period:',
                     null,
                     _passportExpiry,
@@ -880,47 +908,42 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
                     },
                     '2030-01-15',
                   ),
+                  _buildTextField(
+                    'Personal Address:',
+                    _homeAddressController,
+                    'Street, Building, Apt',
+                    true,
+                  ),
                 ],
               ),
             ),
           ],
         ),
 
+        // Email (full width)
+        _buildTextField('Email:', _emailController, 'john@example.com', true),
+
         // Section 3: Professional & Academic
-        buildSectionHeader('Hünär we bilim / Professional & Academic'),
+        _buildSectionHeader('Hünär we bilim / Professional & Academic'),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
               child: Column(
                 children: [
-                  buildTextField(
+                  _buildTextField(
                     'Education:',
                     _educationController,
-                    'Bachelor\'s Degree',
+                    "Bachelor's Degree",
                     true,
                   ),
-                  buildTextField(
-                    'Speciality:',
-                    _specialtyController,
-                    'Computer Science',
-                    true,
+                  _buildTextField(
+                    'Place of work (Company name):',
+                    _employerNameController,
+                    'Tech Corp',
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 24),
-            Expanded(
-              child: Column(
-                children: [
-                  buildTextField(
-                    'Place of study:',
-                    _placeOfStudyController,
-                    'Harvard University',
-                    true,
-                  ),
-                  buildTextField(
-                    'Job title:',
+                  _buildTextField(
+                    'Position:',
                     _jobTitleController,
                     'Software Engineer',
                     true,
@@ -928,153 +951,171 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
                 ],
               ),
             ),
-          ],
-        ),
-
-        // Section 4: Residential Information
-        buildSectionHeader('Ýaşaýan ýeri / Residential Information'),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Column(
-                children: [
-                  buildTextField(
-                    'Home Address:',
-                    _homeAddressController,
-                    'Köçe, jaý, kwartira / Street, Building, Apt',
-                    true,
-                  ),
-                  buildTextField(
-                    'Home City:',
-                    _homeCityController,
-                    'Aşgabat',
-                    true,
-                  ),
-                ],
-              ),
-            ),
             const SizedBox(width: 24),
             Expanded(
               child: Column(
                 children: [
-                  buildTextField(
-                    'Home Country:',
-                    _homeCountryController,
-                    'Türkmenistan',
+                  _buildTextField(
+                    'Speciality:',
+                    _specialtyController,
+                    'Computer Science',
+                    true,
+                  ),
+                  PhoneInputField(
+                    initialPhone: _phoneNumberE164,
+                    labelText: 'Personal mobile number:',
+                    hintText: '61444555',
+                    onChanged: (e164) {
+                      setState(() => _phoneNumberE164 = e164);
+                    },
+                  ),
+                  _buildTextField(
+                    'Place of education:',
+                    _placeOfStudyController,
+                    'Harvard University',
                     true,
                   ),
                 ],
               ),
             ),
           ],
+        ),
+
+        // Planned residential address (full width)
+        _buildTextField(
+          'Planned residential address:',
+          _plannedResidentialAddressController,
+          'Address during stay',
         ),
       ],
     );
   }
 
-  Widget buildSingleColumnLayout() {
+  Widget _buildSingleColumnLayout() {
     return Column(
       children: [
-        buildPhotoUpload(),
-        buildSectionHeader('Şahsy maglumatlar / Personal Information'),
-        buildTextField('Name:', _nameController, 'John', true),
-        buildTextField('Surname:', _surnameController, 'Smith', true),
-        buildTextField(
-          'Place of Birth:',
+        _buildPhotoUpload(),
+        _buildSectionHeader('Şahsy maglumatlar / Personal Information'),
+        _buildTextField('Name:', _nameController, 'John', true),
+        _buildTextField('Surname:', _surnameController, 'Smith', true),
+        _buildTextField(
+          "Father's name:",
+          _fatherNameController,
+          'Robert',
+          true,
+        ),
+        _buildGenderDropdown(),
+        _buildTextField(
+          'Surname at birth:',
+          _surnameAtBirthController,
+          'Maiden name (if different)',
+        ),
+        _buildTextField(
+          'Country of birth:',
+          _countryOfBirthController,
+          'United States',
+          true,
+        ),
+        _buildTextField(
+          'Place of birth (City):',
           _placeOfBirthController,
           'New York',
           true,
         ),
-        buildDateField('Date of birth:', null, _dateOfBirth, (date) {
+        _buildDateField('Date of birth:', null, _dateOfBirth, (date) {
           setState(() => _dateOfBirth = date);
         }, '1990-05-20'),
-        buildTextField(
+        _buildTextField(
           'Citizenship:',
           _citizenshipController,
           'United States',
           true,
         ),
+        _buildTextField('Email:', _emailController, 'john@example.com', true),
         PhoneInputField(
           initialPhone: _phoneNumberE164,
-          labelText: 'Phone number:',
+          labelText: 'Personal mobile number:',
           hintText: '61444555',
           onChanged: (e164) {
             setState(() => _phoneNumberE164 = e164);
           },
         ),
-        buildSectionHeader('Passport maglumatlary / Passport Details'),
-        buildTextField(
-          'Passport series:',
-          _passportSeriesController,
-          'AB',
-          true,
+        _buildSectionHeader('Passport maglumatlary / Passport Details'),
+        _buildTextField(
+          'Type of passport:',
+          _typeOfPassportController,
+          'Ordinary',
         ),
-        buildTextField(
+        _buildTextField(
           'Passport number:',
           _passportNumberController,
           '1234567',
           true,
         ),
-        buildDateField('Passport date issue:', null, _passportDateIssue, (
-          date,
-        ) {
+        _buildDateField('Passport date issue:', null, _passportDateIssue,
+            (date) {
           setState(() => _passportDateIssue = date);
         }, '2020-01-15'),
-        buildDateField('Passport expiry:', null, _passportExpiry, (date) {
-          setState(() => _passportExpiry = date);
-        }, '2030-01-15'),
-        buildTextField(
-          'Passport issuing country:',
+        _buildDateField(
+          'Passport validity period:',
+          null,
+          _passportExpiry,
+          (date) {
+            setState(() => _passportExpiry = date);
+          },
+          '2030-01-15',
+        ),
+        _buildTextField(
+          'Place of issue (country):',
           _passportIssuingCountryController,
           'United States',
         ),
-        buildSectionHeader('Hünär we bilim / Professional & Academic'),
-        buildTextField(
+        _buildTextField(
+          'Personal Address:',
+          _homeAddressController,
+          'Street, Building, Apt',
+          true,
+        ),
+        _buildSectionHeader('Hünär we bilim / Professional & Academic'),
+        _buildTextField(
           'Education:',
           _educationController,
-          'Bachelor\'s Degree',
+          "Bachelor's Degree",
           true,
         ),
-        buildTextField(
-          'Place of study:',
-          _placeOfStudyController,
-          'Harvard University',
-          true,
-        ),
-        buildTextField(
-          'Specialty:',
+        _buildTextField(
+          'Speciality:',
           _specialtyController,
           'Computer Science',
           true,
         ),
-        buildTextField(
-          'Job title:',
+        _buildTextField(
+          'Place of work (Company name):',
+          _employerNameController,
+          'Tech Corp',
+        ),
+        _buildTextField(
+          'Position:',
           _jobTitleController,
           'Software Engineer',
           true,
         ),
-        buildTextField('Employer name:', _employerNameController, 'Tech Corp'),
-        buildSectionHeader('Ýaşaýan ýeri / Residential Information'),
-        buildTextField(
-          'Home address:',
-          _homeAddressController,
-          'Köçe, jaý, kwartira / Street, Building, Apt',
+        _buildTextField(
+          'Place of education:',
+          _placeOfStudyController,
+          'Harvard University',
           true,
         ),
-        buildTextField('Home city:', _homeCityController, 'New York', true),
-        buildTextField(
-          'Home country:',
-          _homeCountryController,
-          'Türkmenistan',
-          true,
+        _buildTextField(
+          'Planned residential address:',
+          _plannedResidentialAddressController,
+          'Address during stay',
         ),
-        buildTextField('Home postal code:', _homePostalCodeController, '10001'),
       ],
     );
   }
 
-  Widget buildSectionHeader(String title) {
+  Widget _buildSectionHeader(String title) {
     return Padding(
       padding: const EdgeInsets.only(top: 24, bottom: 12),
       child: Text(
@@ -1088,7 +1129,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
     );
   }
 
-  Widget buildTextField(
+  Widget _buildTextField(
     String label,
     TextEditingController controller, [
     String? hintText,
@@ -1136,18 +1177,70 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
     );
   }
 
-  Widget buildDateField(
+  Widget _buildGenderDropdown() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Gender:',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+          ),
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey[300]!),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButtonFormField<String>(
+                initialValue: _gender,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.zero,
+                ),
+                hint: Text(
+                  'Select gender',
+                  style: TextStyle(color: Colors.grey[400], fontSize: 14),
+                ),
+                items: ['Male', 'Female'].map((String value) {
+                  return DropdownMenuItem<String>(
+                    value: value,
+                    child: Text(value),
+                  );
+                }).toList(),
+                onChanged: (String? newValue) {
+                  setState(() {
+                    _gender = newValue;
+                  });
+                },
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'This field is required';
+                  }
+                  return null;
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDateField(
     String label,
     TextEditingController? controller,
     DateTime? selectedDate, [
     Function(DateTime)? onDateSelected,
     String? hintText,
   ]) {
-    // Create a temporary controller if one wasn't provided
     final TextEditingController displayController =
         controller ?? TextEditingController();
 
-    // Set the text to the formatted date if a date is selected
     if (selectedDate != null && controller == null) {
       displayController.text = DateFormat('yyyy-MM-dd').format(selectedDate);
     }
@@ -1199,7 +1292,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
     );
   }
 
-  Widget buildPhotoUpload() {
+  Widget _buildPhotoUpload() {
     final hasImage = kIsWeb ? _photoBytes != null : _photoFile != null;
 
     return Padding(
@@ -1215,10 +1308,9 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Compact square photo preview with blue border
               Container(
                 width: 120,
-                height: 144, // 5:6 aspect ratio
+                height: 144,
                 decoration: BoxDecoration(
                   border: Border.all(
                     color: hasImage
@@ -1269,7 +1361,6 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
                       ),
               ),
               const SizedBox(width: 12),
-              // Upload button
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1305,91 +1396,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
     );
   }
 
-  Widget buildMaritalStatusSection() {
-    return Column(
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: buildTextField(
-                'Full name:',
-                _spouseFullNameController,
-                'Jane Smith',
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Relationship:',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-                  ),
-                  const SizedBox(height: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey[300]!),
-                      borderRadius: BorderRadius.circular(4),
-                      color: const Color(0xFFE8EAF6),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: _spouseRelationship,
-                        isExpanded: true,
-                        items: ['Wife', 'Husband'].map((String value) {
-                          return DropdownMenuItem<String>(
-                            value: value,
-                            child: Text(value),
-                          );
-                        }).toList(),
-                        onChanged: (String? newValue) {
-                          setState(() {
-                            _spouseRelationship = newValue!;
-                          });
-                        },
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        Row(
-          children: [
-            Expanded(
-              child: buildTextField(
-                'Place of birth:',
-                _spousePlaceOfBirthController,
-                'Los Angeles',
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: buildDateField(
-                'Date of birth:',
-                null,
-                _spouseDateOfBirth,
-                (date) {
-                  setState(() => _spouseDateOfBirth = date);
-                },
-                '1992-07-10',
-              ),
-            ),
-          ],
-        ),
-        buildTextField(
-          'Citizenship:',
-          _spouseCitizenshipController,
-          'United States',
-        ),
-      ],
-    );
-  }
-
-  Widget buildChildSection(int index, Map<String, dynamic> child) {
+  Widget _buildRelativeSection(int index, Map<String, dynamic> rel) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
@@ -1403,7 +1410,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Child ${index + 1}',
+                'Relative ${index + 1}',
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
@@ -1411,76 +1418,119 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
               ),
               IconButton(
                 icon: const Icon(Icons.delete_outline, color: Colors.red),
-                onPressed: () => removeChild(index),
+                onPressed: () => _removeRelative(index),
               ),
             ],
           ),
           const SizedBox(height: 8),
+
+          // Relationship dropdown
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Relationship:',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey[300]!),
+                    borderRadius: BorderRadius.circular(4),
+                    color: const Color(0xFFE8EAF6),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: rel['relationship'] as String,
+                      isExpanded: true,
+                      items: ['Wife', 'Husband', 'Daughter', 'Son']
+                          .map((String value) {
+                        return DropdownMenuItem<String>(
+                          value: value,
+                          child: Text(value),
+                        );
+                      }).toList(),
+                      onChanged: (String? newValue) {
+                        setState(() {
+                          rel['relationship'] = newValue!;
+                        });
+                      },
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Name row
           Row(
             children: [
-              Expanded(child: buildTextField('Full name:', child['fullName'])),
+              Expanded(
+                child: _buildTextField(
+                  'Name:',
+                  rel['firstName'] as TextEditingController,
+                ),
+              ),
               const SizedBox(width: 16),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Relationship:',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey[300]!),
-                        borderRadius: BorderRadius.circular(4),
-                        color: const Color(0xFFE8EAF6),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: child['relationship'],
-                          isExpanded: true,
-                          items: ['Son', 'Daughter'].map((String value) {
-                            return DropdownMenuItem<String>(
-                              value: value,
-                              child: Text(value),
-                            );
-                          }).toList(),
-                          onChanged: (String? newValue) {
-                            setState(() {
-                              child['relationship'] = newValue!;
-                            });
-                          },
-                        ),
-                      ),
-                    ),
-                  ],
+                child: _buildTextField(
+                  'Surname:',
+                  rel['lastName'] as TextEditingController,
                 ),
               ),
             ],
           ),
+
+          // Father's name & Middle name row
           Row(
             children: [
               Expanded(
-                child: buildTextField('Place of birth:', child['placeOfBirth']),
+                child: _buildTextField(
+                  "Father's name:",
+                  rel['fatherName'] as TextEditingController,
+                ),
               ),
               const SizedBox(width: 16),
               Expanded(
-                child: buildDateField(
+                child: _buildTextField(
+                  'Middle name:',
+                  rel['middleName'] as TextEditingController,
+                ),
+              ),
+            ],
+          ),
+
+          // Date of birth & Surname at birth
+          Row(
+            children: [
+              Expanded(
+                child: _buildDateField(
                   'Date of birth:',
                   null,
-                  child['dateOfBirth'],
+                  rel['dateOfBirth'] as DateTime?,
                   (date) {
-                    setState(() => child['dateOfBirth'] = date);
+                    setState(() => rel['dateOfBirth'] = date);
                   },
                 ),
               ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _buildTextField(
+                  'Surname at birth:',
+                  rel['surnameAtBirth'] as TextEditingController,
+                ),
+              ),
             ],
           ),
-          buildTextField('Citizenship:', child['citizenship']),
+
+          // Citizenship
+          _buildTextField(
+            'Citizenship:',
+            rel['citizenship'] as TextEditingController,
+          ),
         ],
       ),
     );
