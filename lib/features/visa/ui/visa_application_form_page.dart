@@ -1342,6 +1342,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
             width: 123, height: 154, label: 'Portrait photo',
             hasImage: kIsWeb ? _photoBytes != null : _photoFile != null,
             imageWidget: _buildPortraitImage(),
+            previewAsset: 'assets/visa_application/profile_preview.jpg',
             onUpload: _pickImage, onDelete: _deletePhoto,
           ),
           const SizedBox(width: 16),
@@ -1349,6 +1350,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
             width: 216, height: 154, label: 'Passport scan',
             hasImage: kIsWeb ? _passportScanBytes != null : _passportScanFile != null,
             imageWidget: _buildPassportScanImage(),
+            previewAsset: 'assets/visa_application/visa_preview.png',
             onUpload: _pickPassportScan, onDelete: _deletePassportScan,
           ),
         ],
@@ -1359,6 +1361,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
   Widget _buildPhotoBox({
     required double width, required double height, required String label,
     required bool hasImage, required Widget imageWidget,
+    required String previewAsset,
     required VoidCallback onUpload, required VoidCallback onDelete,
   }) {
     return Column(
@@ -1377,8 +1380,27 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
               ),
               child: hasImage
                   ? ClipRRect(borderRadius: BorderRadius.circular(4), child: imageWidget)
-                  : Center(child: Icon(Icons.image_outlined, size: 40, color: Colors.grey[300])),
+                  : ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: Opacity(
+                        opacity: 0.4,
+                        child: Image.asset(previewAsset, width: width, height: height, fit: BoxFit.cover),
+                      ),
+                    ),
             ),
+            if (!hasImage)
+              Positioned.fill(
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Text('Example', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+                  ),
+                ),
+              ),
             if (hasImage)
               Positioned(
                 top: 4, right: 4,
