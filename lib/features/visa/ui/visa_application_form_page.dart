@@ -171,7 +171,6 @@ class _VisaApplicationFormPageState
     for (final rel in _relatives) {
       (rel['firstName'] as TextEditingController).dispose();
       (rel['lastName'] as TextEditingController).dispose();
-      (rel['fatherName'] as TextEditingController).dispose();
       (rel['middleName'] as TextEditingController).dispose();
       (rel['surnameAtBirth'] as TextEditingController).dispose();
       (rel['citizenship'] as TextEditingController).dispose();
@@ -278,7 +277,6 @@ class _VisaApplicationFormPageState
             relationship: rel['relationship'] ?? 'Wife',
             firstName: rel['first_name'] ?? '',
             lastName: rel['last_name'] ?? '',
-            fatherName: rel['father_name'] ?? '',
             middleName: rel['middle_name'] ?? '',
             surnameAtBirth: rel['surname_at_birth'] ?? '',
             citizenship: rel['citizenship'] ?? '',
@@ -339,7 +337,6 @@ class _VisaApplicationFormPageState
     String relationship = 'Wife',
     String firstName = '',
     String lastName = '',
-    String fatherName = '',
     String middleName = '',
     String surnameAtBirth = '',
     String citizenship = '',
@@ -349,7 +346,6 @@ class _VisaApplicationFormPageState
       'relationship': relationship,
       'firstName': TextEditingController(text: firstName),
       'lastName': TextEditingController(text: lastName),
-      'fatherName': TextEditingController(text: fatherName),
       'middleName': TextEditingController(text: middleName),
       'surnameAtBirth': TextEditingController(text: surnameAtBirth),
       'citizenship': TextEditingController(text: citizenship),
@@ -478,7 +474,6 @@ class _VisaApplicationFormPageState
       final rel = _relatives[index];
       (rel['firstName'] as TextEditingController).dispose();
       (rel['lastName'] as TextEditingController).dispose();
-      (rel['fatherName'] as TextEditingController).dispose();
       (rel['middleName'] as TextEditingController).dispose();
       (rel['surnameAtBirth'] as TextEditingController).dispose();
       (rel['citizenship'] as TextEditingController).dispose();
@@ -582,8 +577,6 @@ class _VisaApplicationFormPageState
                 (rel['firstName'] as TextEditingController).text.trim(),
             'last_name':
                 (rel['lastName'] as TextEditingController).text.trim(),
-            'father_name':
-                (rel['fatherName'] as TextEditingController).text.trim(),
             'middle_name':
                 (rel['middleName'] as TextEditingController).text.trim(),
             'surname_at_birth':
@@ -1846,23 +1839,9 @@ class _VisaApplicationFormPageState
             ],
           ),
 
-          // Father's name & Middle name row
-          Row(
-            children: [
-              Expanded(
-                child: _buildTextField(
-                  "Father's name:",
-                  rel['fatherName'] as TextEditingController,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _buildTextField(
-                  'Middle name:',
-                  rel['middleName'] as TextEditingController,
-                ),
-              ),
-            ],
+          _buildTextField(
+            'Middle name:',
+            rel['middleName'] as TextEditingController,
           ),
 
           // Date of birth & Surname at birth
@@ -1889,7 +1868,7 @@ class _VisaApplicationFormPageState
           ),
 
           // Citizenship
-          _buildTextField(
+          _buildCountryPickerField(
             'Citizenship:',
             rel['citizenship'] as TextEditingController,
           ),
