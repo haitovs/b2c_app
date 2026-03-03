@@ -75,26 +75,37 @@ jobs:
           rm: false
 
       # ---------------------------------------------------------
-      # STEP 4: RESTART DOCKER
+      # STEP 4: FIX SCP NESTING & RESTART DOCKER
       # ---------------------------------------------------------
-      - name: Restart Container
+      - name: Fix build structure and restart container
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT || 22 }}
-          # FIX: Increase timeout to 60 minutes (default is 10m) 
           command_timeout: 60m
           script: |
             set -Eeuo pipefail
             cd /home/main/apps/b2c_app
-            
+
+            # Fix SCP nesting: appleboy/scp-action creates build/web/build/web/
+            if [ -d "build/web/build/web" ]; then
+              echo "==> Fixing nested build/web structure..."
+              rm -rf build/web_tmp
+              mv build/web/build/web build/web_tmp
+              rm -rf build/web
+              mv build/web_tmp build/web
+            fi
+
+            echo "==> Verifying build/web has index.html..."
+            ls build/web/index.html
+
             if docker compose version >/dev/null 2>&1; then DC="docker compose"; else DC="docker-compose"; fi
-            
+
             echo "==> Rebuilding..."
             $DC build --no-cache b2c-frontend
-            $DC up -d b2c-frontend
-            
+            $DC up -d --force-recreate b2c-frontend
+
             echo "==> Pruning..."
             docker image prune -f
