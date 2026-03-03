@@ -1,24 +1,24 @@
 import 'package:b2c_app/l10n/generated/app_localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:provider/provider.dart';
 
 import '../../../core/app_theme.dart';
 import '../../../core/widgets/app_text_field.dart';
-import '../services/auth_service.dart';
+import '../providers/auth_provider.dart';
 import 'verification_pending_page.dart';
 import 'widgets/auth_page_layout.dart';
 import 'widgets/auth_button.dart';
 import 'widgets/hover_text.dart';
 
-class LoginPage extends StatefulWidget {
+class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
 
   @override
-  State<LoginPage> createState() => _LoginPageState();
+  ConsumerState<LoginPage> createState() => _LoginPageState();
 }
 
-class _LoginPageState extends State<LoginPage> {
+class _LoginPageState extends ConsumerState<LoginPage> {
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _rememberMe = false;
@@ -169,7 +169,7 @@ class _LoginPageState extends State<LoginPage> {
     setState(() => _isLoading = true);
 
     try {
-      final errorMessage = await context.read<AuthService>().login(
+      final errorMessage = await ref.read(authNotifierProvider.notifier).login(
         _usernameController.text.trim(),
         _passwordController.text,
         rememberMe: _rememberMe,

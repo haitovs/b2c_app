@@ -5,12 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
-import 'package:provider/provider.dart' as legacy_provider;
-
 import '../../../core/config/app_config.dart';
 import '../../../core/services/event_context_service.dart';
 import '../../../core/widgets/custom_app_bar.dart';
-import '../../auth/services/auth_service.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../../events/ui/widgets/profile_dropdown.dart';
 import '../../notifications/ui/notification_drawer.dart';
 
@@ -109,11 +107,7 @@ class _NewMeetingPageState extends ConsumerState<NewMeetingPage> {
     setState(() => _isLoading = true);
 
     try {
-      final authService = legacy_provider.Provider.of<AuthService>(
-        context,
-        listen: false,
-      );
-      final token = await authService.getToken();
+      final token = await ref.read(authNotifierProvider.notifier).getToken();
 
       // Fetch B2C users for B2B meetings
       // These have UUID IDs for meeting requests between app users
@@ -156,11 +150,7 @@ class _NewMeetingPageState extends ConsumerState<NewMeetingPage> {
     if (_govEntities.isNotEmpty) return; // Already loaded
 
     try {
-      final authService = legacy_provider.Provider.of<AuthService>(
-        context,
-        listen: false,
-      );
-      final token = await authService.getToken();
+      final token = await ref.read(authNotifierProvider.notifier).getToken();
 
       final govResponse = await http.get(
         Uri.parse('${AppConfig.b2cApiBaseUrl}/api/v1/meetings/gov-entities'),

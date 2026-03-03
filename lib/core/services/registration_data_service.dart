@@ -1,14 +1,12 @@
 import 'package:flutter/foundation.dart';
 
-import '../../features/auth/services/auth_service.dart';
-import '../services/api_client.dart';
+import 'api_client.dart';
 
 /// Service to manage registration data with B2C backend
 class RegistrationDataService {
   final ApiClient _api;
 
-  RegistrationDataService(AuthService authService)
-    : _api = ApiClient(authService);
+  RegistrationDataService(this._api);
 
   // ============== FETCH METHODS ==============
 

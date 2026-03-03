@@ -4,22 +4,22 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/config/app_config.dart';
-import '../../auth/services/auth_service.dart';
+import '../../auth/providers/auth_provider.dart';
 
 /// My Participants - Responsive design with Figma specifications
-class MyParticipantsPage extends StatefulWidget {
+class MyParticipantsPage extends ConsumerStatefulWidget {
   final int eventId;
 
   const MyParticipantsPage({super.key, required this.eventId});
 
   @override
-  State<MyParticipantsPage> createState() => _MyParticipantsPageState();
+  ConsumerState<MyParticipantsPage> createState() => _MyParticipantsPageState();
 }
 
-class _MyParticipantsPageState extends State<MyParticipantsPage> {
+class _MyParticipantsPageState extends ConsumerState<MyParticipantsPage> {
   bool _isLoading = true;
   String? _error;
   List<Map<String, dynamic>> _participants = [];
@@ -37,8 +37,8 @@ class _MyParticipantsPageState extends State<MyParticipantsPage> {
   }
 
   void _checkUserRole() {
-    final authService = context.read<AuthService>();
-    final user = authService.currentUser;
+    final authState = ref.read(authNotifierProvider);
+    final user = authState.currentUser;
     if (user != null) {
       final roles = List<String>.from(user['roles'] ?? []);
       // Administrator if doesn't have PARTICIPANT role, or has USER/ADMIN role
@@ -57,8 +57,7 @@ class _MyParticipantsPageState extends State<MyParticipantsPage> {
 
   Future<void> _loadParticipants() async {
     try {
-      final authService = context.read<AuthService>();
-      final token = await authService.getToken();
+      final token = await ref.read(authNotifierProvider.notifier).getToken();
 
       final response = await http.get(
         Uri.parse(
@@ -1132,8 +1131,7 @@ class _MyParticipantsPageState extends State<MyParticipantsPage> {
 
     try {
       if (!mounted) return;
-      final authService = Provider.of<AuthService>(context, listen: false);
-      final token = await authService.getToken();
+      final token = await ref.read(authNotifierProvider.notifier).getToken();
 
       final response = await http.delete(
         Uri.parse(

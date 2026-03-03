@@ -7,14 +7,13 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
-import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/config/app_config.dart';
 import '../../../../core/services/event_context_service.dart';
 import '../../../../core/widgets/attention_seeker.dart';
 import '../../../../l10n/generated/app_localizations.dart';
-import '../../auth/services/auth_service.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../../notifications/ui/notification_drawer.dart';
 import 'widgets/profile_dropdown.dart';
 
@@ -76,8 +75,7 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
 
   Future<void> _checkRegistrationStatus() async {
     try {
-      final authService = context.read<AuthService>();
-      final token = await authService.getToken();
+      final token = await ref.read(authNotifierProvider.notifier).getToken();
 
       final response = await http.get(
         Uri.parse(
@@ -123,8 +121,7 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
   /// Check if user is a participant (auto-registered, no registration form needed)
   Future<void> _checkParticipantAutoRegistration() async {
     try {
-      final authService = context.read<AuthService>();
-      final token = await authService.getToken();
+      final token = await ref.read(authNotifierProvider.notifier).getToken();
 
       final response = await http.get(
         Uri.parse(
@@ -838,8 +835,8 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
                                           // Check if menu item requires agreement
                                           final requiresAgreement =
                                               item['requiresAgreement'] == true;
-                                          final hasAgreed = context
-                                              .read<AuthService>()
+                                          final hasAgreed = ref
+                                              .read(authNotifierProvider)
                                               .hasAgreedTerms;
 
                                           if (requiresAgreement && !hasAgreed) {

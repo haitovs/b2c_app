@@ -3,13 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:provider/provider.dart' as legacy_provider;
-
-import '../../../../core/services/registration_data_service.dart';
 import '../../../../core/widgets/app_text_field.dart';
 import '../../../../core/widgets/custom_app_bar.dart';
-import '../../auth/services/auth_service.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../../notifications/ui/notification_drawer.dart';
+import '../../registration/providers/registration_providers.dart';
 import 'widgets/profile_dropdown.dart';
 
 /// Event Registration Page - Phase 1: Contact Information
@@ -88,11 +86,7 @@ class _EventRegistrationPageState extends ConsumerState<EventRegistrationPage> {
 
   /// Fetch delegate packages and expo products from backend API
   Future<void> _fetchPackagesAndProducts() async {
-    final authService = legacy_provider.Provider.of<AuthService>(
-      context,
-      listen: false,
-    );
-    final service = RegistrationDataService(authService);
+    final service = ref.read(registrationDataServiceProvider);
 
     try {
       // Fetch packages
@@ -129,11 +123,7 @@ class _EventRegistrationPageState extends ConsumerState<EventRegistrationPage> {
 
     setState(() => _isSaving = true);
 
-    final authService = legacy_provider.Provider.of<AuthService>(
-      context,
-      listen: false,
-    );
-    final service = RegistrationDataService(authService);
+    final service = ref.read(registrationDataServiceProvider);
 
     try {
       // Step 1: Create registration (or get existing)
@@ -232,12 +222,9 @@ class _EventRegistrationPageState extends ConsumerState<EventRegistrationPage> {
 
   /// Pre-fill form with current user's profile data
   void _prefillUserData() {
-    // Get current user from AuthService
-    final authService = legacy_provider.Provider.of<AuthService>(
-      context,
-      listen: false,
-    );
-    final user = authService.currentUser;
+    // Get current user from auth provider
+    final authState = ref.read(authNotifierProvider);
+    final user = authState.currentUser;
 
     if (user != null) {
       _nameController.text = user['first_name'] ?? '';

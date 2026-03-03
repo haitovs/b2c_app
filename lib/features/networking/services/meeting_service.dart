@@ -1,5 +1,4 @@
 import '../../../core/services/api_client.dart';
-import '../../auth/services/auth_service.dart';
 
 /// Meeting types matching the B2C backend enum
 enum MeetingType { b2b, b2g }
@@ -11,7 +10,7 @@ enum MeetingStatus { pending, confirmed, declined, cancelled }
 class MeetingService {
   final ApiClient _api;
 
-  MeetingService(AuthService authService) : _api = ApiClient(authService);
+  MeetingService(this._api);
 
   /// Get all meetings for the current user
   Future<List<Map<String, dynamic>>> fetchMyMeetings() async {

@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart' as legacy_provider;
 
-import '../../auth/services/auth_service.dart';
+import '../../../core/services/api_client.dart';
 import '../services/notification_service.dart';
 
 /// Simple ChangeNotifier-based notification provider
 /// Can be used with Provider package for state management
 class NotificationProvider extends ChangeNotifier {
-  final AuthService _authService;
   late final NotificationService _service;
 
   List<NotificationItem> _notifications = [];
@@ -20,8 +18,8 @@ class NotificationProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
 
-  NotificationProvider(this._authService) {
-    _service = NotificationService(_authService);
+  NotificationProvider(ApiClient apiClient) {
+    _service = NotificationService(apiClient);
   }
 
   Future<void> fetchNotifications() async {
@@ -78,16 +76,3 @@ class NotificationProvider extends ChangeNotifier {
   }
 }
 
-/// Helper extension to get notification count in widgets
-extension NotificationContext on BuildContext {
-  /// Get unread notification count - call this from widgets using CustomAppBar
-  Future<int> getUnreadNotificationCount() async {
-    final authService = legacy_provider.Provider.of<AuthService>(
-      this,
-      listen: false,
-    );
-    final service = NotificationService(authService);
-    final notifications = await service.getNotifications();
-    return notifications.where((n) => !n.isRead).length;
-  }
-}

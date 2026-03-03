@@ -1,25 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:provider/provider.dart';
 
-import '../../auth/services/auth_service.dart';
 import '../models/flight.dart';
+import '../providers/flight_providers.dart';
 import '../services/flight_service.dart';
 import '../widgets/flight_card.dart';
 import '../widgets/flight_search_bar.dart';
 
 /// Main flights search and listing page.
-class FlightsPage extends StatefulWidget {
+class FlightsPage extends ConsumerStatefulWidget {
   final int? eventId;
 
   const FlightsPage({super.key, this.eventId});
 
   @override
-  State<FlightsPage> createState() => _FlightsPageState();
+  ConsumerState<FlightsPage> createState() => _FlightsPageState();
 }
 
-class _FlightsPageState extends State<FlightsPage> {
+class _FlightsPageState extends ConsumerState<FlightsPage> {
   FlightService? _service;
   List<Flight> _flights = [];
   bool _isLoading = true;
@@ -33,11 +33,8 @@ class _FlightsPageState extends State<FlightsPage> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final authService = context.read<AuthService>();
-      _service = FlightService(authService);
-      _loadFlights();
-    });
+    _service = ref.read(flightServiceProvider);
+    _loadFlights();
   }
 
   Future<void> _loadFlights() async {

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:provider/provider.dart';
 
 import '../../../core/app_theme.dart';
-import '../services/auth_service.dart';
+import '../providers/auth_provider.dart';
 import 'widgets/auth_info_box.dart';
 import 'widgets/auth_page_layout.dart';
 import 'widgets/auth_button.dart';
@@ -12,19 +12,18 @@ import 'widgets/hover_text.dart';
 
 /// Page shown after registration where user enters the verification code
 /// sent to their email.
-class VerificationCodePage extends StatefulWidget {
+class VerificationCodePage extends ConsumerStatefulWidget {
   final String email;
   final String? password;
 
   const VerificationCodePage({super.key, required this.email, this.password});
 
   @override
-  State<VerificationCodePage> createState() => _VerificationCodePageState();
+  ConsumerState<VerificationCodePage> createState() => _VerificationCodePageState();
 }
 
-class _VerificationCodePageState extends State<VerificationCodePage> {
+class _VerificationCodePageState extends ConsumerState<VerificationCodePage> {
   final _codeController = TextEditingController();
-  final _authService = AuthService();
   bool _isVerifying = false;
   bool _isResending = false;
 
@@ -212,15 +211,15 @@ class _VerificationCodePageState extends State<VerificationCodePage> {
     setState(() => _isVerifying = true);
 
     try {
-      final error = await _authService.verifyCode(widget.email, code);
+      final authNotifier = ref.read(authNotifierProvider.notifier);
+      final error = await authNotifier.verifyCode(widget.email, code);
 
       if (!mounted) return;
 
       if (error == null) {
         // Auto-login if we have the password from registration
         if (widget.password != null) {
-          final authService = Provider.of<AuthService>(context, listen: false);
-          final loginError = await authService.login(widget.email, widget.password!);
+          final loginError = await authNotifier.login(widget.email, widget.password!);
 
           if (!mounted) return;
 
@@ -260,7 +259,7 @@ class _VerificationCodePageState extends State<VerificationCodePage> {
     setState(() => _isResending = true);
 
     try {
-      final error = await _authService.resendCode(widget.email);
+      final error = await ref.read(authNotifierProvider.notifier).resendCode(widget.email);
 
       if (!mounted) return;
 

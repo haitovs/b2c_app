@@ -1,6 +1,5 @@
 import '../../../core/config/app_config.dart';
 import '../../../core/services/api_client.dart';
-import '../../auth/services/auth_service.dart';
 
 /// News item model
 class NewsItem {
@@ -48,7 +47,7 @@ class NewsItem {
 class NewsService {
   final ApiClient _api;
 
-  NewsService(AuthService authService) : _api = ApiClient(authService);
+  NewsService(this._api);
 
   /// Fetch news with pagination
   Future<List<NewsItem>> fetchNews({

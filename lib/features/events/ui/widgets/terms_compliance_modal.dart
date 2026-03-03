@@ -1,24 +1,24 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
-import 'package:provider/provider.dart';
 
 import '../../../../core/config/app_config.dart';
-import '../../../auth/services/auth_service.dart';
+import '../../../auth/providers/auth_provider.dart';
 
 /// Terms & Conditions Compliance Modal
 /// Mandatory modal shown on first login for participants
-class TermsComplianceModal extends StatefulWidget {
+class TermsComplianceModal extends ConsumerStatefulWidget {
   final VoidCallback onAccepted;
 
   const TermsComplianceModal({super.key, required this.onAccepted});
 
   @override
-  State<TermsComplianceModal> createState() => _TermsComplianceModalState();
+  ConsumerState<TermsComplianceModal> createState() => _TermsComplianceModalState();
 }
 
-class _TermsComplianceModalState extends State<TermsComplianceModal> {
+class _TermsComplianceModalState extends ConsumerState<TermsComplianceModal> {
   bool _termsAccepted = false;
   bool _privacyAccepted = false;
   bool _isSubmitting = false;
@@ -35,8 +35,7 @@ class _TermsComplianceModalState extends State<TermsComplianceModal> {
     });
 
     try {
-      final authService = context.read<AuthService>();
-      final token = await authService.getToken();
+      final token = await ref.read(authNotifierProvider.notifier).getToken();
 
       final response = await http.post(
         Uri.parse(

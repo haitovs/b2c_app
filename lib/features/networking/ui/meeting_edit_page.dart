@@ -7,13 +7,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
-import 'package:provider/provider.dart' as legacy_provider;
-
 import '../../../core/config/app_config.dart';
 import '../../../core/models/api_exception.dart';
 import '../../../core/services/event_context_service.dart';
 import '../../../core/widgets/custom_app_bar.dart';
-import '../../auth/services/auth_service.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../../events/ui/widgets/profile_dropdown.dart';
 import '../../notifications/ui/notification_drawer.dart';
 
@@ -93,11 +91,7 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
     setState(() => _isLoading = true);
 
     try {
-      final authService = legacy_provider.Provider.of<AuthService>(
-        context,
-        listen: false,
-      );
-      final token = await authService.getToken();
+      final token = await ref.read(authNotifierProvider.notifier).getToken();
 
       // Get meeting data - either from extra or fetch from API
       if (widget.meetingData != null) {
@@ -312,11 +306,7 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
     setState(() => _isSaving = true);
 
     try {
-      final authService = legacy_provider.Provider.of<AuthService>(
-        context,
-        listen: false,
-      );
-      final token = await authService.getToken();
+      final token = await ref.read(authNotifierProvider.notifier).getToken();
 
       // Collect attendees as comma-separated text
       final attendeesText = _attendeeControllers

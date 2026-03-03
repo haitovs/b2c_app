@@ -1,11 +1,10 @@
 import '../../../core/services/api_client.dart';
-import '../../auth/services/auth_service.dart';
 
 /// Service for handling contact form submissions
 class ContactService {
   final ApiClient _api;
 
-  ContactService(AuthService authService) : _api = ApiClient(authService);
+  ContactService(this._api);
 
   /// Submit a contact message
   Future<bool> sendMessage({

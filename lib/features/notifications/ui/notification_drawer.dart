@@ -1,21 +1,22 @@
 import 'package:b2c_app/l10n/generated/app_localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:provider/provider.dart' as legacy_provider;
 
-import '../../auth/services/auth_service.dart';
+import '../providers/notification_providers.dart';
 import '../services/notification_service.dart';
 
-class NotificationDrawer extends StatefulWidget {
+class NotificationDrawer extends ConsumerStatefulWidget {
   const NotificationDrawer({super.key});
 
   @override
-  State<NotificationDrawer> createState() => _NotificationDrawerState();
+  ConsumerState<NotificationDrawer> createState() =>
+      _NotificationDrawerState();
 }
 
-class _NotificationDrawerState extends State<NotificationDrawer>
+class _NotificationDrawerState extends ConsumerState<NotificationDrawer>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   late NotificationService _notificationService;
@@ -33,11 +34,7 @@ class _NotificationDrawerState extends State<NotificationDrawer>
     super.didChangeDependencies();
     if (!_initialized) {
       _initialized = true;
-      final authService = legacy_provider.Provider.of<AuthService>(
-        context,
-        listen: false,
-      );
-      _notificationService = NotificationService(authService);
+      _notificationService = ref.read(notificationServiceProvider);
       _loadNotifications();
     }
   }

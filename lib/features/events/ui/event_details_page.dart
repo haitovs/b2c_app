@@ -2,13 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:provider/provider.dart' as p;
-
 import '../../../../core/services/event_context_service.dart';
 import '../../../../core/widgets/custom_app_bar.dart';
 import '../../../../l10n/generated/app_localizations.dart';
 import '../../notifications/ui/notification_drawer.dart';
-import '../services/event_service.dart';
+import '../providers/event_providers.dart';
 import 'widgets/profile_dropdown.dart';
 
 class EventDetailsPage extends ConsumerStatefulWidget {
@@ -42,7 +40,7 @@ class _EventDetailsPageState extends ConsumerState<EventDetailsPage> {
         return;
       }
 
-      final eventService = p.Provider.of<EventService>(context, listen: false);
+      final eventService = ref.read(eventServiceProvider);
       final eventData = await eventService.fetchEvent(eventId);
 
       if (!mounted) return;

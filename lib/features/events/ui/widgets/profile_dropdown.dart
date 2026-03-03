@@ -1,21 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:provider/provider.dart';
 
 import '../../../../core/app_theme.dart';
-import '../../../auth/services/auth_service.dart';
+import '../../../auth/providers/auth_provider.dart';
 
-class ProfileDropdown extends StatefulWidget {
+class ProfileDropdown extends ConsumerStatefulWidget {
   final VoidCallback? onLogout;
   final VoidCallback? onClose; // Callback to close the dropdown
 
   const ProfileDropdown({super.key, this.onLogout, this.onClose});
 
   @override
-  State<ProfileDropdown> createState() => _ProfileDropdownState();
+  ConsumerState<ProfileDropdown> createState() => _ProfileDropdownState();
 }
 
-class _ProfileDropdownState extends State<ProfileDropdown>
+class _ProfileDropdownState extends ConsumerState<ProfileDropdown>
     with SingleTickerProviderStateMixin {
   bool _isLanguageExpanded = false;
   late AnimationController _rotationController;
@@ -60,9 +60,9 @@ class _ProfileDropdownState extends State<ProfileDropdown>
 
   @override
   Widget build(BuildContext context) {
-    // Watch auth service for user changes
-    final authService = context.watch<AuthService>();
-    final user = authService.currentUser;
+    // Watch auth state for user changes
+    final authState = ref.watch(authNotifierProvider);
+    final user = authState.currentUser;
     final String fullName = user != null
         ? "${user['first_name'] ?? ''} ${user['last_name'] ?? ''}"
         : "Guest";
@@ -209,7 +209,7 @@ class _ProfileDropdownState extends State<ProfileDropdown>
             borderRadius: BorderRadius.circular(5),
             child: InkWell(
               onTap: () => _closeAndNavigate(() async {
-                await authService.logout();
+                await ref.read(authNotifierProvider.notifier).logout();
                 if (context.mounted) {
                   context.go('/login');
                 }

@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:provider/provider.dart' as legacy_provider;
 
-import '../../auth/services/auth_service.dart';
-import '../../registration/services/registration_service.dart';
+import '../../registration/providers/registration_providers.dart';
 import 'meeting_not_registered_page.dart';
 import 'meetings_page.dart';
 
@@ -42,11 +40,7 @@ class _MeetingGatePageState extends ConsumerState<MeetingGatePage> {
     }
 
     try {
-      final authService = legacy_provider.Provider.of<AuthService>(
-        context,
-        listen: false,
-      );
-      final registrationService = RegistrationService(authService);
+      final registrationService = ref.read(registrationServiceProvider);
       final eventId = int.tryParse(widget.eventId) ?? 0;
       final isRegistered = await registrationService.hasApprovedRegistration(
         eventId,

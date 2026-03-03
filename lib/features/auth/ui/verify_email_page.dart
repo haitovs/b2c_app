@@ -1,20 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:provider/provider.dart';
-import '../services/auth_service.dart';
 import 'package:b2c_app/core/app_theme.dart';
 
+import '../providers/auth_provider.dart';
+
 /// Page that handles email verification when user clicks the link in their email
-class VerifyEmailPage extends StatefulWidget {
+class VerifyEmailPage extends ConsumerStatefulWidget {
   final String token;
 
   const VerifyEmailPage({super.key, required this.token});
 
   @override
-  State<VerifyEmailPage> createState() => _VerifyEmailPageState();
+  ConsumerState<VerifyEmailPage> createState() => _VerifyEmailPageState();
 }
 
-class _VerifyEmailPageState extends State<VerifyEmailPage> {
+class _VerifyEmailPageState extends ConsumerState<VerifyEmailPage> {
   bool _isVerifying = true;
   String? _errorMessage;
   bool _success = false;
@@ -26,8 +27,7 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
   }
 
   Future<void> _verifyEmail() async {
-    final authService = Provider.of<AuthService>(context, listen: false);
-    final error = await authService.verifyEmail(widget.token);
+    final error = await ref.read(authNotifierProvider.notifier).verifyEmail(widget.token);
 
     if (!mounted) return;
 

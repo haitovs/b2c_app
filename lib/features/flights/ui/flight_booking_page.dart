@@ -1,24 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:provider/provider.dart';
 
-import '../../auth/services/auth_service.dart';
 import '../models/flight.dart';
 import '../models/flight_booking.dart';
+import '../providers/flight_providers.dart';
 import '../services/flight_service.dart';
 
 /// Flight booking page with traveler details and payment.
-class FlightBookingPage extends StatefulWidget {
+class FlightBookingPage extends ConsumerStatefulWidget {
   final int flightId;
 
   const FlightBookingPage({super.key, required this.flightId});
 
   @override
-  State<FlightBookingPage> createState() => _FlightBookingPageState();
+  ConsumerState<FlightBookingPage> createState() => _FlightBookingPageState();
 }
 
-class _FlightBookingPageState extends State<FlightBookingPage> {
+class _FlightBookingPageState extends ConsumerState<FlightBookingPage> {
   FlightService? _service;
   Flight? _flight;
   bool _isLoading = true;
@@ -37,11 +37,8 @@ class _FlightBookingPageState extends State<FlightBookingPage> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final authService = context.read<AuthService>();
-      _service = FlightService(authService);
-      _loadFlight();
-    });
+    _service = ref.read(flightServiceProvider);
+    _loadFlight();
   }
 
   @override

@@ -1,16 +1,12 @@
 import '../../../core/services/api_client.dart';
-import '../../auth/services/auth_service.dart';
 import '../models/flight.dart';
 import '../models/flight_booking.dart';
 
 /// Service for flight search and booking operations.
 class FlightService {
-  final AuthService _authService;
-  late final ApiClient _client;
+  final ApiClient _client;
 
-  FlightService(this._authService) {
-    _client = ApiClient(_authService);
-  }
+  FlightService(this._client);
 
   /// Search for flights with optional filters.
   Future<List<Flight>> searchFlights({

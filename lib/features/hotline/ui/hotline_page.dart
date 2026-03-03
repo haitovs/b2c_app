@@ -2,22 +2,22 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:provider/provider.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../../../core/app_theme.dart';
-import '../../auth/services/auth_service.dart';
+import '../providers/hotline_providers.dart';
 import '../services/hotline_service.dart';
 
-class HotlinePage extends StatefulWidget {
+class HotlinePage extends ConsumerStatefulWidget {
   const HotlinePage({super.key});
 
   @override
-  State<HotlinePage> createState() => _HotlinePageState();
+  ConsumerState<HotlinePage> createState() => _HotlinePageState();
 }
 
-class _HotlinePageState extends State<HotlinePage> {
+class _HotlinePageState extends ConsumerState<HotlinePage> {
   late HotlineService _service;
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -34,8 +34,7 @@ class _HotlinePageState extends State<HotlinePage> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (!_initialized) {
-      final authService = Provider.of<AuthService>(context, listen: false);
-      _service = HotlineService(authService);
+      _service = ref.read(hotlineServiceProvider);
       _initialized = true;
       _loadHistory();
       _connectWebSocket();

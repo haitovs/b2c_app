@@ -5,16 +5,16 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/widgets/app_snackbar.dart';
 import '../../../core/widgets/phone_input_field.dart';
-import '../../auth/services/auth_service.dart';
+import '../../auth/providers/auth_provider.dart';
 
 /// Edit Participant Form Page
 /// Allows editing existing participant data with pre-filled form
-class EditParticipantPage extends StatefulWidget {
+class EditParticipantPage extends ConsumerStatefulWidget {
   final String participantId;
   final int eventId;
 
@@ -25,10 +25,10 @@ class EditParticipantPage extends StatefulWidget {
   });
 
   @override
-  State<EditParticipantPage> createState() => _EditParticipantPageState();
+  ConsumerState<EditParticipantPage> createState() => _EditParticipantPageState();
 }
 
-class _EditParticipantPageState extends State<EditParticipantPage> {
+class _EditParticipantPageState extends ConsumerState<EditParticipantPage> {
   final _formKey = GlobalKey<FormState>();
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
@@ -60,8 +60,7 @@ class _EditParticipantPageState extends State<EditParticipantPage> {
 
   Future<void> _loadParticipantData() async {
     try {
-      final authService = context.read<AuthService>();
-      final token = await authService.getToken();
+      final token = await ref.read(authNotifierProvider.notifier).getToken();
 
       final response = await http.get(
         Uri.parse(
@@ -127,8 +126,7 @@ class _EditParticipantPageState extends State<EditParticipantPage> {
     if (_imageBytes == null) return null;
 
     try {
-      final authService = context.read<AuthService>();
-      final token = await authService.getToken();
+      final token = await ref.read(authNotifierProvider.notifier).getToken();
 
       var request = http.MultipartRequest(
         'POST',
@@ -180,8 +178,7 @@ class _EditParticipantPageState extends State<EditParticipantPage> {
 
       if (!mounted) return;
 
-      final authService = context.read<AuthService>();
-      final token = await authService.getToken();
+      final token = await ref.read(authNotifierProvider.notifier).getToken();
 
       final body = {
         'first_name': _firstNameController.text.trim(),

@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/app_theme.dart';
 import '../../../core/widgets/app_text_field.dart';
-import '../services/auth_service.dart';
+import '../providers/auth_provider.dart';
 import 'widgets/auth_info_box.dart';
 import 'widgets/auth_page_layout.dart';
 import 'widgets/auth_button.dart';
 import 'widgets/send_me_back_link.dart';
 
-class ResetPasswordPage extends StatefulWidget {
+class ResetPasswordPage extends ConsumerStatefulWidget {
   final String email;
   final String code;
 
@@ -20,13 +21,12 @@ class ResetPasswordPage extends StatefulWidget {
   });
 
   @override
-  State<ResetPasswordPage> createState() => _ResetPasswordPageState();
+  ConsumerState<ResetPasswordPage> createState() => _ResetPasswordPageState();
 }
 
-class _ResetPasswordPageState extends State<ResetPasswordPage> {
+class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  final _authService = AuthService();
   bool _isLoading = false;
 
   @override
@@ -116,7 +116,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
     setState(() => _isLoading = true);
 
     try {
-      final error = await _authService.resetPassword(
+      final error = await ref.read(authNotifierProvider.notifier).resetPassword(
         widget.email,
         widget.code,
         newPassword,

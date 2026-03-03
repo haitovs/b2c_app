@@ -1,23 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:provider/provider.dart';
-
 import '../../../../core/widgets/custom_app_bar.dart';
-import '../../auth/services/auth_service.dart';
-import '../../events/services/event_service.dart';
+import '../../auth/providers/auth_provider.dart';
+import '../../events/providers/event_providers.dart';
 import '../../notifications/ui/notification_drawer.dart';
 import 'widgets/event_card.dart';
 import 'widgets/profile_dropdown.dart';
 
-class EventCalendarPage extends StatefulWidget {
+class EventCalendarPage extends ConsumerStatefulWidget {
   const EventCalendarPage({super.key});
 
   @override
-  State<EventCalendarPage> createState() => _EventCalendarPageState();
+  ConsumerState<EventCalendarPage> createState() => _EventCalendarPageState();
 }
 
-class _EventCalendarPageState extends State<EventCalendarPage> {
+class _EventCalendarPageState extends ConsumerState<EventCalendarPage> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   // Search Controller
@@ -41,7 +40,7 @@ class _EventCalendarPageState extends State<EventCalendarPage> {
 
   Future<void> _loadEvents() async {
     try {
-      final events = await context.read<EventService>().fetchEvents();
+      final events = await ref.read(eventServiceProvider).fetchEvents();
       if (mounted) {
         setState(() {
           _allEvents = events;
@@ -88,7 +87,7 @@ class _EventCalendarPageState extends State<EventCalendarPage> {
   }
 
   void _logout() async {
-    await context.read<AuthService>().logout();
+    await ref.read(authNotifierProvider.notifier).logout();
     if (mounted) {
       context.go('/login');
     }

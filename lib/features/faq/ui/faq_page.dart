@@ -1,24 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:provider/provider.dart' as legacy_provider;
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../auth/services/auth_service.dart';
 import '../models/faq_item.dart';
+import '../providers/faq_providers.dart';
 import '../services/faq_service.dart';
 
-class FAQPage extends StatefulWidget {
+class FAQPage extends ConsumerStatefulWidget {
   final String eventId;
 
   const FAQPage({super.key, required this.eventId});
 
   @override
-  State<FAQPage> createState() => _FAQPageState();
+  ConsumerState<FAQPage> createState() => _FAQPageState();
 }
 
-class _FAQPageState extends State<FAQPage> {
+class _FAQPageState extends ConsumerState<FAQPage> {
   late final FAQService _service;
   final TextEditingController _searchController = TextEditingController();
 
@@ -30,11 +30,7 @@ class _FAQPageState extends State<FAQPage> {
   @override
   void initState() {
     super.initState();
-    final authService = legacy_provider.Provider.of<AuthService>(
-      context,
-      listen: false,
-    );
-    _service = FAQService(authService);
+    _service = ref.read(faqServiceProvider);
     _loadFAQs();
   }
 

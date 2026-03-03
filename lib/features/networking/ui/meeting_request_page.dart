@@ -6,14 +6,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
-import 'package:provider/provider.dart' as legacy_provider;
-
 import '../../../core/config/app_config.dart';
 import '../../../core/services/event_context_service.dart';
 import '../../../core/widgets/custom_app_bar.dart';
-import '../../auth/services/auth_service.dart';
 import '../../events/ui/widgets/profile_dropdown.dart';
 import '../../notifications/ui/notification_drawer.dart';
+import '../providers/meeting_providers.dart';
 import '../services/meeting_service.dart';
 
 /// B2B Meeting Request Page - for creating a new meeting request
@@ -287,13 +285,7 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
     setState(() => _isSubmitting = true);
 
     try {
-      // Get auth service for token
-      final authService = legacy_provider.Provider.of<AuthService>(
-        context,
-        listen: false,
-      );
-
-      final meetingService = MeetingService(authService);
+      final meetingService = ref.read(meetingServiceProvider);
 
       // Collect attendees as comma-separated text
       final attendeesText = _attendeeControllers

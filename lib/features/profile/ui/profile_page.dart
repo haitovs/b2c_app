@@ -5,19 +5,19 @@ import 'dart:typed_data';
 import 'package:csc_picker_plus/csc_picker_plus.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
-import 'package:provider/provider.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/widgets/phone_input_field.dart';
 import '../../../shared/widgets/legal_bottom_sheet.dart';
-import '../../auth/services/auth_service.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../models/social_network.dart';
 
-class ProfilePage extends StatefulWidget {
+class ProfilePage extends ConsumerStatefulWidget {
   final int initialTab;
   final String? returnTo;
   final bool highlightConfirmButton;
@@ -30,10 +30,10 @@ class ProfilePage extends StatefulWidget {
   });
 
   @override
-  State<ProfilePage> createState() => _ProfilePageState();
+  ConsumerState<ProfilePage> createState() => _ProfilePageState();
 }
 
-class _ProfilePageState extends State<ProfilePage>
+class _ProfilePageState extends ConsumerState<ProfilePage>
     with SingleTickerProviderStateMixin {
   late int _currentTab;
   bool _isEditing = false;
@@ -145,7 +145,7 @@ class _ProfilePageState extends State<ProfilePage>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final user = context.read<AuthService>().currentUser;
+    final user = ref.read(authNotifierProvider).currentUser;
     if (user != null) {
       _nameController.text = user['first_name'] ?? '';
       _surnameController.text = user['last_name'] ?? '';
@@ -213,8 +213,7 @@ class _ProfilePageState extends State<ProfilePage>
     if (_selectedImageBytes == null) return null;
 
     try {
-      final authService = context.read<AuthService>();
-      final token = await authService.getToken();
+      final token = await ref.read(authNotifierProvider.notifier).getToken();
 
       var request = http.MultipartRequest(
         'POST',
@@ -394,8 +393,7 @@ class _ProfilePageState extends State<ProfilePage>
 
                     // Call API
                     try {
-                      final authService = this.context.read<AuthService>();
-                      final token = await authService.getToken();
+                      final token = await ref.read(authNotifierProvider.notifier).getToken();
                       final response = await http.patch(
                         Uri.parse(
                           '${AppConfig.b2cApiBaseUrl}/api/v1/users/me/password?current_password=${Uri.encodeComponent(currentPasswordController.text)}&new_password=${Uri.encodeComponent(newPasswordController.text)}',
@@ -785,8 +783,8 @@ class _ProfilePageState extends State<ProfilePage>
                           child: GestureDetector(
                             onTap: () {
                               // Only allow toggling if user hasn't already confirmed
-                              final hasConfirmed = context
-                                  .read<AuthService>()
+                              final hasConfirmed = ref
+                                  .read(authNotifierProvider)
                                   .hasAgreedTerms;
                               if (!hasConfirmed) {
                                 setState(
@@ -857,11 +855,11 @@ class _ProfilePageState extends State<ProfilePage>
               // Only enable if checkbox is checked AND user hasn't already confirmed
               onPressed:
                   (_agreedToTerms &&
-                      !context.read<AuthService>().hasAgreedTerms)
+                      !ref.read(authNotifierProvider).hasAgreedTerms)
                   ? () async {
                       // Save agreement to API
-                      final error = await context
-                          .read<AuthService>()
+                      final error = await ref
+                          .read(authNotifierProvider.notifier)
                           .updateProfile({'has_agreed_terms': true});
                       if (!mounted) return;
                       if (error != null) {
@@ -1085,8 +1083,8 @@ class _ProfilePageState extends State<ProfilePage>
                             .toList(),
                       };
 
-                      final error = await context
-                          .read<AuthService>()
+                      final error = await ref
+                          .read(authNotifierProvider.notifier)
                           .updateProfile(updates);
                       if (!mounted) return;
                       if (error != null) {

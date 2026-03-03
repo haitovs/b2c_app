@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:provider/provider.dart';
 
-import '../../auth/services/auth_service.dart';
+import '../providers/transfer_providers.dart';
 import '../services/transfer_service.dart';
 import 'booking_confirmation_page.dart';
 
 /// Booking page for all transfer types
-class TransferBookingPage extends StatefulWidget {
+class TransferBookingPage extends ConsumerStatefulWidget {
   final String serviceType; // "shuttle", "individual", "rental"
   final int resourceId;
   final String resourceName;
@@ -28,10 +28,11 @@ class TransferBookingPage extends StatefulWidget {
   });
 
   @override
-  State<TransferBookingPage> createState() => _TransferBookingPageState();
+  ConsumerState<TransferBookingPage> createState() =>
+      _TransferBookingPageState();
 }
 
-class _TransferBookingPageState extends State<TransferBookingPage> {
+class _TransferBookingPageState extends ConsumerState<TransferBookingPage> {
   final _formKey = GlobalKey<FormState>();
   TransferService? _transferService;
 
@@ -69,10 +70,7 @@ class _TransferBookingPageState extends State<TransferBookingPage> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (_transferService == null) {
-      final authService = context.read<AuthService>();
-      _transferService = TransferService(authService);
-    }
+    _transferService ??= ref.read(transferServiceProvider);
   }
 
   @override

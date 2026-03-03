@@ -5,26 +5,26 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/widgets/app_snackbar.dart';
 import '../../../core/widgets/phone_input_field.dart';
-import '../../auth/services/auth_service.dart';
+import '../../auth/providers/auth_provider.dart';
 
 /// Add Participant Form Page (Figma Design)
 /// Left: Photo upload (5:6 ratio) with preview
 /// Right: Profile fields (all required)
-class AddParticipantFormPage extends StatefulWidget {
+class AddParticipantFormPage extends ConsumerStatefulWidget {
   final int eventId;
 
   const AddParticipantFormPage({super.key, required this.eventId});
 
   @override
-  State<AddParticipantFormPage> createState() => _AddParticipantFormPageState();
+  ConsumerState<AddParticipantFormPage> createState() => _AddParticipantFormPageState();
 }
 
-class _AddParticipantFormPageState extends State<AddParticipantFormPage> {
+class _AddParticipantFormPageState extends ConsumerState<AddParticipantFormPage> {
   final _formKey = GlobalKey<FormState>();
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
@@ -79,8 +79,7 @@ class _AddParticipantFormPageState extends State<AddParticipantFormPage> {
     if (_imageBytes == null) return null;
 
     try {
-      final authService = context.read<AuthService>();
-      final token = await authService.getToken();
+      final token = await ref.read(authNotifierProvider.notifier).getToken();
 
       var request = http.MultipartRequest(
         'POST',
@@ -137,8 +136,7 @@ class _AddParticipantFormPageState extends State<AddParticipantFormPage> {
 
       if (!mounted) return;
 
-      final authService = context.read<AuthService>();
-      final token = await authService.getToken();
+      final token = await ref.read(authNotifierProvider.notifier).getToken();
 
       final body = {
         'first_name': _firstNameController.text.trim(),

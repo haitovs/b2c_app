@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:provider/provider.dart';
 
-import '../services/visa_service.dart';
+import '../providers/visa_providers.dart';
 
 /// Visa Details Page - Shows APPROVED/DECLINED status with full details
-class VisaDetailsPage extends StatelessWidget {
+class VisaDetailsPage extends ConsumerWidget {
   final int eventId;
   final String participantId;
 
@@ -16,13 +16,13 @@ class VisaDetailsPage extends StatelessWidget {
     required this.participantId,
   });
 
-  Future<Map<String, dynamic>> _loadVisa(BuildContext context) async {
-    final visaService = context.read<VisaService>();
+  Future<Map<String, dynamic>> _loadVisa(WidgetRef ref) async {
+    final visaService = ref.read(visaServiceProvider);
     return await visaService.getMyVisa(participantId);
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       backgroundColor: const Color(0xFF3C4494),
       appBar: AppBar(
@@ -43,7 +43,7 @@ class VisaDetailsPage extends StatelessWidget {
       ),
       body: SafeArea(
         child: FutureBuilder<Map<String, dynamic>>(
-          future: _loadVisa(context),
+          future: _loadVisa(ref),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(

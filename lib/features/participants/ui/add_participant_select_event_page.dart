@@ -4,23 +4,23 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/config/app_config.dart';
-import '../../auth/services/auth_service.dart';
+import '../../auth/providers/auth_provider.dart';
 
 /// Add Participant - Event Selection Page
 /// Shows events where user has purchased packages and available slots
-class AddParticipantSelectEventPage extends StatefulWidget {
+class AddParticipantSelectEventPage extends ConsumerStatefulWidget {
   const AddParticipantSelectEventPage({super.key});
 
   @override
-  State<AddParticipantSelectEventPage> createState() =>
+  ConsumerState<AddParticipantSelectEventPage> createState() =>
       _AddParticipantSelectEventPageState();
 }
 
 class _AddParticipantSelectEventPageState
-    extends State<AddParticipantSelectEventPage> {
+    extends ConsumerState<AddParticipantSelectEventPage> {
   List<Map<String, dynamic>> _events = [];
   List<Map<String, dynamic>> _filteredEvents = [];
   bool _isLoading = true;
@@ -41,8 +41,7 @@ class _AddParticipantSelectEventPageState
 
   Future<void> _loadEligibleEvents() async {
     try {
-      final authService = context.read<AuthService>();
-      final token = await authService.getToken();
+      final token = await ref.read(authNotifierProvider.notifier).getToken();
 
       final response = await http.get(
         Uri.parse(

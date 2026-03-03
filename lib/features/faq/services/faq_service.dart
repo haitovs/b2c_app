@@ -1,12 +1,11 @@
 import '../../../core/services/api_client.dart';
-import '../../auth/services/auth_service.dart';
 import '../models/faq_item.dart';
 
 /// Service for fetching FAQs from the B2C backend
 class FAQService {
   final ApiClient _api;
 
-  FAQService(AuthService authService) : _api = ApiClient(authService);
+  FAQService(this._api);
 
   /// Get FAQs, optionally filtered by event ID and search query
   Future<List<FAQItem>> getFAQs({int? eventId, String? search}) async {

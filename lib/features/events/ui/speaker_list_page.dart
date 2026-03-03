@@ -5,13 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
-import 'package:provider/provider.dart' as legacy_provider;
-
 import '../../../core/config/app_config.dart';
 import '../../../core/services/event_context_service.dart';
 import '../../../core/widgets/custom_app_bar.dart';
-import '../../auth/services/auth_service.dart';
-import '../../notifications/services/notification_service.dart';
+import '../../notifications/providers/notification_providers.dart';
 import '../../notifications/ui/notification_drawer.dart';
 import 'widgets/profile_dropdown.dart';
 
@@ -45,11 +42,7 @@ class _SpeakerListPageState extends ConsumerState<SpeakerListPage> {
 
   Future<void> _loadNotificationCount() async {
     try {
-      final authService = legacy_provider.Provider.of<AuthService>(
-        context,
-        listen: false,
-      );
-      final notificationService = NotificationService(authService);
+      final notificationService = ref.read(notificationServiceProvider);
       final notifications = await notificationService.getNotifications();
       if (mounted) {
         setState(() {

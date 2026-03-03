@@ -1,5 +1,4 @@
 import '../../../core/services/api_client.dart';
-import '../../auth/services/auth_service.dart';
 
 /// Registration status enum matching backend
 enum RegistrationStatus { submitted, approved, rejected }
@@ -8,7 +7,7 @@ enum RegistrationStatus { submitted, approved, rejected }
 class RegistrationService {
   final ApiClient _api;
 
-  RegistrationService(AuthService authService) : _api = ApiClient(authService);
+  RegistrationService(this._api);
 
   /// Get current user's registrations
   Future<List<Map<String, dynamic>>> getMyRegistrations() async {

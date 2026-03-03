@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:provider/provider.dart';
 
-import '../../auth/services/auth_service.dart';
 import '../models/car.dart';
 import '../models/shuttle.dart';
+import '../providers/transfer_providers.dart';
 import '../services/transfer_service.dart';
 import '../widgets/car_card.dart';
 import '../widgets/shuttle_card.dart';
@@ -12,16 +12,16 @@ import 'car_detail_page.dart';
 import 'shuttle_detail_page.dart';
 
 /// Main transfer page with 3 tabs: Shuttle, Individual Car, Rent Car
-class TransferPage extends StatefulWidget {
+class TransferPage extends ConsumerStatefulWidget {
   final int eventId;
 
   const TransferPage({super.key, required this.eventId});
 
   @override
-  State<TransferPage> createState() => _TransferPageState();
+  ConsumerState<TransferPage> createState() => _TransferPageState();
 }
 
-class _TransferPageState extends State<TransferPage>
+class _TransferPageState extends ConsumerState<TransferPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   TransferService? _transferService;
@@ -48,8 +48,7 @@ class _TransferPageState extends State<TransferPage>
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (_transferService == null) {
-      final authService = context.read<AuthService>();
-      _transferService = TransferService(authService);
+      _transferService = ref.read(transferServiceProvider);
       _loadData();
     }
   }

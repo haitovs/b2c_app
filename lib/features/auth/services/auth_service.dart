@@ -4,10 +4,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/services/api_client.dart';
+import '../../../core/services/token_provider.dart';
 
 /// Authentication service handling login, registration, and user state.
 /// This is a ChangeNotifier so it can be used with Provider.
-class AuthService extends ChangeNotifier {
+class AuthService extends ChangeNotifier implements TokenProvider {
   final String baseUrl = '${AppConfig.b2cApiBaseUrl}/api/v1';
 
   Map<String, dynamic>? _currentUser;
@@ -23,6 +24,7 @@ class AuthService extends ChangeNotifier {
   bool get isInitialized => _isInitialized;
   bool get hasAgreedTerms => _currentUser?['has_agreed_terms'] ?? false;
 
+  @override
   Future<String?> getToken() async {
     if (_token != null) return _token;
     final prefs = await SharedPreferences.getInstance();

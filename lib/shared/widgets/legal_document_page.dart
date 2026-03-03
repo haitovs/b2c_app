@@ -1,25 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:provider/provider.dart' as legacy_provider;
 
 import '../../core/app_theme.dart';
+import '../../core/providers/legal_provider.dart';
 import '../../core/services/legal_service.dart';
-import '../../features/auth/services/auth_service.dart';
 
 /// Full-page legal document viewer used from auth pages (login/registration footer).
 /// Displays legal documents with a gradient header and white card body.
-class LegalDocumentPage extends StatefulWidget {
+class LegalDocumentPage extends ConsumerStatefulWidget {
   final String docType;
 
   const LegalDocumentPage({super.key, required this.docType});
 
   @override
-  State<LegalDocumentPage> createState() => _LegalDocumentPageState();
+  ConsumerState<LegalDocumentPage> createState() => _LegalDocumentPageState();
 }
 
-class _LegalDocumentPageState extends State<LegalDocumentPage> {
+class _LegalDocumentPageState extends ConsumerState<LegalDocumentPage> {
   LegalDocument? _document;
   bool _isLoading = true;
   String? _error;
@@ -28,11 +28,7 @@ class _LegalDocumentPageState extends State<LegalDocumentPage> {
   @override
   void initState() {
     super.initState();
-    final authService = legacy_provider.Provider.of<AuthService>(
-      context,
-      listen: false,
-    );
-    _legalService = LegalService(authService);
+    _legalService = ref.read(legalServiceProvider);
     _loadDocument();
   }
 

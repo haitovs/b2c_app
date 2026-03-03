@@ -5,15 +5,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
-import 'package:provider/provider.dart' as legacy_provider;
-
 import '../../../core/config/app_config.dart';
 import '../../../core/models/api_exception.dart';
 import '../../../core/services/event_context_service.dart';
 import '../../../core/widgets/custom_app_bar.dart';
-import '../../auth/services/auth_service.dart';
 import '../../events/ui/widgets/profile_dropdown.dart';
-import '../../notifications/services/notification_service.dart';
+import '../../auth/providers/auth_provider.dart';
+import '../../notifications/providers/notification_providers.dart';
 import '../../notifications/ui/notification_drawer.dart';
 import 'widgets/delete_confirmation_dialog.dart';
 
@@ -63,11 +61,7 @@ class _MeetingsPageState extends ConsumerState<MeetingsPage> {
 
   Future<void> _loadNotificationCount() async {
     try {
-      final authService = legacy_provider.Provider.of<AuthService>(
-        context,
-        listen: false,
-      );
-      final notificationService = NotificationService(authService);
+      final notificationService = ref.read(notificationServiceProvider);
       final notifications = await notificationService.getNotifications();
       if (mounted) {
         setState(() {
@@ -110,11 +104,7 @@ class _MeetingsPageState extends ConsumerState<MeetingsPage> {
     setState(() => _isLoading = true);
 
     try {
-      final authService = legacy_provider.Provider.of<AuthService>(
-        context,
-        listen: false,
-      );
-      final token = await authService.getToken();
+      final token = await ref.read(authNotifierProvider.notifier).getToken();
 
       // Fetch meetings from B2C backend - filtered by event_id
       final eventId = widget.eventId;
@@ -321,17 +311,11 @@ class _MeetingsPageState extends ConsumerState<MeetingsPage> {
   }
 
   Future<void> _deleteMeeting(String meetingId) async {
-    // Capture context-dependent values before async gap
-    final authService = legacy_provider.Provider.of<AuthService>(
-      context,
-      listen: false,
-    );
-
     final confirmed = await showDeleteConfirmationDialog(context);
     if (!confirmed) return;
 
     try {
-      final token = await authService.getToken();
+      final token = await ref.read(authNotifierProvider.notifier).getToken();
 
       // Call API to update status to CANCELLED
       final response = await http.patch(
@@ -394,11 +378,7 @@ class _MeetingsPageState extends ConsumerState<MeetingsPage> {
 
   Future<void> _respondToMeeting(String meetingId, String action) async {
     try {
-      final authService = legacy_provider.Provider.of<AuthService>(
-        context,
-        listen: false,
-      );
-      final token = await authService.getToken();
+      final token = await ref.read(authNotifierProvider.notifier).getToken();
 
       final response = await http.post(
         Uri.parse(

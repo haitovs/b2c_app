@@ -1,6 +1,6 @@
 import '../../../core/config/app_config.dart';
 import '../../../core/services/api_client.dart';
-import '../../auth/services/auth_service.dart';
+import '../../../core/services/token_provider.dart';
 
 class ChatMessage {
   final int? id;
@@ -35,9 +35,9 @@ class ChatMessage {
 
 class HotlineService {
   final ApiClient _api;
-  final AuthService _authService;
+  final TokenProvider _tokenProvider;
 
-  HotlineService(this._authService) : _api = ApiClient(_authService);
+  HotlineService(this._api, this._tokenProvider);
 
   /// Get chat history
   Future<List<ChatMessage>> getChatHistory({
@@ -66,7 +66,7 @@ class HotlineService {
 
   /// Get WebSocket URL for real-time chat
   Future<String?> getWebSocketUrl() async {
-    final token = await _authService.getToken();
+    final token = await _tokenProvider.getToken();
     if (token == null) return null;
     // Convert http(s) to ws(s)
     final wsUrl = AppConfig.b2cApiBaseUrl.replaceFirst('http', 'ws');

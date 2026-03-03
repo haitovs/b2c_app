@@ -1,21 +1,21 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../services/auth_service.dart';
+import '../providers/auth_provider.dart';
 import 'login_page.dart';
 
 /// Page shown after registration, prompting user to verify their email
-class VerificationPendingPage extends StatefulWidget {
+class VerificationPendingPage extends ConsumerStatefulWidget {
   final String email;
 
   const VerificationPendingPage({super.key, required this.email});
 
   @override
-  State<VerificationPendingPage> createState() =>
+  ConsumerState<VerificationPendingPage> createState() =>
       _VerificationPendingPageState();
 }
 
-class _VerificationPendingPageState extends State<VerificationPendingPage> {
+class _VerificationPendingPageState extends ConsumerState<VerificationPendingPage> {
   bool _isResending = false;
   String? _message;
   bool _isSuccess = false;
@@ -26,7 +26,7 @@ class _VerificationPendingPageState extends State<VerificationPendingPage> {
       _message = null;
     });
 
-    final error = await context.read<AuthService>().resendVerificationEmail(
+    final error = await ref.read(authNotifierProvider.notifier).resendVerificationEmail(
       widget.email,
     );
 

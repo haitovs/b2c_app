@@ -3,9 +3,9 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
-import '../../features/auth/services/auth_service.dart';
 import '../config/app_config.dart';
 import '../models/api_exception.dart';
+import 'token_provider.dart';
 
 /// Result type for API calls - Success or Error
 class ApiResult<T> {
@@ -22,11 +22,11 @@ class ApiResult<T> {
 /// Centralized API client for all HTTP requests.
 /// Handles authentication, headers, and error parsing.
 class ApiClient {
-  final AuthService _authService;
+  final TokenProvider _tokenProvider;
 
   static const String _contentTypeJson = 'application/json';
 
-  ApiClient(this._authService);
+  ApiClient(this._tokenProvider);
 
   /// Base URL for B2C backend
   String get baseUrl => AppConfig.b2cApiBaseUrl;
@@ -39,7 +39,7 @@ class ApiClient {
     final headers = <String, String>{'Content-Type': _contentTypeJson};
 
     if (auth) {
-      final token = await _authService.getToken();
+      final token = await _tokenProvider.getToken();
       if (token != null) {
         headers['Authorization'] = 'Bearer $token';
       }

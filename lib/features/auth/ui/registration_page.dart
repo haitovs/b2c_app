@@ -1,22 +1,23 @@
 import 'package:b2c_app/l10n/generated/app_localizations.dart';
 import 'package:country_code_picker/country_code_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/app_theme.dart';
 import '../../../core/widgets/app_text_field.dart';
-import '../services/auth_service.dart';
+import '../providers/auth_provider.dart';
 import 'verification_code_page.dart';
 import 'widgets/auth_page_layout.dart';
 import 'widgets/auth_button.dart';
 
-class RegistrationPage extends StatefulWidget {
+class RegistrationPage extends ConsumerStatefulWidget {
   const RegistrationPage({super.key});
 
   @override
-  State<RegistrationPage> createState() => _RegistrationPageState();
+  ConsumerState<RegistrationPage> createState() => _RegistrationPageState();
 }
 
-class _RegistrationPageState extends State<RegistrationPage> {
+class _RegistrationPageState extends ConsumerState<RegistrationPage> {
   final _nameController = TextEditingController();
   final _surnameController = TextEditingController();
   final _emailController = TextEditingController();
@@ -28,8 +29,6 @@ class _RegistrationPageState extends State<RegistrationPage> {
   bool _isLoading = false;
 
   String _countryCode = "+993";
-
-  final _authService = AuthService();
 
   @override
   Widget build(BuildContext context) {
@@ -328,7 +327,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
     try {
       final fullMobile = "$_countryCode${_mobileController.text.trim()}";
 
-      final errorMessage = await _authService.register(
+      final errorMessage = await ref.read(authNotifierProvider.notifier).register(
         email: _emailController.text.trim(),
         password: _passwordController.text,
         firstName: _nameController.text.trim(),

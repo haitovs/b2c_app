@@ -1,5 +1,4 @@
 import '../../../core/services/api_client.dart';
-import '../../auth/services/auth_service.dart';
 
 /// Model for a feedback item
 class FeedbackItem {
@@ -32,7 +31,7 @@ class FeedbackItem {
 class FeedbackService {
   final ApiClient _api;
 
-  FeedbackService(AuthService authService) : _api = ApiClient(authService);
+  FeedbackService(this._api);
 
   /// Get feedback status (open/closed) for an event
   Future<bool> getFeedbackStatus(int eventId) async {

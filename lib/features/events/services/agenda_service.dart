@@ -1,10 +1,9 @@
 import '../../../core/services/api_client.dart';
-import '../../auth/services/auth_service.dart';
 
 class AgendaService {
   final ApiClient _api;
 
-  AgendaService(AuthService authService) : _api = ApiClient(authService);
+  AgendaService(this._api);
 
   /// Fetch agenda days from tourism backend
   Future<List<dynamic>> fetchAgendaDays({int? siteId}) async {

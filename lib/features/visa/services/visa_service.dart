@@ -4,18 +4,18 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../../../core/config/app_config.dart';
-import '../../auth/services/auth_service.dart';
+import '../../../core/services/token_provider.dart';
 
 /// Service for handling visa application API operations
 class VisaService {
-  final AuthService authService;
+  final TokenProvider _tokenProvider;
 
-  VisaService(this.authService);
+  VisaService(this._tokenProvider);
 
   String get _baseUrl => '${AppConfig.b2cApiBaseUrl}/api/v1/visas';
 
   Future<String?> _getToken() async {
-    final token = await authService.getToken();
+    final token = await _tokenProvider.getToken();
     if (token == null) throw Exception('Not authenticated');
     return token;
   }

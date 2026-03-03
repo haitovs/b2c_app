@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../core/services/api_client.dart';
-import '../../auth/services/auth_service.dart';
 
 /// Notification model
 class NotificationItem {
@@ -50,7 +49,7 @@ class NotificationService extends ChangeNotifier {
   int get unreadCount => _unreadCount;
   bool get isLoading => _isLoading;
 
-  NotificationService(AuthService authService) : _api = ApiClient(authService);
+  NotificationService(this._api);
 
   /// Fetch all notifications for current user
   Future<List<NotificationItem>> getNotifications() async {
