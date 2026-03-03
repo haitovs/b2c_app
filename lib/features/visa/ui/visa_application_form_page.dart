@@ -1037,183 +1037,88 @@ class _VisaApplicationFormPageState
   // TWO-COLUMN (desktop) LAYOUT
   // ---------------------------------------------------------------------------
 
+  Widget _buildFieldRow({required Widget left, required Widget right}) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: left),
+        const SizedBox(width: 24),
+        Expanded(child: right),
+      ],
+    );
+  }
+
   Widget _buildTwoColumnLayout() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Row 1: Name fields + Photo upload
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Column(
-                children: [
-                  _buildTextField('Name:', _nameController, 'John', true),
-                  _buildTextField(
-                      'Surname:', _surnameController, 'Smith', true),
-                  _buildGenderDropdown(),
-                  _buildTextField(
-                    'Surname at birth:',
-                    _surnameAtBirthController,
-                    'Maiden name (if different)',
-                    false,
-                    true, // optional label
-                  ),
-                  _buildCountryPickerField(
-                    'Country of birth:',
-                    _countryOfBirthController,
-                    true,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 24),
-            Expanded(
-              child: Column(
-                children: [
-                  _buildPhotoUploadSection(),
-                  _buildDateField('Date of birth:', null, _dateOfBirth,
-                      (date) {
-                    setState(() => _dateOfBirth = date);
-                  }, '1990-05-20'),
-                  _buildCountryPickerField(
-                    'Citizenship:',
-                    _citizenshipController,
-                    true,
-                  ),
-                  _buildTextField(
-                    'Place of birth (City):',
-                    _placeOfBirthController,
-                    'New York',
-                    true,
-                  ),
-                ],
-              ),
-            ),
-          ],
+        // Photo upload – full width so it doesn't push other fields down
+        _buildPhotoUploadSection(),
+
+        // Personal info – paired rows
+        _buildFieldRow(
+          left: _buildTextField('Name:', _nameController, 'John', true),
+          right: _buildDateField('Date of birth:', null, _dateOfBirth, (date) {
+            setState(() => _dateOfBirth = date);
+          }, '1990-05-20'),
+        ),
+        _buildFieldRow(
+          left: _buildTextField('Surname:', _surnameController, 'Smith', true),
+          right: _buildCountryPickerField('Citizenship:', _citizenshipController, true),
+        ),
+        _buildFieldRow(
+          left: _buildGenderDropdown(),
+          right: _buildTextField('Place of birth (City):', _placeOfBirthController, 'New York', true),
+        ),
+        _buildFieldRow(
+          left: _buildTextField('Surname at birth:', _surnameAtBirthController, 'Maiden name (if different)', false, true),
+          right: _buildCountryPickerField('Country of birth:', _countryOfBirthController, true),
         ),
 
-        // Row 2: Passport Details
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Column(
-                children: [
-                  _buildPassportTypeDropdown(),
-                  _buildDateField(
-                    'Passport date issue:',
-                    null,
-                    _passportDateIssue,
-                    (date) {
-                      setState(() => _passportDateIssue = date);
-                    },
-                    '2020-01-15',
-                  ),
-                  _buildCountryPickerField(
-                    'Place of issue (country):',
-                    _passportIssuingCountryController,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 24),
-            Expanded(
-              child: Column(
-                children: [
-                  _buildTextField(
-                    'Passport number:',
-                    _passportNumberController,
-                    'AB1234567',
-                    true,
-                  ),
-                  _buildDateField(
-                    'Passport validity period:',
-                    null,
-                    _passportExpiry,
-                    (date) {
-                      setState(() => _passportExpiry = date);
-                    },
-                    '2030-01-15',
-                  ),
-                  _buildTextField(
-                    'Personal Address:',
-                    _homeAddressController,
-                    'Street, Building, Apt',
-                    true,
-                  ),
-                ],
-              ),
-            ),
-          ],
+        // Passport section – paired rows
+        _buildFieldRow(
+          left: _buildPassportTypeDropdown(),
+          right: _buildTextField('Passport number:', _passportNumberController, 'AB1234567', true),
+        ),
+        _buildFieldRow(
+          left: _buildDateField('Passport date issue:', null, _passportDateIssue, (date) {
+            setState(() => _passportDateIssue = date);
+          }, '2020-01-15'),
+          right: _buildDateField('Passport validity period:', null, _passportExpiry, (date) {
+            setState(() => _passportExpiry = date);
+          }, '2030-01-15'),
+        ),
+        _buildFieldRow(
+          left: _buildCountryPickerField('Place of issue (country):', _passportIssuingCountryController),
+          right: _buildTextField('Personal Address:', _homeAddressController, 'Street, Building, Apt', true),
         ),
 
-        // Email (full width)
+        // Email – full width
         _buildTextField('Email:', _emailController, 'john@example.com', true),
 
-        // Row 3: Professional & Academic
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Column(
-                children: [
-                  _buildTextField(
-                    'Education:',
-                    _educationController,
-                    "Bachelor's Degree",
-                    true,
-                  ),
-                  _buildTextField(
-                    'Place of work (Company name):',
-                    _employerNameController,
-                    'Tech Corp',
-                  ),
-                  _buildTextField(
-                    'Position:',
-                    _jobTitleController,
-                    'Software Engineer',
-                    true,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 24),
-            Expanded(
-              child: Column(
-                children: [
-                  _buildTextField(
-                    'Speciality:',
-                    _specialtyController,
-                    'Computer Science',
-                    true,
-                  ),
-                  PhoneInputField(
-                    initialPhone: _phoneNumberE164,
-                    labelText: 'Personal mobile number:',
-                    hintText: '61444555',
-                    onChanged: (e164) {
-                      setState(() => _phoneNumberE164 = e164);
-                    },
-                  ),
-                  _buildTextField(
-                    'Place of education:',
-                    _placeOfStudyController,
-                    'Harvard University',
-                    true,
-                  ),
-                ],
-              ),
-            ),
-          ],
+        // Professional section – paired rows
+        _buildFieldRow(
+          left: _buildTextField('Education:', _educationController, "Bachelor's Degree", true),
+          right: _buildTextField('Speciality:', _specialtyController, 'Computer Science', true),
+        ),
+        _buildFieldRow(
+          left: _buildTextField('Place of work (Company name):', _employerNameController, 'Tech Corp'),
+          right: PhoneInputField(
+            initialPhone: _phoneNumberE164,
+            labelText: 'Personal mobile number:',
+            hintText: '61444555',
+            onChanged: (e164) {
+              setState(() => _phoneNumberE164 = e164);
+            },
+          ),
+        ),
+        _buildFieldRow(
+          left: _buildTextField('Position:', _jobTitleController, 'Software Engineer', true),
+          right: _buildTextField('Place of education:', _placeOfStudyController, 'Harvard University', true),
         ),
 
-        // Planned residential address (full width)
-        _buildTextField(
-          'Planned residential address:',
-          _plannedResidentialAddressController,
-          'Address during stay',
-        ),
+        // Planned residential address – full width
+        _buildTextField('Planned residential address:', _plannedResidentialAddressController, 'Address during stay'),
       ],
     );
   }
