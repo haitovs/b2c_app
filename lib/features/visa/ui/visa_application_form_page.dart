@@ -1052,27 +1052,37 @@ class _VisaApplicationFormPageState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Photo upload – full width so it doesn't push other fields down
-        _buildPhotoUploadSection(),
+        // Name/Surname on the left, Photo uploads on the right
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                children: [
+                  _buildTextField('Name:', _nameController, 'John', true),
+                  _buildTextField('Surname:', _surnameController, 'Smith', true),
+                ],
+              ),
+            ),
+            const SizedBox(width: 24),
+            Expanded(child: _buildPhotoUploadSection()),
+          ],
+        ),
 
-        // Personal info – paired rows
+        // Remaining personal info – paired rows
         _buildFieldRow(
-          left: _buildTextField('Name:', _nameController, 'John', true),
+          left: _buildGenderDropdown(),
           right: _buildDateField('Date of birth:', null, _dateOfBirth, (date) {
             setState(() => _dateOfBirth = date);
           }, '1990-05-20'),
         ),
         _buildFieldRow(
-          left: _buildTextField('Surname:', _surnameController, 'Smith', true),
+          left: _buildTextField('Surname at birth:', _surnameAtBirthController, 'Maiden name (if different)', false, true),
           right: _buildCountryPickerField('Citizenship:', _citizenshipController, true),
         ),
         _buildFieldRow(
-          left: _buildGenderDropdown(),
+          left: _buildCountryPickerField('Country of birth:', _countryOfBirthController, true),
           right: _buildTextField('Place of birth (City):', _placeOfBirthController, 'New York', true),
-        ),
-        _buildFieldRow(
-          left: _buildTextField('Surname at birth:', _surnameAtBirthController, 'Maiden name (if different)', false, true),
-          right: _buildCountryPickerField('Country of birth:', _countryOfBirthController, true),
         ),
 
         // Passport section – paired rows
