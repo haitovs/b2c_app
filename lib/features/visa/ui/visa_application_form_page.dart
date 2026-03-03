@@ -3,17 +3,17 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/widgets/phone_input_field.dart';
-import '../../auth/providers/auth_provider.dart';
-import '../providers/visa_providers.dart';
+import '../../auth/services/auth_service.dart';
+import '../services/visa_service.dart';
 
 const List<String> _countries = [
   'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola',
@@ -67,7 +67,7 @@ const List<String> _passportTypes = [
 ];
 
 /// Visa Application Form Page matching Figma design
-class VisaApplicationFormPage extends ConsumerStatefulWidget {
+class VisaApplicationFormPage extends StatefulWidget {
   final int eventId;
   final String? participantId;
 
@@ -78,12 +78,11 @@ class VisaApplicationFormPage extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<VisaApplicationFormPage> createState() =>
+  State<VisaApplicationFormPage> createState() =>
       _VisaApplicationFormPageState();
 }
 
-class _VisaApplicationFormPageState
-    extends ConsumerState<VisaApplicationFormPage> {
+class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
   final _formKey = GlobalKey<FormState>();
   final _imagePicker = ImagePicker();
 
@@ -196,7 +195,7 @@ class _VisaApplicationFormPageState
         return;
       }
 
-      final visaService = ref.read(visaServiceProvider);
+      final visaService = context.read<VisaService>();
       Map<String, dynamic> visa;
       try {
         visa = await visaService.getMyVisa(widget.participantId!);
@@ -359,7 +358,8 @@ class _VisaApplicationFormPageState
 
   Future<void> _prefillFromParticipant() async {
     try {
-      final token = await ref.read(authNotifierProvider.notifier).getToken();
+      final authService = context.read<AuthService>();
+      final token = await authService.getToken();
 
       final response = await http.get(
         Uri.parse(
@@ -508,7 +508,7 @@ class _VisaApplicationFormPageState
       String? photoUrl;
       if (_photoFile != null || _photoBytes != null) {
         if (!mounted) return;
-        final visaService = ref.read(visaServiceProvider);
+        final visaService = context.read<VisaService>();
         photoUrl = await visaService.uploadPhoto(
           participantId: widget.participantId ?? 'self',
           photoData: kIsWeb ? _photoBytes : _photoFile,
@@ -519,7 +519,7 @@ class _VisaApplicationFormPageState
       String? passportScanUrl;
       if (_passportScanFile != null || _passportScanBytes != null) {
         if (!mounted) return;
-        final visaService = ref.read(visaServiceProvider);
+        final visaService = context.read<VisaService>();
         passportScanUrl = await visaService.uploadPhoto(
           participantId: widget.participantId ?? 'self',
           photoData: kIsWeb ? _passportScanBytes : _passportScanFile,
@@ -600,7 +600,7 @@ class _VisaApplicationFormPageState
 
       // 4. Update visa application
       if (!mounted) return;
-      final visaService = ref.read(visaServiceProvider);
+      final visaService = context.read<VisaService>();
       await visaService.updateMyVisa(
         participantId: widget.participantId ?? 'self',
         data: formData,
@@ -720,31 +720,18 @@ class _VisaApplicationFormPageState
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 1. Page title
                 _buildPageTitle(),
                 const SizedBox(height: 12),
-
-                // 2. Separator line
                 _buildSeparatorLine(),
                 const SizedBox(height: 20),
-
-                // 3. Alert banner
                 _buildAlertBanner(),
                 const SizedBox(height: 24),
-
-                // 4. Main form card
                 _buildMainFormCard(),
                 const SizedBox(height: 24),
-
-                // 5. Marital status card
                 _buildMaritalStatusCard(),
                 const SizedBox(height: 24),
-
-                // 6. Confirmation checkbox
                 _buildConfirmationCheckbox(),
                 const SizedBox(height: 24),
-
-                // 7. Cancel + Submit buttons
                 _buildButtonRow(),
                 const SizedBox(height: 32),
               ],
@@ -772,10 +759,7 @@ class _VisaApplicationFormPageState
   }
 
   Widget _buildSeparatorLine() {
-    return Container(
-      height: 0.5,
-      color: const Color(0xFFCACACA),
-    );
+    return Container(height: 0.5, color: const Color(0xFFCACACA));
   }
 
   Widget _buildAlertBanner() {
@@ -801,11 +785,7 @@ class _VisaApplicationFormPageState
           const Expanded(
             child: Text(
               'If the application form is not completed correctly or required information is missing, there is a risk that the visa may be denied.',
-              style: TextStyle(
-                color: _alertTextColor,
-                fontSize: 14,
-                height: 1.4,
-              ),
+              style: TextStyle(color: _alertTextColor, fontSize: 14, height: 1.4),
             ),
           ),
         ],
@@ -819,18 +799,13 @@ class _VisaApplicationFormPageState
         color: Colors.white,
         borderRadius: BorderRadius.circular(5),
         boxShadow: const [
-          BoxShadow(
-            color: Color(0x40000000),
-            blurRadius: 10,
-            offset: Offset.zero,
-          ),
+          BoxShadow(color: Color(0x40000000), blurRadius: 10, offset: Offset.zero),
         ],
       ),
       padding: const EdgeInsets.all(24),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final isWide = constraints.maxWidth > 600;
-          if (isWide) {
+          if (constraints.maxWidth > 600) {
             return _buildTwoColumnLayout();
           } else {
             return _buildSingleColumnLayout();
@@ -846,11 +821,7 @@ class _VisaApplicationFormPageState
         color: Colors.white,
         borderRadius: BorderRadius.circular(5),
         boxShadow: const [
-          BoxShadow(
-            color: Color(0x40000000),
-            blurRadius: 10,
-            offset: Offset.zero,
-          ),
+          BoxShadow(color: Color(0x40000000), blurRadius: 10, offset: Offset.zero),
         ],
       ),
       padding: const EdgeInsets.all(24),
@@ -859,35 +830,21 @@ class _VisaApplicationFormPageState
         children: [
           const Text(
             'Marital Status',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF1E1E1E),
-            ),
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Color(0xFF1E1E1E)),
           ),
           const SizedBox(height: 16),
           _buildMaritalStatusToggle(),
           const SizedBox(height: 16),
-
-          // Relatives section (shown when married)
           if (_maritalStatus == 'married') ...[
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'Relatives:',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
+                const Text('Relatives:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
                 TextButton.icon(
                   onPressed: _addRelative,
                   icon: const Icon(Icons.add, size: 18),
                   label: const Text('Add'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: _primaryColor,
-                  ),
+                  style: TextButton.styleFrom(foregroundColor: _primaryColor),
                 ),
               ],
             ),
@@ -904,7 +861,6 @@ class _VisaApplicationFormPageState
     final isMarried = _maritalStatus == 'married';
     return Row(
       children: [
-        // Yes button
         SizedBox(
           width: 100,
           height: 40,
@@ -914,15 +870,12 @@ class _VisaApplicationFormPageState
               backgroundColor: isMarried ? _greenColor : Colors.white,
               foregroundColor: isMarried ? Colors.white : _greenColor,
               side: const BorderSide(color: _greenColor, width: 1.5),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(5),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
             ),
             child: const Text('Yes', style: TextStyle(fontSize: 14)),
           ),
         ),
         const SizedBox(width: 12),
-        // No button
         SizedBox(
           width: 100,
           height: 40,
@@ -932,9 +885,7 @@ class _VisaApplicationFormPageState
               backgroundColor: !isMarried ? _redColor : Colors.white,
               foregroundColor: !isMarried ? Colors.white : _redColor,
               side: const BorderSide(color: _redColor, width: 1.5),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(5),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
             ),
             child: const Text('No', style: TextStyle(fontSize: 14)),
           ),
@@ -945,11 +896,7 @@ class _VisaApplicationFormPageState
 
   Widget _buildConfirmationCheckbox() {
     return GestureDetector(
-      onTap: () {
-        setState(() {
-          _confirmationChecked = !_confirmationChecked;
-        });
-      },
+      onTap: () => setState(() => _confirmationChecked = !_confirmationChecked),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -979,7 +926,6 @@ class _VisaApplicationFormPageState
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        // Cancel button
         SizedBox(
           width: 183,
           height: 43,
@@ -988,18 +934,12 @@ class _VisaApplicationFormPageState
             style: OutlinedButton.styleFrom(
               foregroundColor: const Color(0xFF666666),
               side: const BorderSide(color: _borderColor),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(5),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
             ),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-            ),
+            child: const Text('Cancel', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
           ),
         ),
         const SizedBox(width: 16),
-        // Submit button
         SizedBox(
           width: 183,
           height: 43,
@@ -1009,24 +949,14 @@ class _VisaApplicationFormPageState
               backgroundColor: _primaryColor,
               foregroundColor: Colors.white,
               disabledBackgroundColor: _primaryColor.withAlpha(153),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(5),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
             ),
             child: _isSubmitting
                 ? const SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(
-                      color: Colors.white,
-                      strokeWidth: 2,
-                    ),
+                    height: 20, width: 20,
+                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                   )
-                : const Text(
-                    'Submit',
-                    style:
-                        TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                  ),
+                : const Text('Submit', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
           ),
         ),
       ],
@@ -1041,7 +971,6 @@ class _VisaApplicationFormPageState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Row 1: Name fields + Photo upload
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1049,21 +978,10 @@ class _VisaApplicationFormPageState
               child: Column(
                 children: [
                   _buildTextField('Name:', _nameController, 'John', true),
-                  _buildTextField(
-                      'Surname:', _surnameController, 'Smith', true),
+                  _buildTextField('Surname:', _surnameController, 'Smith', true),
                   _buildGenderDropdown(),
-                  _buildTextField(
-                    'Surname at birth:',
-                    _surnameAtBirthController,
-                    'Maiden name (if different)',
-                    false,
-                    true, // optional label
-                  ),
-                  _buildCountryPickerField(
-                    'Country of birth:',
-                    _countryOfBirthController,
-                    true,
-                  ),
+                  _buildTextField('Surname at birth:', _surnameAtBirthController, 'Maiden name (if different)', false, true),
+                  _buildCountryPickerField('Country of birth:', _countryOfBirthController, true),
                 ],
               ),
             ),
@@ -1072,28 +990,16 @@ class _VisaApplicationFormPageState
               child: Column(
                 children: [
                   _buildPhotoUploadSection(),
-                  _buildDateField('Date of birth:', null, _dateOfBirth,
-                      (date) {
+                  _buildDateField('Date of birth:', null, _dateOfBirth, (date) {
                     setState(() => _dateOfBirth = date);
                   }, '1990-05-20'),
-                  _buildCountryPickerField(
-                    'Citizenship:',
-                    _citizenshipController,
-                    true,
-                  ),
-                  _buildTextField(
-                    'Place of birth (City):',
-                    _placeOfBirthController,
-                    'New York',
-                    true,
-                  ),
+                  _buildCountryPickerField('Citizenship:', _citizenshipController, true),
+                  _buildTextField('Place of birth (City):', _placeOfBirthController, 'New York', true),
                 ],
               ),
             ),
           ],
         ),
-
-        // Row 2: Passport Details
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1101,19 +1007,10 @@ class _VisaApplicationFormPageState
               child: Column(
                 children: [
                   _buildPassportTypeDropdown(),
-                  _buildDateField(
-                    'Passport date issue:',
-                    null,
-                    _passportDateIssue,
-                    (date) {
-                      setState(() => _passportDateIssue = date);
-                    },
-                    '2020-01-15',
-                  ),
-                  _buildCountryPickerField(
-                    'Place of issue (country):',
-                    _passportIssuingCountryController,
-                  ),
+                  _buildDateField('Passport date issue:', null, _passportDateIssue, (date) {
+                    setState(() => _passportDateIssue = date);
+                  }, '2020-01-15'),
+                  _buildCountryPickerField('Place of issue (country):', _passportIssuingCountryController),
                 ],
               ),
             ),
@@ -1121,60 +1018,26 @@ class _VisaApplicationFormPageState
             Expanded(
               child: Column(
                 children: [
-                  _buildTextField(
-                    'Passport number:',
-                    _passportNumberController,
-                    'AB1234567',
-                    true,
-                  ),
-                  _buildDateField(
-                    'Passport validity period:',
-                    null,
-                    _passportExpiry,
-                    (date) {
-                      setState(() => _passportExpiry = date);
-                    },
-                    '2030-01-15',
-                  ),
-                  _buildTextField(
-                    'Personal Address:',
-                    _homeAddressController,
-                    'Street, Building, Apt',
-                    true,
-                  ),
+                  _buildTextField('Passport number:', _passportNumberController, 'AB1234567', true),
+                  _buildDateField('Passport validity period:', null, _passportExpiry, (date) {
+                    setState(() => _passportExpiry = date);
+                  }, '2030-01-15'),
+                  _buildTextField('Personal Address:', _homeAddressController, 'Street, Building, Apt', true),
                 ],
               ),
             ),
           ],
         ),
-
-        // Email (full width)
         _buildTextField('Email:', _emailController, 'john@example.com', true),
-
-        // Row 3: Professional & Academic
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
               child: Column(
                 children: [
-                  _buildTextField(
-                    'Education:',
-                    _educationController,
-                    "Bachelor's Degree",
-                    true,
-                  ),
-                  _buildTextField(
-                    'Place of work (Company name):',
-                    _employerNameController,
-                    'Tech Corp',
-                  ),
-                  _buildTextField(
-                    'Position:',
-                    _jobTitleController,
-                    'Software Engineer',
-                    true,
-                  ),
+                  _buildTextField('Education:', _educationController, "Bachelor's Degree", true),
+                  _buildTextField('Place of work (Company name):', _employerNameController, 'Tech Corp'),
+                  _buildTextField('Position:', _jobTitleController, 'Software Engineer', true),
                 ],
               ),
             ),
@@ -1182,38 +1045,20 @@ class _VisaApplicationFormPageState
             Expanded(
               child: Column(
                 children: [
-                  _buildTextField(
-                    'Speciality:',
-                    _specialtyController,
-                    'Computer Science',
-                    true,
-                  ),
+                  _buildTextField('Speciality:', _specialtyController, 'Computer Science', true),
                   PhoneInputField(
                     initialPhone: _phoneNumberE164,
                     labelText: 'Personal mobile number:',
                     hintText: '61444555',
-                    onChanged: (e164) {
-                      setState(() => _phoneNumberE164 = e164);
-                    },
+                    onChanged: (e164) => setState(() => _phoneNumberE164 = e164),
                   ),
-                  _buildTextField(
-                    'Place of education:',
-                    _placeOfStudyController,
-                    'Harvard University',
-                    true,
-                  ),
+                  _buildTextField('Place of education:', _placeOfStudyController, 'Harvard University', true),
                 ],
               ),
             ),
           ],
         ),
-
-        // Planned residential address (full width)
-        _buildTextField(
-          'Planned residential address:',
-          _plannedResidentialAddressController,
-          'Address during stay',
-        ),
+        _buildTextField('Planned residential address:', _plannedResidentialAddressController, 'Address during stay'),
       ],
     );
   }
@@ -1230,105 +1075,36 @@ class _VisaApplicationFormPageState
         _buildTextField('Name:', _nameController, 'John', true),
         _buildTextField('Surname:', _surnameController, 'Smith', true),
         _buildGenderDropdown(),
-        _buildTextField(
-          'Surname at birth:',
-          _surnameAtBirthController,
-          'Maiden name (if different)',
-          false,
-          true,
-        ),
-        _buildCountryPickerField(
-          'Country of birth:',
-          _countryOfBirthController,
-          true,
-        ),
-        _buildTextField(
-          'Place of birth (City):',
-          _placeOfBirthController,
-          'New York',
-          true,
-        ),
+        _buildTextField('Surname at birth:', _surnameAtBirthController, 'Maiden name (if different)', false, true),
+        _buildCountryPickerField('Country of birth:', _countryOfBirthController, true),
+        _buildTextField('Place of birth (City):', _placeOfBirthController, 'New York', true),
         _buildDateField('Date of birth:', null, _dateOfBirth, (date) {
           setState(() => _dateOfBirth = date);
         }, '1990-05-20'),
-        _buildCountryPickerField(
-          'Citizenship:',
-          _citizenshipController,
-          true,
-        ),
+        _buildCountryPickerField('Citizenship:', _citizenshipController, true),
         _buildTextField('Email:', _emailController, 'john@example.com', true),
         PhoneInputField(
           initialPhone: _phoneNumberE164,
           labelText: 'Personal mobile number:',
           hintText: '61444555',
-          onChanged: (e164) {
-            setState(() => _phoneNumberE164 = e164);
-          },
+          onChanged: (e164) => setState(() => _phoneNumberE164 = e164),
         ),
         _buildPassportTypeDropdown(),
-        _buildTextField(
-          'Passport number:',
-          _passportNumberController,
-          'AB1234567',
-          true,
-        ),
-        _buildDateField('Passport date issue:', null, _passportDateIssue,
-            (date) {
+        _buildTextField('Passport number:', _passportNumberController, 'AB1234567', true),
+        _buildDateField('Passport date issue:', null, _passportDateIssue, (date) {
           setState(() => _passportDateIssue = date);
         }, '2020-01-15'),
-        _buildDateField(
-          'Passport validity period:',
-          null,
-          _passportExpiry,
-          (date) {
-            setState(() => _passportExpiry = date);
-          },
-          '2030-01-15',
-        ),
-        _buildCountryPickerField(
-          'Place of issue (country):',
-          _passportIssuingCountryController,
-        ),
-        _buildTextField(
-          'Personal Address:',
-          _homeAddressController,
-          'Street, Building, Apt',
-          true,
-        ),
-        _buildTextField(
-          'Education:',
-          _educationController,
-          "Bachelor's Degree",
-          true,
-        ),
-        _buildTextField(
-          'Speciality:',
-          _specialtyController,
-          'Computer Science',
-          true,
-        ),
-        _buildTextField(
-          'Place of work (Company name):',
-          _employerNameController,
-          'Tech Corp',
-        ),
-        _buildTextField(
-          'Position:',
-          _jobTitleController,
-          'Software Engineer',
-          true,
-        ),
-        _buildTextField(
-          'Place of education:',
-          _placeOfStudyController,
-          'Harvard University',
-          true,
-        ),
-        _buildTextField(
-          'Planned residential address:',
-          _plannedResidentialAddressController,
-          'Address during stay',
-        ),
+        _buildDateField('Passport validity period:', null, _passportExpiry, (date) {
+          setState(() => _passportExpiry = date);
+        }, '2030-01-15'),
+        _buildCountryPickerField('Place of issue (country):', _passportIssuingCountryController),
+        _buildTextField('Personal Address:', _homeAddressController, 'Street, Building, Apt', true),
+        _buildTextField('Education:', _educationController, "Bachelor's Degree", true),
+        _buildTextField('Speciality:', _specialtyController, 'Computer Science', true),
+        _buildTextField('Place of work (Company name):', _employerNameController, 'Tech Corp'),
+        _buildTextField('Position:', _jobTitleController, 'Software Engineer', true),
+        _buildTextField('Place of education:', _placeOfStudyController, 'Harvard University', true),
+        _buildTextField('Planned residential address:', _plannedResidentialAddressController, 'Address during stay'),
       ],
     );
   }
@@ -1365,9 +1141,7 @@ class _VisaApplicationFormPageState
               controller: controller,
               validator: isRequired
                   ? (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'This field is required';
-                      }
+                      if (value == null || value.trim().isEmpty) return 'This field is required';
                       return null;
                     }
                   : null,
@@ -1385,48 +1159,19 @@ class _VisaApplicationFormPageState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Gender:',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w500,
-              fontFamily: 'Inter',
-              color: Color(0xFF1E1E1E),
-            ),
-          ),
+          const Text('Gender:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500, fontFamily: 'Inter', color: Color(0xFF1E1E1E))),
           const SizedBox(height: 6),
           SizedBox(
             height: 50,
             child: DropdownButtonFormField<String>(
               initialValue: _gender,
               isExpanded: true,
-              icon: SvgPicture.asset(
-                'assets/visa_application/icons/chevron-down.svg',
-                width: 18,
-                height: 18,
-              ),
+              icon: SvgPicture.asset('assets/visa_application/icons/chevron-down.svg', width: 18, height: 18),
               decoration: _inputDecoration(),
-              hint: Text(
-                'Select gender',
-                style: TextStyle(color: Colors.grey[400], fontSize: 14),
-              ),
-              items: ['Male', 'Female'].map((String value) {
-                return DropdownMenuItem<String>(
-                  value: value,
-                  child: Text(value),
-                );
-              }).toList(),
-              onChanged: (String? newValue) {
-                setState(() {
-                  _gender = newValue;
-                });
-              },
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'This field is required';
-                }
-                return null;
-              },
+              hint: Text('Select gender', style: TextStyle(color: Colors.grey[400], fontSize: 14)),
+              items: ['Male', 'Female'].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
+              onChanged: (v) => setState(() => _gender = v),
+              validator: (v) => (v == null || v.isEmpty) ? 'This field is required' : null,
             ),
           ),
         ],
@@ -1440,42 +1185,18 @@ class _VisaApplicationFormPageState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Type of passport:',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w500,
-              fontFamily: 'Inter',
-              color: Color(0xFF1E1E1E),
-            ),
-          ),
+          const Text('Type of passport:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500, fontFamily: 'Inter', color: Color(0xFF1E1E1E))),
           const SizedBox(height: 6),
           SizedBox(
             height: 50,
             child: DropdownButtonFormField<String>(
               initialValue: _typeOfPassport,
               isExpanded: true,
-              icon: SvgPicture.asset(
-                'assets/visa_application/icons/chevron-down.svg',
-                width: 18,
-                height: 18,
-              ),
+              icon: SvgPicture.asset('assets/visa_application/icons/chevron-down.svg', width: 18, height: 18),
               decoration: _inputDecoration(),
-              hint: Text(
-                'Select passport type',
-                style: TextStyle(color: Colors.grey[400], fontSize: 14),
-              ),
-              items: _passportTypes.map((String value) {
-                return DropdownMenuItem<String>(
-                  value: value,
-                  child: Text(value),
-                );
-              }).toList(),
-              onChanged: (String? newValue) {
-                setState(() {
-                  _typeOfPassport = newValue;
-                });
-              },
+              hint: Text('Select passport type', style: TextStyle(color: Colors.grey[400], fontSize: 14)),
+              items: _passportTypes.map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
+              onChanged: (v) => setState(() => _typeOfPassport = v),
             ),
           ),
         ],
@@ -1490,9 +1211,7 @@ class _VisaApplicationFormPageState
     Function(DateTime)? onDateSelected,
     String? hintText,
   ]) {
-    final TextEditingController displayController =
-        controller ?? TextEditingController();
-
+    final displayController = controller ?? TextEditingController();
     if (selectedDate != null && controller == null) {
       displayController.text = DateFormat('yyyy-MM-dd').format(selectedDate);
     }
@@ -1502,15 +1221,7 @@ class _VisaApplicationFormPageState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w500,
-              fontFamily: 'Inter',
-              color: Color(0xFF1E1E1E),
-            ),
-          ),
+          Text(label, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500, fontFamily: 'Inter', color: Color(0xFF1E1E1E))),
           const SizedBox(height: 6),
           SizedBox(
             height: 50,
@@ -1519,25 +1230,15 @@ class _VisaApplicationFormPageState
               readOnly: true,
               style: const TextStyle(color: Colors.black, fontSize: 14),
               onTap: () {
-                selectDate(
-                  context,
-                  selectedDate,
-                  onDateSelected ??
-                      (date) {
-                        controller?.text =
-                            DateFormat('yyyy-MM-dd').format(date);
-                      },
-                );
+                selectDate(context, selectedDate, onDateSelected ?? (date) {
+                  controller?.text = DateFormat('yyyy-MM-dd').format(date);
+                });
               },
               decoration: _inputDecoration(
                 hintText: hintText,
                 suffixIcon: Padding(
                   padding: const EdgeInsets.all(14),
-                  child: SvgPicture.asset(
-                    'assets/visa_application/icons/calendar.svg',
-                    width: 18,
-                    height: 18,
-                  ),
+                  child: SvgPicture.asset('assets/visa_application/icons/calendar.svg', width: 18, height: 18),
                 ),
               ),
             ),
@@ -1556,10 +1257,7 @@ class _VisaApplicationFormPageState
           builder: (ctx, setDialogState) {
             final filtered = searchQuery.isEmpty
                 ? _countries
-                : _countries
-                    .where((c) =>
-                        c.toLowerCase().contains(searchQuery.toLowerCase()))
-                    .toList();
+                : _countries.where((c) => c.toLowerCase().contains(searchQuery.toLowerCase())).toList();
             return AlertDialog(
               title: const Text('Select Country'),
               content: SizedBox(
@@ -1572,17 +1270,10 @@ class _VisaApplicationFormPageState
                       decoration: InputDecoration(
                         hintText: 'Search country...',
                         prefixIcon: const Icon(Icons.search),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 10,
-                        ),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                       ),
-                      onChanged: (value) {
-                        setDialogState(() => searchQuery = value);
-                      },
+                      onChanged: (value) => setDialogState(() => searchQuery = value),
                     ),
                     const SizedBox(height: 8),
                     Expanded(
@@ -1592,25 +1283,14 @@ class _VisaApplicationFormPageState
                               itemCount: filtered.length,
                               itemBuilder: (ctx, index) {
                                 final country = filtered[index];
-                                final isSelected =
-                                    controller.text == country;
+                                final isSelected = controller.text == country;
                                 return ListTile(
                                   dense: true,
-                                  title: Text(
-                                    country,
-                                    style: TextStyle(
-                                      fontWeight: isSelected
-                                          ? FontWeight.bold
-                                          : FontWeight.normal,
-                                      color: isSelected
-                                          ? _primaryColor
-                                          : null,
-                                    ),
-                                  ),
-                                  trailing: isSelected
-                                      ? const Icon(Icons.check,
-                                          color: _primaryColor, size: 20)
-                                      : null,
+                                  title: Text(country, style: TextStyle(
+                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                    color: isSelected ? _primaryColor : null,
+                                  )),
+                                  trailing: isSelected ? const Icon(Icons.check, color: _primaryColor, size: 20) : null,
                                   onTap: () {
                                     controller.text = country;
                                     Navigator.of(ctx).pop();
@@ -1623,12 +1303,7 @@ class _VisaApplicationFormPageState
                   ],
                 ),
               ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(ctx).pop(),
-                  child: const Text('Cancel'),
-                ),
-              ],
+              actions: [TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel'))],
             );
           },
         );
@@ -1636,25 +1311,13 @@ class _VisaApplicationFormPageState
     );
   }
 
-  Widget _buildCountryPickerField(
-    String label,
-    TextEditingController controller, [
-    bool isRequired = false,
-  ]) {
+  Widget _buildCountryPickerField(String label, TextEditingController controller, [bool isRequired = false]) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w500,
-              fontFamily: 'Inter',
-              color: Color(0xFF1E1E1E),
-            ),
-          ),
+          Text(label, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500, fontFamily: 'Inter', color: Color(0xFF1E1E1E))),
           const SizedBox(height: 6),
           SizedBox(
             height: 50,
@@ -1662,23 +1325,12 @@ class _VisaApplicationFormPageState
               controller: controller,
               readOnly: true,
               onTap: () => _showCountryPickerDialog(controller),
-              validator: isRequired
-                  ? (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'This field is required';
-                      }
-                      return null;
-                    }
-                  : null,
+              validator: isRequired ? (v) => (v == null || v.trim().isEmpty) ? 'This field is required' : null : null,
               decoration: _inputDecoration(
                 hintText: 'Select country',
                 suffixIcon: Padding(
                   padding: const EdgeInsets.all(14),
-                  child: SvgPicture.asset(
-                    'assets/visa_application/icons/chevron-down.svg',
-                    width: 18,
-                    height: 18,
-                  ),
+                  child: SvgPicture.asset('assets/visa_application/icons/chevron-down.svg', width: 18, height: 18),
                 ),
               ),
             ),
@@ -1698,28 +1350,18 @@ class _VisaApplicationFormPageState
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Left: Portrait photo
           _buildPhotoBox(
-            width: 123,
-            height: 154,
-            label: 'Portrait photo',
+            width: 123, height: 154, label: 'Portrait photo',
             hasImage: kIsWeb ? _photoBytes != null : _photoFile != null,
             imageWidget: _buildPortraitImage(),
-            onUpload: _pickImage,
-            onDelete: _deletePhoto,
+            onUpload: _pickImage, onDelete: _deletePhoto,
           ),
           const SizedBox(width: 16),
-          // Right: Passport scan
           _buildPhotoBox(
-            width: 216,
-            height: 154,
-            label: 'Passport scan',
-            hasImage: kIsWeb
-                ? _passportScanBytes != null
-                : _passportScanFile != null,
+            width: 216, height: 154, label: 'Passport scan',
+            hasImage: kIsWeb ? _passportScanBytes != null : _passportScanFile != null,
             imageWidget: _buildPassportScanImage(),
-            onUpload: _pickPassportScan,
-            onDelete: _deletePassportScan,
+            onUpload: _pickPassportScan, onDelete: _deletePassportScan,
           ),
         ],
       ),
@@ -1727,71 +1369,37 @@ class _VisaApplicationFormPageState
   }
 
   Widget _buildPhotoBox({
-    required double width,
-    required double height,
-    required String label,
-    required bool hasImage,
-    required Widget imageWidget,
-    required VoidCallback onUpload,
-    required VoidCallback onDelete,
+    required double width, required double height, required String label,
+    required bool hasImage, required Widget imageWidget,
+    required VoidCallback onUpload, required VoidCallback onDelete,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: Color(0xFF1E1E1E),
-          ),
-        ),
+        Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF1E1E1E))),
         const SizedBox(height: 6),
         Stack(
           children: [
             Container(
-              width: width,
-              height: height,
+              width: width, height: height,
               decoration: BoxDecoration(
-                border: Border.all(
-                  color: hasImage ? _primaryColor : _borderColor,
-                  width: hasImage ? 2 : 1,
-                ),
+                border: Border.all(color: hasImage ? _primaryColor : _borderColor, width: hasImage ? 2 : 1),
                 borderRadius: BorderRadius.circular(5),
                 color: Colors.grey[50],
               ),
               child: hasImage
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: imageWidget,
-                    )
-                  : Center(
-                      child: Icon(
-                        Icons.image_outlined,
-                        size: 40,
-                        color: Colors.grey[300],
-                      ),
-                    ),
+                  ? ClipRRect(borderRadius: BorderRadius.circular(4), child: imageWidget)
+                  : Center(child: Icon(Icons.image_outlined, size: 40, color: Colors.grey[300])),
             ),
-            // Delete button (top-right)
             if (hasImage)
               Positioned(
-                top: 4,
-                right: 4,
+                top: 4, right: 4,
                 child: GestureDetector(
                   onTap: onDelete,
                   child: Container(
-                    width: 24,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      color: Colors.black54,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: SvgPicture.asset(
-                      'assets/visa_application/icons/x-close.svg',
-                      width: 14,
-                      height: 14,
-                    ),
+                    width: 24, height: 24,
+                    decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(12)),
+                    child: SvgPicture.asset('assets/visa_application/icons/x-close.svg', width: 14, height: 14),
                   ),
                 ),
               ),
@@ -1799,22 +1407,15 @@ class _VisaApplicationFormPageState
         ),
         const SizedBox(height: 8),
         SizedBox(
-          width: width,
-          height: 32,
+          width: width, height: 32,
           child: ElevatedButton(
             onPressed: onUpload,
             style: ElevatedButton.styleFrom(
-              backgroundColor: _primaryColor,
-              foregroundColor: Colors.white,
+              backgroundColor: _primaryColor, foregroundColor: Colors.white,
               padding: EdgeInsets.zero,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(5),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
             ),
-            child: Text(
-              hasImage ? 'Change' : 'Upload',
-              style: const TextStyle(fontSize: 12),
-            ),
+            child: Text(hasImage ? 'Change' : 'Upload', style: const TextStyle(fontSize: 12)),
           ),
         ),
       ],
@@ -1822,22 +1423,14 @@ class _VisaApplicationFormPageState
   }
 
   Widget _buildPortraitImage() {
-    if (kIsWeb && _photoBytes != null) {
-      return Image.memory(_photoBytes!, fit: BoxFit.cover);
-    }
-    if (!kIsWeb && _photoFile != null) {
-      return Image.file(_photoFile!, fit: BoxFit.cover);
-    }
+    if (kIsWeb && _photoBytes != null) return Image.memory(_photoBytes!, fit: BoxFit.cover);
+    if (!kIsWeb && _photoFile != null) return Image.file(_photoFile!, fit: BoxFit.cover);
     return const SizedBox.shrink();
   }
 
   Widget _buildPassportScanImage() {
-    if (kIsWeb && _passportScanBytes != null) {
-      return Image.memory(_passportScanBytes!, fit: BoxFit.cover);
-    }
-    if (!kIsWeb && _passportScanFile != null) {
-      return Image.file(_passportScanFile!, fit: BoxFit.cover);
-    }
+    if (kIsWeb && _passportScanBytes != null) return Image.memory(_passportScanBytes!, fit: BoxFit.cover);
+    if (!kIsWeb && _passportScanFile != null) return Image.file(_passportScanFile!, fit: BoxFit.cover);
     return const SizedBox.shrink();
   }
 
@@ -1849,74 +1442,36 @@ class _VisaApplicationFormPageState
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        border: Border.all(color: _borderColor),
-        borderRadius: BorderRadius.circular(5),
-      ),
+      decoration: BoxDecoration(border: Border.all(color: _borderColor), borderRadius: BorderRadius.circular(5)),
       child: Column(
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Relative ${index + 1}',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.delete_outline, color: _redColor),
-                onPressed: () => _removeRelative(index),
-              ),
+              Text('Relative ${index + 1}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+              IconButton(icon: const Icon(Icons.delete_outline, color: _redColor), onPressed: () => _removeRelative(index)),
             ],
           ),
           const SizedBox(height: 8),
-
-          // Relationship dropdown
           Padding(
             padding: const EdgeInsets.only(bottom: 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Relationship:',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w500,
-                    fontFamily: 'Inter',
-                  ),
-                ),
+                const Text('Relationship:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500, fontFamily: 'Inter')),
                 const SizedBox(height: 6),
                 SizedBox(
                   height: 50,
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: _borderColor),
-                      borderRadius: BorderRadius.circular(5),
-                    ),
+                    decoration: BoxDecoration(border: Border.all(color: _borderColor), borderRadius: BorderRadius.circular(5)),
                     child: DropdownButtonHideUnderline(
                       child: DropdownButton<String>(
                         value: rel['relationship'] as String,
                         isExpanded: true,
-                        icon: SvgPicture.asset(
-                          'assets/visa_application/icons/chevron-down.svg',
-                          width: 18,
-                          height: 18,
-                        ),
-                        items: ['Wife', 'Husband', 'Daughter', 'Son']
-                            .map((String value) {
-                          return DropdownMenuItem<String>(
-                            value: value,
-                            child: Text(value),
-                          );
-                        }).toList(),
-                        onChanged: (String? newValue) {
-                          setState(() {
-                            rel['relationship'] = newValue!;
-                          });
-                        },
+                        icon: SvgPicture.asset('assets/visa_application/icons/chevron-down.svg', width: 18, height: 18),
+                        items: ['Wife', 'Husband', 'Daughter', 'Son'].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
+                        onChanged: (v) => setState(() => rel['relationship'] = v!),
                       ),
                     ),
                   ),
@@ -1924,73 +1479,24 @@ class _VisaApplicationFormPageState
               ],
             ),
           ),
-
-          // Name row
-          Row(
-            children: [
-              Expanded(
-                child: _buildTextField(
-                  'Name:',
-                  rel['firstName'] as TextEditingController,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _buildTextField(
-                  'Surname:',
-                  rel['lastName'] as TextEditingController,
-                ),
-              ),
-            ],
-          ),
-
-          // Father's name & Middle name row
-          Row(
-            children: [
-              Expanded(
-                child: _buildTextField(
-                  "Father's name:",
-                  rel['fatherName'] as TextEditingController,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _buildTextField(
-                  'Middle name:',
-                  rel['middleName'] as TextEditingController,
-                ),
-              ),
-            ],
-          ),
-
-          // Date of birth & Surname at birth
-          Row(
-            children: [
-              Expanded(
-                child: _buildDateField(
-                  'Date of birth:',
-                  null,
-                  rel['dateOfBirth'] as DateTime?,
-                  (date) {
-                    setState(() => rel['dateOfBirth'] = date);
-                  },
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _buildTextField(
-                  'Surname at birth:',
-                  rel['surnameAtBirth'] as TextEditingController,
-                ),
-              ),
-            ],
-          ),
-
-          // Citizenship
-          _buildTextField(
-            'Citizenship:',
-            rel['citizenship'] as TextEditingController,
-          ),
+          Row(children: [
+            Expanded(child: _buildTextField('Name:', rel['firstName'] as TextEditingController)),
+            const SizedBox(width: 16),
+            Expanded(child: _buildTextField('Surname:', rel['lastName'] as TextEditingController)),
+          ]),
+          Row(children: [
+            Expanded(child: _buildTextField("Father's name:", rel['fatherName'] as TextEditingController)),
+            const SizedBox(width: 16),
+            Expanded(child: _buildTextField('Middle name:', rel['middleName'] as TextEditingController)),
+          ]),
+          Row(children: [
+            Expanded(child: _buildDateField('Date of birth:', null, rel['dateOfBirth'] as DateTime?, (date) {
+              setState(() => rel['dateOfBirth'] = date);
+            })),
+            const SizedBox(width: 16),
+            Expanded(child: _buildTextField('Surname at birth:', rel['surnameAtBirth'] as TextEditingController)),
+          ]),
+          _buildTextField('Citizenship:', rel['citizenship'] as TextEditingController),
         ],
       ),
     );
@@ -2000,27 +1506,12 @@ class _VisaApplicationFormPageState
   // SHARED INPUT DECORATION (Figma style)
   // ---------------------------------------------------------------------------
 
-  InputDecoration _inputDecoration({
-    String? hintText,
-    Widget? suffixIcon,
-  }) {
+  InputDecoration _inputDecoration({String? hintText, Widget? suffixIcon}) {
     return InputDecoration(
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(5),
-        borderSide: const BorderSide(color: _borderColor),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(5),
-        borderSide: const BorderSide(color: _borderColor),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(5),
-        borderSide: const BorderSide(color: _primaryColor, width: 1.5),
-      ),
-      contentPadding: const EdgeInsets.symmetric(
-        horizontal: 12,
-        vertical: 14,
-      ),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(5), borderSide: const BorderSide(color: _borderColor)),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(5), borderSide: const BorderSide(color: _borderColor)),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(5), borderSide: const BorderSide(color: _primaryColor, width: 1.5)),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
       hintText: hintText,
       hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
       suffixIcon: suffixIcon,
