@@ -503,6 +503,21 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
 
     setState(() => _isSubmitting = true);
 
+    // TODO: re-enable when backend visa submission is ready
+    // For now, show a confirmation message without calling the API
+    await Future.delayed(const Duration(milliseconds: 500));
+    if (!mounted) return;
+    setState(() => _isSubmitting = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Visa application form saved. Submission will be available soon.'),
+        backgroundColor: Color(0xFF3C4494),
+        duration: Duration(seconds: 3),
+      ),
+    );
+    return;
+
+    // ignore: dead_code
     try {
       // 1. Upload photo if exists
       String? photoUrl;
@@ -619,9 +634,14 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
       context.pop(true);
     } catch (e) {
       if (mounted) {
+        final msg = e.toString().replaceAll('Exception: ', '');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(e.toString().replaceAll('Exception: ', '')),
+            content: Text(
+              msg.contains('Participant profile not found')
+                  ? 'Please register as a participant before submitting a visa application.'
+                  : msg,
+            ),
             backgroundColor: Colors.red,
             duration: const Duration(seconds: 5),
           ),
