@@ -18,7 +18,7 @@ class VisaStatusPage extends ConsumerWidget {
 
   Future<Map<String, dynamic>> _loadVisa(WidgetRef ref) async {
     final visaService = ref.read(visaServiceProvider);
-    return await visaService.getMyVisa(participantId);
+    return await visaService.getMyVisa(participantId: participantId, eventId: eventId);
   }
 
   @override

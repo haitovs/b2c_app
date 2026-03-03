@@ -190,15 +190,13 @@ class _VisaApplicationFormPageState
     try {
       if (!mounted) return;
 
-      if (widget.participantId == null) {
-        setState(() => _isLoading = false);
-        return;
-      }
-
       final visaService = ref.read(visaServiceProvider);
       Map<String, dynamic> visa;
       try {
-        visa = await visaService.getMyVisa(widget.participantId!);
+        visa = await visaService.getMyVisa(
+          participantId: widget.participantId,
+          eventId: widget.eventId,
+        );
       } catch (_) {
         if (mounted) setState(() => _isLoading = false);
         return;
@@ -505,7 +503,7 @@ class _VisaApplicationFormPageState
         if (!mounted) return;
         final visaService = ref.read(visaServiceProvider);
         photoUrl = await visaService.uploadPhoto(
-          participantId: widget.participantId ?? 'self',
+          participantId: widget.participantId,
           photoData: kIsWeb ? _photoBytes : _photoFile,
         );
       }
@@ -516,7 +514,7 @@ class _VisaApplicationFormPageState
         if (!mounted) return;
         final visaService = ref.read(visaServiceProvider);
         passportScanUrl = await visaService.uploadPhoto(
-          participantId: widget.participantId ?? 'self',
+          participantId: widget.participantId,
           photoData: kIsWeb ? _passportScanBytes : _passportScanFile,
         );
       }
@@ -595,13 +593,17 @@ class _VisaApplicationFormPageState
       if (!mounted) return;
       final visaService = ref.read(visaServiceProvider);
       await visaService.updateMyVisa(
-        participantId: widget.participantId ?? 'self',
+        participantId: widget.participantId,
+        eventId: widget.eventId,
         data: formData,
       );
 
       // 5. Submit for review
       if (!mounted) return;
-      await visaService.submitMyVisa(widget.participantId ?? 'self');
+      await visaService.submitMyVisa(
+        participantId: widget.participantId,
+        eventId: widget.eventId,
+      );
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
