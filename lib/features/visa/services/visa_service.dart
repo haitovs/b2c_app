@@ -20,13 +20,27 @@ class VisaService {
     return token;
   }
 
-  /// Get or create visa application for participant
-  /// Returns visa data including status, validation info, etc.
-  Future<Map<String, dynamic>> getMyVisa(String participantId) async {
+  /// Build query parameters from optional participantId and eventId
+  String _buildQueryParams({String? participantId, int? eventId}) {
+    final params = <String, String>{};
+    if (participantId != null) params['participant_id'] = participantId;
+    if (eventId != null) params['event_id'] = eventId.toString();
+    if (params.isEmpty) return '';
+    return '?${params.entries.map((e) => '${e.key}=${e.value}').join('&')}';
+  }
+
+  /// Get or create visa application for the current user.
+  /// Uses participant path if participantId is provided,
+  /// otherwise falls back to direct user path with eventId.
+  Future<Map<String, dynamic>> getMyVisa({
+    String? participantId,
+    int? eventId,
+  }) async {
     final token = await _getToken();
+    final query = _buildQueryParams(participantId: participantId, eventId: eventId);
 
     final response = await http.get(
-      Uri.parse('$_baseUrl/my-visa?participant_id=$participantId'),
+      Uri.parse('$_baseUrl/my-visa$query'),
       headers: {'Authorization': 'Bearer $token'},
     );
 
@@ -41,13 +55,15 @@ class VisaService {
   /// Update visa application with form data
   /// Can only be updated in FILL_OUT or DECLINED status
   Future<Map<String, dynamic>> updateMyVisa({
-    required String participantId,
+    String? participantId,
+    int? eventId,
     required Map<String, dynamic> data,
   }) async {
     final token = await _getToken();
+    final query = _buildQueryParams(participantId: participantId, eventId: eventId);
 
     final response = await http.put(
-      Uri.parse('$_baseUrl/my-visa?participant_id=$participantId'),
+      Uri.parse('$_baseUrl/my-visa$query'),
       headers: {
         'Authorization': 'Bearer $token',
         'Content-Type': 'application/json',
@@ -65,11 +81,15 @@ class VisaService {
 
   /// Submit visa application for review
   /// Validates completeness and changes status to PENDING
-  Future<Map<String, dynamic>> submitMyVisa(String participantId) async {
+  Future<Map<String, dynamic>> submitMyVisa({
+    String? participantId,
+    int? eventId,
+  }) async {
     final token = await _getToken();
+    final query = _buildQueryParams(participantId: participantId, eventId: eventId);
 
     final response = await http.post(
-      Uri.parse('$_baseUrl/my-visa/submit?participant_id=$participantId'),
+      Uri.parse('$_baseUrl/my-visa/submit$query'),
       headers: {'Authorization': 'Bearer $token'},
     );
 
@@ -83,11 +103,15 @@ class VisaService {
 
   /// Validate visa application without submitting
   /// Returns validation result with missing fields and warnings
-  Future<Map<String, dynamic>> validateMyVisa(String participantId) async {
+  Future<Map<String, dynamic>> validateMyVisa({
+    String? participantId,
+    int? eventId,
+  }) async {
     final token = await _getToken();
+    final query = _buildQueryParams(participantId: participantId, eventId: eventId);
 
     final response = await http.get(
-      Uri.parse('$_baseUrl/my-visa/validate?participant_id=$participantId'),
+      Uri.parse('$_baseUrl/my-visa/validate$query'),
       headers: {'Authorization': 'Bearer $token'},
     );
 
@@ -102,7 +126,7 @@ class VisaService {
   /// Upload visa photo to server
   /// Returns photo URL on success
   Future<String> uploadPhoto({
-    required String participantId,
+    String? participantId,
     required dynamic photoData, // File for mobile, Uint8List for web
   }) async {
     final token = await _getToken();
@@ -115,13 +139,17 @@ class VisaService {
     request.headers['Authorization'] = 'Bearer $token';
     request.fields['folder'] = 'visa-photos';
 
+    final filename = participantId != null
+        ? 'photo_$participantId.jpg'
+        : 'photo_${DateTime.now().millisecondsSinceEpoch}.jpg';
+
     // Handle both File (mobile) and Uint8List (web)
     if (kIsWeb && photoData is Uint8List) {
       request.files.add(
         http.MultipartFile.fromBytes(
           'file',
           photoData,
-          filename: 'photo_$participantId.jpg',
+          filename: filename,
         ),
       );
     } else if (photoData is File) {

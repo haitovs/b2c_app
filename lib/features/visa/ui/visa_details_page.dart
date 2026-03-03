@@ -18,7 +18,7 @@ class VisaDetailsPage extends StatelessWidget {
 
   Future<Map<String, dynamic>> _loadVisa(BuildContext context) async {
     final visaService = context.read<VisaService>();
-    return await visaService.getMyVisa(participantId);
+    return await visaService.getMyVisa(participantId: participantId, eventId: eventId);
   }
 
   @override

@@ -189,20 +189,13 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
     try {
       if (!mounted) return;
 
-      // TODO: re-enable when backend my-visa endpoint is ready
-      setState(() => _isLoading = false);
-      return;
-
-      // ignore: dead_code
-      if (widget.participantId == null) {
-        setState(() => _isLoading = false);
-        return;
-      }
-
       final visaService = context.read<VisaService>();
       Map<String, dynamic> visa;
       try {
-        visa = await visaService.getMyVisa(widget.participantId!);
+        visa = await visaService.getMyVisa(
+          participantId: widget.participantId,
+          eventId: widget.eventId,
+        );
       } catch (_) {
         if (mounted) setState(() => _isLoading = false);
         return;
@@ -503,21 +496,6 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
 
     setState(() => _isSubmitting = true);
 
-    // TODO: re-enable when backend visa submission is ready
-    // For now, show a confirmation message without calling the API
-    await Future.delayed(const Duration(milliseconds: 500));
-    if (!mounted) return;
-    setState(() => _isSubmitting = false);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Visa application form saved. Submission will be available soon.'),
-        backgroundColor: Color(0xFF3C4494),
-        duration: Duration(seconds: 3),
-      ),
-    );
-    return;
-
-    // ignore: dead_code
     try {
       // 1. Upload photo if exists
       String? photoUrl;
@@ -525,7 +503,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
         if (!mounted) return;
         final visaService = context.read<VisaService>();
         photoUrl = await visaService.uploadPhoto(
-          participantId: widget.participantId ?? 'self',
+          participantId: widget.participantId,
           photoData: kIsWeb ? _photoBytes : _photoFile,
         );
       }
@@ -536,7 +514,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
         if (!mounted) return;
         final visaService = context.read<VisaService>();
         passportScanUrl = await visaService.uploadPhoto(
-          participantId: widget.participantId ?? 'self',
+          participantId: widget.participantId,
           photoData: kIsWeb ? _passportScanBytes : _passportScanFile,
         );
       }
@@ -615,13 +593,17 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
       if (!mounted) return;
       final visaService = context.read<VisaService>();
       await visaService.updateMyVisa(
-        participantId: widget.participantId ?? 'self',
+        participantId: widget.participantId,
+        eventId: widget.eventId,
         data: formData,
       );
 
       // 5. Submit for review
       if (!mounted) return;
-      await visaService.submitMyVisa(widget.participantId ?? 'self');
+      await visaService.submitMyVisa(
+        participantId: widget.participantId,
+        eventId: widget.eventId,
+      );
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
