@@ -14,6 +14,57 @@ import '../../../core/widgets/phone_input_field.dart';
 import '../../auth/services/auth_service.dart';
 import '../services/visa_service.dart';
 
+const List<String> _countries = [
+  'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola',
+  'Antigua and Barbuda', 'Argentina', 'Armenia', 'Australia', 'Austria',
+  'Azerbaijan', 'Bahamas', 'Bahrain', 'Bangladesh', 'Barbados',
+  'Belarus', 'Belgium', 'Belize', 'Benin', 'Bhutan',
+  'Bolivia', 'Bosnia and Herzegovina', 'Botswana', 'Brazil', 'Brunei',
+  'Bulgaria', 'Burkina Faso', 'Burundi', 'Cabo Verde', 'Cambodia',
+  'Cameroon', 'Canada', 'Central African Republic', 'Chad', 'Chile',
+  'China', 'Colombia', 'Comoros', 'Congo', 'Costa Rica',
+  'Croatia', 'Cuba', 'Cyprus', 'Czech Republic', 'Denmark',
+  'Djibouti', 'Dominica', 'Dominican Republic', 'Ecuador', 'Egypt',
+  'El Salvador', 'Equatorial Guinea', 'Eritrea', 'Estonia', 'Eswatini',
+  'Ethiopia', 'Fiji', 'Finland', 'France', 'Gabon',
+  'Gambia', 'Georgia', 'Germany', 'Ghana', 'Greece',
+  'Grenada', 'Guatemala', 'Guinea', 'Guinea-Bissau', 'Guyana',
+  'Haiti', 'Honduras', 'Hungary', 'Iceland', 'India',
+  'Indonesia', 'Iran', 'Iraq', 'Ireland', 'Israel',
+  'Italy', 'Jamaica', 'Japan', 'Jordan', 'Kazakhstan',
+  'Kenya', 'Kiribati', 'Kosovo', 'Kuwait', 'Kyrgyzstan',
+  'Laos', 'Latvia', 'Lebanon', 'Lesotho', 'Liberia',
+  'Libya', 'Liechtenstein', 'Lithuania', 'Luxembourg', 'Madagascar',
+  'Malawi', 'Malaysia', 'Maldives', 'Mali', 'Malta',
+  'Marshall Islands', 'Mauritania', 'Mauritius', 'Mexico', 'Micronesia',
+  'Moldova', 'Monaco', 'Mongolia', 'Montenegro', 'Morocco',
+  'Mozambique', 'Myanmar', 'Namibia', 'Nauru', 'Nepal',
+  'Netherlands', 'New Zealand', 'Nicaragua', 'Niger', 'Nigeria',
+  'North Korea', 'North Macedonia', 'Norway', 'Oman', 'Pakistan',
+  'Palau', 'Palestine', 'Panama', 'Papua New Guinea', 'Paraguay',
+  'Peru', 'Philippines', 'Poland', 'Portugal', 'Qatar',
+  'Romania', 'Russia', 'Rwanda', 'Saint Kitts and Nevis', 'Saint Lucia',
+  'Saint Vincent and the Grenadines', 'Samoa', 'San Marino',
+  'Sao Tome and Principe', 'Saudi Arabia', 'Senegal', 'Serbia',
+  'Seychelles', 'Sierra Leone', 'Singapore', 'Slovakia', 'Slovenia',
+  'Solomon Islands', 'Somalia', 'South Africa', 'South Korea', 'South Sudan',
+  'Spain', 'Sri Lanka', 'Sudan', 'Suriname', 'Sweden',
+  'Switzerland', 'Syria', 'Taiwan', 'Tajikistan', 'Tanzania',
+  'Thailand', 'Timor-Leste', 'Togo', 'Tonga', 'Trinidad and Tobago',
+  'Tunisia', 'Turkey', 'Turkmenistan', 'Tuvalu', 'Uganda',
+  'Ukraine', 'United Arab Emirates', 'United Kingdom', 'United States',
+  'Uruguay', 'Uzbekistan', 'Vanuatu', 'Vatican City', 'Venezuela',
+  'Vietnam', 'Yemen', 'Zambia', 'Zimbabwe',
+];
+
+const List<String> _passportTypes = [
+  'Ordinary',
+  'Diplomatic',
+  'Service (Official)',
+  'Special',
+  'Emergency (Temporary)',
+];
+
 /// Visa Application Form Page matching Figma design
 class VisaApplicationFormPage extends StatefulWidget {
   final int eventId;
@@ -51,7 +102,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
   String? _gender;
 
   // Passport Controllers
-  final _typeOfPassportController = TextEditingController();
+  String? _typeOfPassport;
   final _passportNumberController = TextEditingController();
   final _passportIssuingCountryController = TextEditingController();
 
@@ -94,7 +145,6 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
     _countryOfBirthController.dispose();
     _citizenshipController.dispose();
     _emailController.dispose();
-    _typeOfPassportController.dispose();
     _passportNumberController.dispose();
     _passportIssuingCountryController.dispose();
     _educationController.dispose();
@@ -173,7 +223,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
       }
 
       // Passport
-      _typeOfPassportController.text = visa['type_of_passport'] ?? '';
+      _typeOfPassport = visa['type_of_passport'];
       _passportNumberController.text = visa['passport_number'] ?? '';
       if (visa['passport_date_of_issue'] != null) {
         _passportDateIssue = DateTime.parse(visa['passport_date_of_issue']);
@@ -432,7 +482,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
         'phone_number': _phoneNumberE164,
 
         // Passport Details
-        'type_of_passport': _typeOfPassportController.text.trim(),
+        'type_of_passport': _typeOfPassport ?? '',
         'passport_number': _passportNumberController.text.trim(),
         if (_passportDateIssue != null)
           'passport_date_of_issue':
@@ -824,10 +874,9 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
                     _surnameAtBirthController,
                     'Maiden name (if different)',
                   ),
-                  _buildTextField(
+                  _buildCountryPickerField(
                     'Country of birth:',
                     _countryOfBirthController,
-                    'United States',
                     true,
                   ),
                 ],
@@ -841,10 +890,9 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
                   _buildDateField('Date of birth:', null, _dateOfBirth, (date) {
                     setState(() => _dateOfBirth = date);
                   }, '1990-05-20'),
-                  _buildTextField(
+                  _buildCountryPickerField(
                     'Citizenship:',
                     _citizenshipController,
-                    'United States',
                     true,
                   ),
                   _buildTextField(
@@ -867,11 +915,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
             Expanded(
               child: Column(
                 children: [
-                  _buildTextField(
-                    'Type of passport:',
-                    _typeOfPassportController,
-                    'Ordinary',
-                  ),
+                  _buildPassportTypeDropdown(),
                   _buildDateField(
                     'Passport date issue:',
                     null,
@@ -881,10 +925,9 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
                     },
                     '2020-01-15',
                   ),
-                  _buildTextField(
+                  _buildCountryPickerField(
                     'Place of issue (country):',
                     _passportIssuingCountryController,
-                    'United States',
                   ),
                 ],
               ),
@@ -896,7 +939,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
                   _buildTextField(
                     'Passport number:',
                     _passportNumberController,
-                    '1234567',
+                    'AB1234567',
                     true,
                   ),
                   _buildDateField(
@@ -1010,10 +1053,9 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
           _surnameAtBirthController,
           'Maiden name (if different)',
         ),
-        _buildTextField(
+        _buildCountryPickerField(
           'Country of birth:',
           _countryOfBirthController,
-          'United States',
           true,
         ),
         _buildTextField(
@@ -1025,10 +1067,9 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
         _buildDateField('Date of birth:', null, _dateOfBirth, (date) {
           setState(() => _dateOfBirth = date);
         }, '1990-05-20'),
-        _buildTextField(
+        _buildCountryPickerField(
           'Citizenship:',
           _citizenshipController,
-          'United States',
           true,
         ),
         _buildTextField('Email:', _emailController, 'john@example.com', true),
@@ -1041,15 +1082,11 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
           },
         ),
         _buildSectionHeader('Passport maglumatlary / Passport Details'),
-        _buildTextField(
-          'Type of passport:',
-          _typeOfPassportController,
-          'Ordinary',
-        ),
+        _buildPassportTypeDropdown(),
         _buildTextField(
           'Passport number:',
           _passportNumberController,
-          '1234567',
+          'AB1234567',
           true,
         ),
         _buildDateField('Passport date issue:', null, _passportDateIssue,
@@ -1065,10 +1102,9 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
           },
           '2030-01-15',
         ),
-        _buildTextField(
+        _buildCountryPickerField(
           'Place of issue (country):',
           _passportIssuingCountryController,
-          'United States',
         ),
         _buildTextField(
           'Personal Address:',
@@ -1222,6 +1258,193 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
                     return 'This field is required';
                   }
                   return null;
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showCountryPickerDialog(TextEditingController controller) {
+    String searchQuery = '';
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            final filtered = searchQuery.isEmpty
+                ? _countries
+                : _countries
+                    .where((c) =>
+                        c.toLowerCase().contains(searchQuery.toLowerCase()))
+                    .toList();
+            return AlertDialog(
+              title: const Text('Select Country'),
+              content: SizedBox(
+                width: 340,
+                height: 450,
+                child: Column(
+                  children: [
+                    TextField(
+                      autofocus: true,
+                      decoration: InputDecoration(
+                        hintText: 'Search country...',
+                        prefixIcon: const Icon(Icons.search),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                      ),
+                      onChanged: (value) {
+                        setDialogState(() => searchQuery = value);
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    Expanded(
+                      child: filtered.isEmpty
+                          ? const Center(child: Text('No countries found'))
+                          : ListView.builder(
+                              itemCount: filtered.length,
+                              itemBuilder: (ctx, index) {
+                                final country = filtered[index];
+                                final isSelected =
+                                    controller.text == country;
+                                return ListTile(
+                                  dense: true,
+                                  title: Text(
+                                    country,
+                                    style: TextStyle(
+                                      fontWeight: isSelected
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                      color: isSelected
+                                          ? const Color(0xFF3C4494)
+                                          : null,
+                                    ),
+                                  ),
+                                  trailing: isSelected
+                                      ? const Icon(Icons.check,
+                                          color: Color(0xFF3C4494), size: 20)
+                                      : null,
+                                  onTap: () {
+                                    controller.text = country;
+                                    Navigator.of(ctx).pop();
+                                    setState(() {});
+                                  },
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: const Text('Cancel'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildCountryPickerField(
+    String label,
+    TextEditingController controller, [
+    bool isRequired = false,
+  ]) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+          ),
+          const SizedBox(height: 6),
+          TextFormField(
+            controller: controller,
+            readOnly: true,
+            onTap: () => _showCountryPickerDialog(controller),
+            validator: isRequired
+                ? (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'This field is required';
+                    }
+                    return null;
+                  }
+                : null,
+            decoration: InputDecoration(
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(4),
+                borderSide: BorderSide(color: Colors.grey[300]!),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(4),
+                borderSide: BorderSide(color: Colors.grey[300]!),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 12,
+              ),
+              hintText: 'Select country',
+              hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
+              suffixIcon: const Icon(Icons.arrow_drop_down),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPassportTypeDropdown() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Type of passport:',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+          ),
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey[300]!),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButtonFormField<String>(
+                initialValue: _typeOfPassport,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.zero,
+                ),
+                hint: Text(
+                  'Select passport type',
+                  style: TextStyle(color: Colors.grey[400], fontSize: 14),
+                ),
+                items: _passportTypes.map((String value) {
+                  return DropdownMenuItem<String>(
+                    value: value,
+                    child: Text(value),
+                  );
+                }).toList(),
+                onChanged: (String? newValue) {
+                  setState(() {
+                    _typeOfPassport = newValue;
+                  });
                 },
               ),
             ),
