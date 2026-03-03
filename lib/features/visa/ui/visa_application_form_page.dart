@@ -94,6 +94,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
   final _nameController = TextEditingController();
   final _surnameController = TextEditingController();
   final _surnameAtBirthController = TextEditingController();
+  final _fatherNameController = TextEditingController();
   final _placeOfBirthController = TextEditingController();
   final _countryOfBirthController = TextEditingController();
   final _citizenshipController = TextEditingController();
@@ -154,6 +155,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
     _nameController.dispose();
     _surnameController.dispose();
     _surnameAtBirthController.dispose();
+    _fatherNameController.dispose();
     _placeOfBirthController.dispose();
     _countryOfBirthController.dispose();
     _citizenshipController.dispose();
@@ -207,8 +209,9 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
 
       if (status == 'PENDING') {
         if (mounted) {
+          final pid = widget.participantId ?? 'me';
           context.replace(
-            '/events/${widget.eventId}/visa/status/${widget.participantId!}',
+            '/events/${widget.eventId}/visa/status/$pid',
           );
         }
         return;
@@ -216,8 +219,9 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
 
       if (status == 'APPROVED') {
         if (mounted) {
+          final pid = widget.participantId ?? 'me';
           context.replace(
-            '/events/${widget.eventId}/visa/details/${widget.participantId!}',
+            '/events/${widget.eventId}/visa/details/$pid',
           );
         }
         return;
@@ -227,6 +231,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
       _nameController.text = visa['first_name'] ?? '';
       _surnameController.text = visa['last_name'] ?? '';
       _surnameAtBirthController.text = visa['surname_at_birth'] ?? '';
+      _fatherNameController.text = visa['father_name'] ?? '';
       _gender = visa['gender'];
       _placeOfBirthController.text = visa['place_of_birth'] ?? '';
       _countryOfBirthController.text = visa['country_of_birth'] ?? '';
@@ -351,6 +356,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
   }
 
   Future<void> _prefillFromParticipant() async {
+    if (widget.participantId == null) return;
     try {
       final authService = context.read<AuthService>();
       final token = await authService.getToken();
@@ -1006,10 +1012,16 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
             setState(() => _dateOfBirth = date);
           }, '1990-05-20'),
         ),
-        _buildFieldRow(
-          left: _buildTextField('Surname at birth:', _surnameAtBirthController, 'Maiden name (if different)', false, true),
-          right: _buildCountryPickerField('Citizenship:', _citizenshipController, true),
-        ),
+        if (_gender == 'Female')
+          _buildFieldRow(
+            left: _buildTextField('Surname at birth:', _surnameAtBirthController, 'Maiden name (if different)'),
+            right: _buildCountryPickerField('Citizenship:', _citizenshipController, true),
+          ),
+        if (_gender != 'Female')
+          _buildFieldRow(
+            left: _buildCountryPickerField('Citizenship:', _citizenshipController, true),
+            right: const SizedBox.shrink(),
+          ),
         _buildFieldRow(
           left: _buildCountryPickerField('Country of birth:', _countryOfBirthController, true),
           right: _buildTextField('Place of birth (City):', _placeOfBirthController, 'New York', true),
@@ -1073,13 +1085,14 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
         _buildTextField('Name:', _nameController, 'John', true),
         _buildTextField('Surname:', _surnameController, 'Smith', true),
         _buildGenderDropdown(),
-        _buildTextField('Surname at birth:', _surnameAtBirthController, 'Maiden name (if different)', false, true),
+        if (_gender == 'Female')
+          _buildTextField('Surname at birth:', _surnameAtBirthController, 'Maiden name (if different)'),
+        _buildCountryPickerField('Citizenship:', _citizenshipController, true),
         _buildCountryPickerField('Country of birth:', _countryOfBirthController, true),
         _buildTextField('Place of birth (City):', _placeOfBirthController, 'New York', true),
         _buildDateField('Date of birth:', null, _dateOfBirth, (date) {
           setState(() => _dateOfBirth = date);
         }, '1990-05-20'),
-        _buildCountryPickerField('Citizenship:', _citizenshipController, true),
         _buildTextField('Email:', _emailController, 'john@example.com', true),
         PhoneInputField(
           initialPhone: _phoneNumberE164,

@@ -63,21 +63,6 @@ jobs:
       # ---------------------------------------------------------
       # STEP 3: UPLOAD BUILD + REBUILD CONTAINER
       # ---------------------------------------------------------
-      - name: Upload build and restart container
-        uses: appleboy/ssh-action@v1.2.0
-        env:
-          SSH_HOST: ${{ secrets.SSH_HOST }}
-          SSH_USER: ${{ secrets.SSH_USER }}
-          SSH_KEY: ${{ secrets.SSH_KEY }}
-          SSH_PORT: ${{ secrets.SSH_PORT || 22 }}
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          port: ${{ secrets.SSH_PORT || 22 }}
-          command_timeout: 60m
-          script: echo "placeholder"
-
       - name: Deploy to server
         run: |
           # Write SSH key to temp file
