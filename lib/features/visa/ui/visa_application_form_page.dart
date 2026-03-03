@@ -170,7 +170,6 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
     for (final rel in _relatives) {
       (rel['firstName'] as TextEditingController).dispose();
       (rel['lastName'] as TextEditingController).dispose();
-      (rel['fatherName'] as TextEditingController).dispose();
       (rel['middleName'] as TextEditingController).dispose();
       (rel['surnameAtBirth'] as TextEditingController).dispose();
       (rel['citizenship'] as TextEditingController).dispose();
@@ -277,7 +276,6 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
             relationship: rel['relationship'] ?? 'Wife',
             firstName: rel['first_name'] ?? '',
             lastName: rel['last_name'] ?? '',
-            fatherName: rel['father_name'] ?? '',
             middleName: rel['middle_name'] ?? '',
             surnameAtBirth: rel['surname_at_birth'] ?? '',
             citizenship: rel['citizenship'] ?? '',
@@ -338,7 +336,6 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
     String relationship = 'Wife',
     String firstName = '',
     String lastName = '',
-    String fatherName = '',
     String middleName = '',
     String surnameAtBirth = '',
     String citizenship = '',
@@ -348,7 +345,6 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
       'relationship': relationship,
       'firstName': TextEditingController(text: firstName),
       'lastName': TextEditingController(text: lastName),
-      'fatherName': TextEditingController(text: fatherName),
       'middleName': TextEditingController(text: middleName),
       'surnameAtBirth': TextEditingController(text: surnameAtBirth),
       'citizenship': TextEditingController(text: citizenship),
@@ -478,7 +474,6 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
       final rel = _relatives[index];
       (rel['firstName'] as TextEditingController).dispose();
       (rel['lastName'] as TextEditingController).dispose();
-      (rel['fatherName'] as TextEditingController).dispose();
       (rel['middleName'] as TextEditingController).dispose();
       (rel['surnameAtBirth'] as TextEditingController).dispose();
       (rel['citizenship'] as TextEditingController).dispose();
@@ -582,8 +577,6 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
                 (rel['firstName'] as TextEditingController).text.trim(),
             'last_name':
                 (rel['lastName'] as TextEditingController).text.trim(),
-            'father_name':
-                (rel['fatherName'] as TextEditingController).text.trim(),
             'middle_name':
                 (rel['middleName'] as TextEditingController).text.trim(),
             'surname_at_birth':
@@ -1504,11 +1497,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
             const SizedBox(width: 16),
             Expanded(child: _buildTextField('Surname:', rel['lastName'] as TextEditingController)),
           ]),
-          Row(children: [
-            Expanded(child: _buildTextField("Father's name:", rel['fatherName'] as TextEditingController)),
-            const SizedBox(width: 16),
-            Expanded(child: _buildTextField('Middle name:', rel['middleName'] as TextEditingController)),
-          ]),
+          _buildTextField('Middle name:', rel['middleName'] as TextEditingController),
           Row(children: [
             Expanded(child: _buildDateField('Date of birth:', null, rel['dateOfBirth'] as DateTime?, (date) {
               setState(() => rel['dateOfBirth'] = date);
@@ -1516,7 +1505,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
             const SizedBox(width: 16),
             Expanded(child: _buildTextField('Surname at birth:', rel['surnameAtBirth'] as TextEditingController)),
           ]),
-          _buildTextField('Citizenship:', rel['citizenship'] as TextEditingController),
+          _buildCountryPickerField('Citizenship:', rel['citizenship'] as TextEditingController),
         ],
       ),
     );
