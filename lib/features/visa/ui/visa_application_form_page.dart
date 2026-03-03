@@ -189,6 +189,11 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
     try {
       if (!mounted) return;
 
+      // TODO: re-enable when backend my-visa endpoint is ready
+      setState(() => _isLoading = false);
+      return;
+
+      // ignore: dead_code
       if (widget.participantId == null) {
         setState(() => _isLoading = false);
         return;
