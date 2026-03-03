@@ -92,7 +92,6 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
   // Personal Information Controllers
   final _nameController = TextEditingController();
   final _surnameController = TextEditingController();
-  final _fatherNameController = TextEditingController();
   final _surnameAtBirthController = TextEditingController();
   final _placeOfBirthController = TextEditingController();
   final _countryOfBirthController = TextEditingController();
@@ -139,7 +138,6 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
   void dispose() {
     _nameController.dispose();
     _surnameController.dispose();
-    _fatherNameController.dispose();
     _surnameAtBirthController.dispose();
     _placeOfBirthController.dispose();
     _countryOfBirthController.dispose();
@@ -183,7 +181,14 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
       }
 
       final visaService = context.read<VisaService>();
-      final visa = await visaService.getMyVisa(widget.participantId!);
+      Map<String, dynamic> visa;
+      try {
+        visa = await visaService.getMyVisa(widget.participantId!);
+      } catch (_) {
+        // No existing visa — show empty form
+        if (mounted) setState(() => _isLoading = false);
+        return;
+      }
 
       if (!mounted) return;
 
@@ -210,7 +215,6 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
       // Pre-fill form data
       _nameController.text = visa['first_name'] ?? '';
       _surnameController.text = visa['last_name'] ?? '';
-      _fatherNameController.text = visa['father_name'] ?? '';
       _surnameAtBirthController.text = visa['surname_at_birth'] ?? '';
       _gender = visa['gender'];
       _placeOfBirthController.text = visa['place_of_birth'] ?? '';
@@ -470,7 +474,6 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
         // Personal Information
         'first_name': _nameController.text.trim(),
         'last_name': _surnameController.text.trim(),
-        'father_name': _fatherNameController.text.trim(),
         'surname_at_birth': _surnameAtBirthController.text.trim(),
         'gender': _gender,
         'place_of_birth': _placeOfBirthController.text.trim(),
@@ -862,12 +865,6 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
                 children: [
                   _buildTextField('Name:', _nameController, 'John', true),
                   _buildTextField('Surname:', _surnameController, 'Smith', true),
-                  _buildTextField(
-                    "Father's name:",
-                    _fatherNameController,
-                    'Robert',
-                    true,
-                  ),
                   _buildGenderDropdown(),
                   _buildTextField(
                     'Surname at birth:',
@@ -1041,12 +1038,6 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
         _buildSectionHeader('Şahsy maglumatlar / Personal Information'),
         _buildTextField('Name:', _nameController, 'John', true),
         _buildTextField('Surname:', _surnameController, 'Smith', true),
-        _buildTextField(
-          "Father's name:",
-          _fatherNameController,
-          'Robert',
-          true,
-        ),
         _buildGenderDropdown(),
         _buildTextField(
           'Surname at birth:',
@@ -1224,43 +1215,44 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
             style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
           ),
           const SizedBox(height: 6),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey[300]!),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButtonFormField<String>(
-                initialValue: _gender,
-                isExpanded: true,
-                decoration: const InputDecoration(
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.zero,
-                ),
-                hint: Text(
-                  'Select gender',
-                  style: TextStyle(color: Colors.grey[400], fontSize: 14),
-                ),
-                items: ['Male', 'Female'].map((String value) {
-                  return DropdownMenuItem<String>(
-                    value: value,
-                    child: Text(value),
-                  );
-                }).toList(),
-                onChanged: (String? newValue) {
-                  setState(() {
-                    _gender = newValue;
-                  });
-                },
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'This field is required';
-                  }
-                  return null;
-                },
+          DropdownButtonFormField<String>(
+            initialValue: _gender,
+            isExpanded: true,
+            decoration: InputDecoration(
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(4),
+                borderSide: BorderSide(color: Colors.grey[300]!),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(4),
+                borderSide: BorderSide(color: Colors.grey[300]!),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 12,
               ),
             ),
+            hint: Text(
+              'Select gender',
+              style: TextStyle(color: Colors.grey[400], fontSize: 14),
+            ),
+            items: ['Male', 'Female'].map((String value) {
+              return DropdownMenuItem<String>(
+                value: value,
+                child: Text(value),
+              );
+            }).toList(),
+            onChanged: (String? newValue) {
+              setState(() {
+                _gender = newValue;
+              });
+            },
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'This field is required';
+              }
+              return null;
+            },
           ),
         ],
       ),
@@ -1417,37 +1409,38 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
             style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
           ),
           const SizedBox(height: 6),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey[300]!),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButtonFormField<String>(
-                initialValue: _typeOfPassport,
-                isExpanded: true,
-                decoration: const InputDecoration(
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.zero,
-                ),
-                hint: Text(
-                  'Select passport type',
-                  style: TextStyle(color: Colors.grey[400], fontSize: 14),
-                ),
-                items: _passportTypes.map((String value) {
-                  return DropdownMenuItem<String>(
-                    value: value,
-                    child: Text(value),
-                  );
-                }).toList(),
-                onChanged: (String? newValue) {
-                  setState(() {
-                    _typeOfPassport = newValue;
-                  });
-                },
+          DropdownButtonFormField<String>(
+            initialValue: _typeOfPassport,
+            isExpanded: true,
+            decoration: InputDecoration(
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(4),
+                borderSide: BorderSide(color: Colors.grey[300]!),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(4),
+                borderSide: BorderSide(color: Colors.grey[300]!),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 12,
               ),
             ),
+            hint: Text(
+              'Select passport type',
+              style: TextStyle(color: Colors.grey[400], fontSize: 14),
+            ),
+            items: _passportTypes.map((String value) {
+              return DropdownMenuItem<String>(
+                value: value,
+                child: Text(value),
+              );
+            }).toList(),
+            onChanged: (String? newValue) {
+              setState(() {
+                _typeOfPassport = newValue;
+              });
+            },
           ),
         ],
       ),
