@@ -1603,28 +1603,20 @@ class _VisaApplicationFormPageState
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Left: Portrait photo
           _buildPhotoBox(
-            width: 123,
-            height: 154,
-            label: 'Portrait photo',
+            width: 123, height: 154, label: 'Portrait photo',
             hasImage: kIsWeb ? _photoBytes != null : _photoFile != null,
             imageWidget: _buildPortraitImage(),
-            onUpload: _pickImage,
-            onDelete: _deletePhoto,
+            previewAsset: 'assets/visa_application/profile_preview.jpg',
+            onUpload: _pickImage, onDelete: _deletePhoto,
           ),
           const SizedBox(width: 16),
-          // Right: Passport scan
           _buildPhotoBox(
-            width: 216,
-            height: 154,
-            label: 'Passport scan',
-            hasImage: kIsWeb
-                ? _passportScanBytes != null
-                : _passportScanFile != null,
+            width: 216, height: 154, label: 'Passport scan',
+            hasImage: kIsWeb ? _passportScanBytes != null : _passportScanFile != null,
             imageWidget: _buildPassportScanImage(),
-            onUpload: _pickPassportScan,
-            onDelete: _deletePassportScan,
+            previewAsset: 'assets/visa_application/visa_preview.png',
+            onUpload: _pickPassportScan, onDelete: _deletePassportScan,
           ),
         ],
       ),
@@ -1632,53 +1624,48 @@ class _VisaApplicationFormPageState
   }
 
   Widget _buildPhotoBox({
-    required double width,
-    required double height,
-    required String label,
-    required bool hasImage,
-    required Widget imageWidget,
-    required VoidCallback onUpload,
-    required VoidCallback onDelete,
+    required double width, required double height, required String label,
+    required bool hasImage, required Widget imageWidget,
+    required String previewAsset,
+    required VoidCallback onUpload, required VoidCallback onDelete,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: Color(0xFF1E1E1E),
-          ),
-        ),
+        Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF1E1E1E))),
         const SizedBox(height: 6),
         Stack(
           children: [
             Container(
-              width: width,
-              height: height,
+              width: width, height: height,
               decoration: BoxDecoration(
-                border: Border.all(
-                  color: hasImage ? _primaryColor : _borderColor,
-                  width: hasImage ? 2 : 1,
-                ),
+                border: Border.all(color: hasImage ? _primaryColor : _borderColor, width: hasImage ? 2 : 1),
                 borderRadius: BorderRadius.circular(5),
                 color: Colors.grey[50],
               ),
               child: hasImage
-                  ? ClipRRect(
+                  ? ClipRRect(borderRadius: BorderRadius.circular(4), child: imageWidget)
+                  : ClipRRect(
                       borderRadius: BorderRadius.circular(4),
-                      child: imageWidget,
-                    )
-                  : Center(
-                      child: Icon(
-                        Icons.image_outlined,
-                        size: 40,
-                        color: Colors.grey[300],
+                      child: Opacity(
+                        opacity: 0.4,
+                        child: Image.asset(previewAsset, width: width, height: height, fit: BoxFit.cover),
                       ),
                     ),
             ),
-            // Delete button (top-right)
+            if (!hasImage)
+              Positioned.fill(
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Text('Example', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+                  ),
+                ),
+              ),
             if (hasImage)
               Positioned(
                 top: 4,
