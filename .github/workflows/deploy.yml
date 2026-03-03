@@ -61,51 +61,57 @@ jobs:
             git reset --hard origin/main
 
       # ---------------------------------------------------------
-      # STEP 3: UPLOAD BUILT ASSETS (Targeted Upload)
+      # STEP 3: UPLOAD BUILD + REBUILD CONTAINER
       # ---------------------------------------------------------
-      - name: Copy built files to Server
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          port: ${{ secrets.SSH_PORT || 22 }}
-          source: "build/web/*,docker-compose.yml,Dockerfile,nginx.conf"
-          target: "/home/main/apps/b2c_app/"
-          rm: false
-
-      # ---------------------------------------------------------
-      # STEP 4: FIX SCP NESTING & RESTART DOCKER
-      # ---------------------------------------------------------
-      - name: Fix build structure and restart container
+      - name: Upload build and restart container
         uses: appleboy/ssh-action@v1.2.0
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_PORT: ${{ secrets.SSH_PORT || 22 }}
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT || 22 }}
           command_timeout: 60m
-          script: |
+          script: echo "placeholder"
+
+      - name: Deploy to server
+        run: |
+          # Write SSH key to temp file
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p ${{ secrets.SSH_PORT || 22 }} ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+          SSH_OPTS="-i ~/.ssh/deploy_key -p ${{ secrets.SSH_PORT || 22 }} -o StrictHostKeyChecking=accept-new"
+          REMOTE="${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}"
+          APP_DIR="/home/main/apps/b2c_app"
+
+          # 1. Upload built web files as a tar stream (no SCP nesting issues)
+          echo "==> Uploading build/web..."
+          tar -cf - -C build web | ssh $SSH_OPTS "$REMOTE" "mkdir -p $APP_DIR/build && rm -rf $APP_DIR/build/web && tar -xf - -C $APP_DIR/build"
+
+          # 2. Verify upload
+          ssh $SSH_OPTS "$REMOTE" "ls $APP_DIR/build/web/index.html"
+
+          # 3. Rebuild and restart container
+          ssh $SSH_OPTS "$REMOTE" "
             set -Eeuo pipefail
-            cd /home/main/apps/b2c_app
+            cd $APP_DIR
 
-            # Fix SCP nesting: appleboy/scp-action creates build/web/build/web/
-            if [ -d "build/web/build/web" ]; then
-              echo "==> Fixing nested build/web structure..."
-              rm -rf build/web_tmp
-              mv build/web/build/web build/web_tmp
-              rm -rf build/web
-              mv build/web_tmp build/web
-            fi
+            if docker compose version >/dev/null 2>&1; then DC='docker compose'; else DC='docker-compose'; fi
 
-            echo "==> Verifying build/web has index.html..."
-            ls build/web/index.html
+            echo '==> Rebuilding...'
+            \$DC build --no-cache b2c-frontend
+            \$DC up -d --force-recreate b2c-frontend
 
-            if docker compose version >/dev/null 2>&1; then DC="docker compose"; else DC="docker-compose"; fi
-
-            echo "==> Rebuilding..."
-            $DC build --no-cache b2c-frontend
-            $DC up -d --force-recreate b2c-frontend
-
-            echo "==> Pruning..."
+            echo '==> Pruning...'
             docker image prune -f
+
+            echo '==> Done!'
+          "
+
+          rm -f ~/.ssh/deploy_key
