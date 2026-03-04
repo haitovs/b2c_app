@@ -910,40 +910,141 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
   // ---------------------------------------------------------------------------
 
   Widget _buildVisaTabs() {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          // Visa tabs
-          for (int i = 0; i < _allVisas.length; i++) ...[
-            if (i > 0) const SizedBox(width: 8),
-            _buildVisaTab(i),
-          ],
-          const SizedBox(width: 8),
-          // "+ Add" button
-          InkWell(
-            onTap: _addNewVisa,
-            borderRadius: BorderRadius.circular(20),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF0F0F0),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: _borderColor),
-              ),
-              child: Text(
-                '+ Add (${_allVisas.length})',
-                style: const TextStyle(
-                  color: _primaryColor,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
+    final currentVisa = _allVisas.isNotEmpty ? _allVisas[_selectedVisaIndex] : null;
+    final currentStatus = currentVisa?['status'] as String? ?? 'FILL_OUT';
+    final canDelete = _allVisas.length > 1 &&
+        currentStatus != 'PENDING' &&
+        currentStatus != 'APPROVED';
+
+    return Row(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                // Visa tabs
+                for (int i = 0; i < _allVisas.length; i++) ...[
+                  if (i > 0) const SizedBox(width: 8),
+                  _buildVisaTab(i),
+                ],
+                const SizedBox(width: 8),
+                // "+ Add" button
+                InkWell(
+                  onTap: _addNewVisa,
+                  borderRadius: BorderRadius.circular(4),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: _borderColor),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.add, size: 16, color: _primaryColor),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Add (${_allVisas.length})',
+                          style: const TextStyle(
+                            color: _primaryColor,
+                            fontWeight: FontWeight.w500,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
+          ),
+        ),
+        // Delete current visa button
+        if (canDelete) ...[
+          const SizedBox(width: 8),
+          InkWell(
+            onTap: _confirmDeleteVisa,
+            borderRadius: BorderRadius.circular(4),
+            child: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: Colors.red.withAlpha(100)),
+              ),
+              child: const Icon(Icons.close, size: 18, color: Colors.red),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  /// Show confirmation dialog then delete the current visa.
+  Future<void> _confirmDeleteVisa() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Visa Application'),
+        content: Text(
+          'Are you sure you want to delete Visa ${_selectedVisaIndex + 1}? This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
           ),
         ],
       ),
     );
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      final visaId = _allVisas[_selectedVisaIndex]['id'] as String;
+      final visaService = context.read<VisaService>();
+
+      // Delete via API — use the update endpoint to mark as deleted,
+      // or call the service. For now we use a DELETE-like approach:
+      // The backend should support deletion. Use a raw HTTP delete.
+      final authService = context.read<AuthService>();
+      final token = await authService.getToken();
+      final response = await http.delete(
+        Uri.parse('${AppConfig.b2cApiBaseUrl}/api/v1/visas/my-visa/$visaId'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      if (response.statusCode != 200 && response.statusCode != 204) {
+        throw Exception('Failed to delete visa application');
+      }
+
+      // Refresh list
+      final visas = await visaService.listMyVisas(eventId: widget.eventId);
+      if (!mounted) return;
+
+      _allVisas = visas;
+      if (_selectedVisaIndex >= _allVisas.length) {
+        _selectedVisaIndex = _allVisas.length - 1;
+      }
+      if (_allVisas.isNotEmpty) {
+        await _loadVisaIntoForm(_allVisas[_selectedVisaIndex]);
+      }
+      setState(() {});
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceAll('Exception: ', '')),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildVisaTab(int index) {
@@ -954,12 +1055,12 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
 
     return InkWell(
       onTap: () => _switchToVisa(index),
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(4),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
-          color: isActive ? _primaryColor.withAlpha(25) : Colors.white,
-          borderRadius: BorderRadius.circular(20),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(4),
           border: Border.all(
             color: isActive ? _primaryColor : _borderColor,
             width: isActive ? 2 : 1,
@@ -972,7 +1073,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
               'Visa ${index + 1}',
               style: TextStyle(
                 color: isActive ? _primaryColor : const Color(0xFF666666),
-                fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
                 fontSize: 14,
               ),
             ),
@@ -1047,14 +1148,29 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
         ],
       ),
       padding: const EdgeInsets.all(24),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          if (constraints.maxWidth > 600) {
-            return _buildTwoColumnLayout();
-          } else {
-            return _buildSingleColumnLayout();
-          }
-        },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'VISA APPLICATION FORM',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF1E1E1E),
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(height: 20),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              if (constraints.maxWidth > 600) {
+                return _buildTwoColumnLayout();
+              } else {
+                return _buildSingleColumnLayout();
+              }
+            },
+          ),
+        ],
       ),
     );
   }
@@ -1845,18 +1961,21 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 20),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildPhotoBox(
-            width: 123, height: 154, label: 'Portrait photo',
+            width: 123, height: 154,
+            buttonLabel: 'Upload files Picture\n(5:6)',
             hasImage: kIsWeb ? _photoBytes != null : _photoFile != null,
             imageWidget: _buildPortraitImage(),
             previewAsset: 'assets/visa_application/profile_preview.jpg',
             onUpload: _pickImage, onDelete: _deletePhoto,
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 24),
           _buildPhotoBox(
-            width: 216, height: 154, label: 'Passport scan',
+            width: 180, height: 154,
+            buttonLabel: 'Upload files',
             hasImage: kIsWeb ? _passportScanBytes != null : _passportScanFile != null,
             imageWidget: _buildPassportScanImage(),
             previewAsset: 'assets/visa_application/visa_preview.png',
@@ -1868,17 +1987,16 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
   }
 
   Widget _buildPhotoBox({
-    required double width, required double height, required String label,
+    required double width, required double height, required String buttonLabel,
     required bool hasImage, required Widget imageWidget,
     required String previewAsset,
     required VoidCallback onUpload, required VoidCallback onDelete,
   }) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF1E1E1E))),
-        const SizedBox(height: 6),
         Stack(
+          clipBehavior: Clip.none,
           children: [
             Container(
               width: width, height: height,
@@ -1906,35 +2024,43 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
                       color: Colors.black54,
                       borderRadius: BorderRadius.circular(4),
                     ),
-                    child: const Text('Example', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+                    child: const Text('EXAMPLE', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
                   ),
                 ),
               ),
             if (hasImage)
               Positioned(
-                top: 4, right: 4,
+                top: -6, right: -6,
                 child: GestureDetector(
                   onTap: onDelete,
                   child: Container(
-                    width: 24, height: 24,
-                    decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(12)),
-                    child: SvgPicture.asset('assets/visa_application/icons/x-close.svg', width: 14, height: 14),
+                    width: 22, height: 22,
+                    decoration: BoxDecoration(
+                      color: Colors.black87,
+                      borderRadius: BorderRadius.circular(11),
+                    ),
+                    child: const Icon(Icons.close, size: 14, color: Colors.white),
                   ),
                 ),
               ),
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
         SizedBox(
-          width: width, height: 32,
+          width: width,
           child: ElevatedButton(
             onPressed: onUpload,
             style: ElevatedButton.styleFrom(
-              backgroundColor: _primaryColor, foregroundColor: Colors.white,
-              padding: EdgeInsets.zero,
+              backgroundColor: _primaryColor,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
             ),
-            child: Text(hasImage ? 'Change' : 'Upload', style: const TextStyle(fontSize: 12)),
+            child: Text(
+              hasImage ? 'Change' : buttonLabel,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 12, height: 1.3),
+            ),
           ),
         ),
       ],
