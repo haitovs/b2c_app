@@ -13,7 +13,6 @@ import 'package:provider/provider.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/widgets/phone_input_field.dart';
 import '../../auth/services/auth_service.dart';
-import 'package:csc_picker_plus/csc_picker_plus.dart';
 
 import '../services/visa_service.dart';
 
@@ -58,6 +57,9 @@ const List<String> _countries = [
   'Ukraine', 'United Arab Emirates', 'United Kingdom', 'United States',
   'Uruguay', 'Uzbekistan', 'Vanuatu', 'Vatican City', 'Venezuela',
   'Vietnam', 'Yemen', 'Zambia', 'Zimbabwe',
+  // Historical countries (for place of birth)
+  'USSR (Soviet Union)', 'Yugoslavia', 'Czechoslovakia',
+  'East Germany (GDR)', 'West Germany (FRG)',
 ];
 
 const List<String> _passportTypes = [
@@ -1351,50 +1353,11 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
   }
 
   Widget _buildBirthLocationPicker() {
-    return CSCPickerPlus(
-      layout: Layout.vertical,
-      showStates: false,
-      showCities: true,
-      flagState: CountryFlag.ENABLE,
-      dropdownDecoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(5),
-        border: Border.all(color: _borderColor),
-      ),
-      disabledDropdownDecoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(5),
-        border: Border.all(color: const Color(0xFFE0E0E0)),
-        color: const Color(0xFFF5F5F5),
-      ),
-      selectedItemStyle: const TextStyle(fontSize: 14, color: Colors.black),
-      dropdownHeadingStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-      dropdownItemStyle: const TextStyle(fontSize: 14),
-      dropdownDialogRadius: 10,
-      searchBarRadius: 10,
-      countrySearchPlaceholder: 'Search country...',
-      citySearchPlaceholder: 'Search city...',
-      countryDropdownLabel: _countryOfBirthController.text.isEmpty
-          ? 'Select country of birth'
-          : _countryOfBirthController.text,
-      cityDropdownLabel: _placeOfBirthController.text.isEmpty
-          ? 'Select city of birth'
-          : _placeOfBirthController.text,
-      currentCountry: _countryOfBirthController.text.isNotEmpty
-          ? _countryOfBirthController.text
-          : null,
-      currentCity: _placeOfBirthController.text.isNotEmpty
-          ? _placeOfBirthController.text
-          : null,
-      onCountryChanged: (value) {
-        setState(() {
-          _countryOfBirthController.text = value;
-          _placeOfBirthController.clear();
-        });
-      },
-      onCityChanged: (value) {
-        setState(() {
-          _placeOfBirthController.text = value ?? '';
-        });
-      },
+    return Column(
+      children: [
+        _buildCountryPickerField('Country of birth *', _countryOfBirthController, true),
+        _buildTextField('Place of birth (City) *', _placeOfBirthController, null, true),
+      ],
     );
   }
 
