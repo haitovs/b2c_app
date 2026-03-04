@@ -1,0 +1,1 @@
+ /Users/goldcomputers/Desktop/Projects/b2c_project/b2c_app/lib/l10n/generated/app_localizations_en.dart /Users/goldcomputers/Desktop/Projects/b2c_project/b2c_app/lib/l10n/generated/app_localizations.dart:  /Users/goldcomputers/Desktop/Projects/b2c_project/b2c_app/l10n.yaml /Users/goldcomputers/Desktop/Projects/b2c_project/b2c_app/lib/l10n/app_en.arb

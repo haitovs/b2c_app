@@ -1,0 +1,1 @@
+ C:\\Users\\Haito\\Desktop\\projects\\b2c_project\\b2c_app\\lib\\l10n\\generated\\app_localizations_en.dart C:\\Users\\Haito\\Desktop\\projects\\b2c_project\\b2c_app\\lib\\l10n\\generated\\app_localizations.dart:  C:\\Users\\Haito\\Desktop\\projects\\b2c_project\\b2c_app\\l10n.yaml C:\\Users\\Haito\\Desktop\\projects\\b2c_project\\b2c_app\\lib\\l10n\\app_en.arb
