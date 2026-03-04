@@ -1,6 +1,7 @@
 import 'package:b2c_app/l10n/generated/app_localizations.dart';
 import 'package:country_code_picker/country_code_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/app_theme.dart';
 import '../../../core/widgets/app_text_field.dart';
@@ -149,7 +150,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
               // Return to login
               Center(
                 child: GestureDetector(
-                  onTap: () => Navigator.of(context).pop(),
+                  onTap: () => context.go('/login'),
                   child: RichText(
                     text: TextSpan(
                       text: "Already have an account? ",
