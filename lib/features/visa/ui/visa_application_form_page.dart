@@ -193,7 +193,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
     if (_cityCache != null) return;
     try {
       final jsonStr = await rootBundle.loadString(
-        'packages/csc_picker_plus/assets/countries.json',
+        'packages/csc_picker_plus/lib/assets/countries.json',
       );
       final List<dynamic> data = json.decode(jsonStr);
       final map = <String, List<String>>{};
