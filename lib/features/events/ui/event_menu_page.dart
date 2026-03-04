@@ -680,8 +680,7 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
                                   // Agreement check happens on tap via redirect to Profile
                                   final isDisabled =
                                       requiresRegistration &&
-                                      !_isRegistered &&
-                                      !_isCheckingRegistration;
+                                      !_isRegistered;
 
                                   // Build the menu card content
                                   Widget cardContent = Container(

@@ -619,7 +619,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
         ),
       );
 
-      context.pop(true);
+      context.go('/events/${widget.eventId}/menu');
     } catch (e) {
       if (mounted) {
         final msg = e.toString().replaceAll('Exception: ', '');

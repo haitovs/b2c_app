@@ -248,8 +248,8 @@ class _EventDetailsPageState extends ConsumerState<EventDetailsPage> {
                             children: [
                               // Logo
                               Container(
-                                width: 130,
-                                height: 130,
+                                width: 80,
+                                height: 80,
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(10),
                                   boxShadow: [
@@ -427,11 +427,12 @@ class _EventDetailsPageState extends ConsumerState<EventDetailsPage> {
                               ),
                             ],
                           )
-                        : IntrinsicHeight(
+                        : SizedBox(
+                            height: 500,
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                // Text Box - matches height of right column
+                                // Text Box - scrollable independently
                                 Expanded(
                                   flex: 2,
                                   child: Container(
@@ -551,35 +552,36 @@ class _EventDetailsPageState extends ConsumerState<EventDetailsPage> {
                                 Column(
                                   children: [
                                     // Event Photo
-                                    Container(
-                                      width: 381,
-                                      height: 497,
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(20),
-                                      ),
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(20),
-                                        child: Image.asset(
-                                          'assets/event_detail/event_photo.png',
-                                          fit: BoxFit.cover,
-                                          errorBuilder: (c, e, s) => Container(
-                                            color: Colors.grey,
-                                            child: const Icon(
-                                              Icons.image,
-                                              size: 100,
-                                              color: Colors.white,
+                                    Expanded(
+                                      child: Container(
+                                        width: 381,
+                                        decoration: BoxDecoration(
+                                          borderRadius: BorderRadius.circular(20),
+                                        ),
+                                        child: ClipRRect(
+                                          borderRadius: BorderRadius.circular(20),
+                                          child: Image.asset(
+                                            'assets/event_detail/event_photo.png',
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (c, e, s) => Container(
+                                              color: Colors.grey,
+                                              child: const Icon(
+                                                Icons.image,
+                                                size: 100,
+                                                color: Colors.white,
+                                              ),
                                             ),
                                           ),
                                         ),
                                       ),
                                     ),
-                                    const SizedBox(height: 27),
+                                    const SizedBox(height: 16),
                                     // Open Button
                                     GestureDetector(
                                       onTap: _onOpenTap,
                                       child: Container(
                                         width: 381,
-                                        height: 121,
+                                        height: 70,
                                         decoration: BoxDecoration(
                                           color: const Color(0xFF9CA4CC),
                                           borderRadius: BorderRadius.circular(
@@ -592,7 +594,7 @@ class _EventDetailsPageState extends ConsumerState<EventDetailsPage> {
                                             context,
                                           )!.openButton,
                                           style: GoogleFonts.montserrat(
-                                            fontSize: 45,
+                                            fontSize: 30,
                                             fontWeight: FontWeight.w500,
                                             color: const Color(0xFFF1F1F6),
                                           ),
