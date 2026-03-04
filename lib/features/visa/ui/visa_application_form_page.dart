@@ -1494,16 +1494,10 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
             setState(() => _dateOfBirth = date);
           }, '1990-05-20'),
         ),
-        if (_gender == 'Female')
-          _buildFieldRow(
-            left: _buildTextField('Surname at birth:', _surnameAtBirthController, 'Maiden name (if different)'),
-            right: _buildCountryPickerField('Citizenship:', _citizenshipController, true),
-          ),
-        if (_gender != 'Female')
-          _buildFieldRow(
-            left: _buildCountryPickerField('Citizenship:', _citizenshipController, true),
-            right: const SizedBox.shrink(),
-          ),
+        _buildFieldRow(
+          left: _buildTextField('Surname at birth:', _surnameAtBirthController, 'Maiden name (if different)', false, false, _gender != null),
+          right: _buildCountryPickerField('Citizenship:', _citizenshipController, true),
+        ),
         _buildBirthLocationPicker(),
 
         // Passport section – paired rows
@@ -1564,8 +1558,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
         _buildTextField('Name:', _nameController, 'John', true),
         _buildTextField('Surname:', _surnameController, 'Smith', true),
         _buildGenderDropdown(),
-        if (_gender == 'Female')
-          _buildTextField('Surname at birth:', _surnameAtBirthController, 'Maiden name (if different)'),
+        _buildTextField('Surname at birth:', _surnameAtBirthController, 'Maiden name (if different)', false, false, _gender != null),
         _buildCountryPickerField('Citizenship:', _citizenshipController, true),
         _buildBirthLocationPicker(),
         _buildDateField('Date of birth:', null, _dateOfBirth, (date) {
@@ -1608,36 +1601,41 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
     String? hintText,
     bool isRequired = false,
     bool isOptional = false,
+    bool enabled = true,
   ]) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w500,
-              fontFamily: 'Inter',
-              color: isOptional ? _optionalLabelColor : const Color(0xFF1E1E1E),
+    return Opacity(
+      opacity: enabled ? 1.0 : 0.5,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w500,
+                fontFamily: 'Inter',
+                color: isOptional ? _optionalLabelColor : const Color(0xFF1E1E1E),
+              ),
             ),
-          ),
-          const SizedBox(height: 6),
-          SizedBox(
-            height: 50,
-            child: TextFormField(
-              controller: controller,
-              validator: isRequired
-                  ? (value) {
-                      if (value == null || value.trim().isEmpty) return 'This field is required';
-                      return null;
-                    }
-                  : null,
-              decoration: _inputDecoration(hintText: hintText),
+            const SizedBox(height: 6),
+            SizedBox(
+              height: 50,
+              child: TextFormField(
+                controller: controller,
+                enabled: enabled,
+                validator: isRequired
+                    ? (value) {
+                        if (value == null || value.trim().isEmpty) return 'This field is required';
+                        return null;
+                      }
+                    : null,
+                decoration: _inputDecoration(hintText: hintText),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
