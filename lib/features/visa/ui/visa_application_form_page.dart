@@ -512,12 +512,6 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
     }
   }
 
-  void _addRelative() {
-    setState(() {
-      _relatives.add(_createRelativeEntry());
-    });
-  }
-
   void _removeRelative(int index) {
     setState(() {
       final rel = _relatives[index];
@@ -867,6 +861,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
   }
 
   Widget _buildMaritalStatusCard() {
+    final isMarried = _maritalStatus == 'married';
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -880,25 +875,53 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Marital Status',
+            'Marital status: Are you married?',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Color(0xFF1E1E1E)),
           ),
           const SizedBox(height: 16),
-          _buildMaritalStatusToggle(),
-          const SizedBox(height: 16),
-          if (_maritalStatus == 'married') ...[
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Relatives:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
-                TextButton.icon(
-                  onPressed: _addRelative,
-                  icon: const Icon(Icons.add, size: 18),
-                  label: const Text('Add'),
-                  style: TextButton.styleFrom(foregroundColor: _primaryColor),
+          // Yes / No toggle
+          Row(
+            children: [
+              SizedBox(
+                width: 80,
+                height: 38,
+                child: ElevatedButton(
+                  onPressed: () => setState(() => _maritalStatus = 'married'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isMarried ? _greenColor : Colors.white,
+                    foregroundColor: isMarried ? Colors.white : _greenColor,
+                    side: BorderSide(color: _greenColor, width: isMarried ? 0 : 1.5),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+                    padding: EdgeInsets.zero,
+                  ),
+                  child: const Text('Yes', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 2),
+              SizedBox(
+                width: 80,
+                height: 38,
+                child: ElevatedButton(
+                  onPressed: () => setState(() => _maritalStatus = 'single'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: !isMarried ? Colors.white : Colors.white,
+                    foregroundColor: !isMarried ? _redColor : Colors.grey,
+                    side: BorderSide(color: !isMarried ? _redColor : _borderColor, width: 1.5),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+                    padding: EdgeInsets.zero,
+                  ),
+                  child: const Text('No', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                ),
+              ),
+            ],
+          ),
+          if (isMarried) ...[
+            const SizedBox(height: 16),
+            // + Add button with relationship popup
+            _buildAddRelativeButton(),
+            const SizedBox(height: 16),
             ..._relatives.asMap().entries.map((entry) {
               return _buildRelativeSection(entry.key, entry.value);
             }),
@@ -908,40 +931,60 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
     );
   }
 
-  Widget _buildMaritalStatusToggle() {
-    final isMarried = _maritalStatus == 'married';
-    return Row(
-      children: [
-        SizedBox(
-          width: 100,
-          height: 40,
-          child: OutlinedButton(
-            onPressed: () => setState(() => _maritalStatus = 'married'),
-            style: OutlinedButton.styleFrom(
-              backgroundColor: isMarried ? _greenColor : Colors.white,
-              foregroundColor: isMarried ? Colors.white : _greenColor,
-              side: const BorderSide(color: _greenColor, width: 1.5),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+  Widget _buildAddRelativeButton() {
+    return OutlinedButton.icon(
+      onPressed: () => _showAddRelativePopup(),
+      icon: const Icon(Icons.add, size: 16),
+      label: const Text('Add'),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: Colors.black87,
+        side: const BorderSide(color: _borderColor),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      ),
+    );
+  }
+
+  void _showAddRelativePopup() {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          contentPadding: const EdgeInsets.symmetric(vertical: 8),
+          content: SizedBox(
+            width: 200,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: ['Wife', 'Husband', 'Daughter', 'Son'].map((type) {
+                return ListTile(
+                  dense: true,
+                  title: Text(type, style: const TextStyle(fontSize: 14)),
+                  trailing: Checkbox(
+                    value: _relatives.any((r) => r['relationship'] == type),
+                    onChanged: (checked) {
+                      setState(() {
+                        if (checked == true) {
+                          _relatives.add(_createRelativeEntry(relationship: type));
+                        } else {
+                          final idx = _relatives.indexWhere((r) => r['relationship'] == type);
+                          if (idx >= 0) _removeRelative(idx);
+                        }
+                      });
+                      Navigator.of(ctx).pop();
+                    },
+                  ),
+                  onTap: () {
+                    setState(() {
+                      _relatives.add(_createRelativeEntry(relationship: type));
+                    });
+                    Navigator.of(ctx).pop();
+                  },
+                );
+              }).toList(),
             ),
-            child: const Text('Yes', style: TextStyle(fontSize: 14)),
           ),
-        ),
-        const SizedBox(width: 12),
-        SizedBox(
-          width: 100,
-          height: 40,
-          child: OutlinedButton(
-            onPressed: () => setState(() => _maritalStatus = 'single'),
-            style: OutlinedButton.styleFrom(
-              backgroundColor: !isMarried ? _redColor : Colors.white,
-              foregroundColor: !isMarried ? Colors.white : _redColor,
-              side: const BorderSide(color: _redColor, width: 1.5),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
-            ),
-            child: const Text('No', style: TextStyle(fontSize: 14)),
-          ),
-        ),
-      ],
+        );
+      },
     );
   }
 
@@ -1637,60 +1680,41 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
   // ---------------------------------------------------------------------------
 
   Widget _buildRelativeSection(int index, Map<String, dynamic> rel) {
+    final relationship = rel['relationship'] as String;
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(border: Border.all(color: _borderColor), borderRadius: BorderRadius.circular(5)),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Relative ${index + 1}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-              IconButton(icon: const Icon(Icons.delete_outline, color: _redColor), onPressed: () => _removeRelative(index)),
+              Text(relationship, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+              IconButton(
+                icon: const Icon(Icons.close, color: _redColor, size: 20),
+                onPressed: () => _removeRelative(index),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
             ],
           ),
-          const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Relationship:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500, fontFamily: 'Inter')),
-                const SizedBox(height: 6),
-                SizedBox(
-                  height: 50,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(border: Border.all(color: _borderColor), borderRadius: BorderRadius.circular(5)),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: rel['relationship'] as String,
-                        isExpanded: true,
-                        icon: SvgPicture.asset('assets/visa_application/icons/chevron-down.svg', width: 18, height: 18),
-                        items: ['Wife', 'Husband', 'Daughter', 'Son'].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
-                        onChanged: (v) => setState(() => rel['relationship'] = v!),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+          const SizedBox(height: 12),
+          _buildFieldRow(
+            left: _buildTextField('Name:', rel['firstName'] as TextEditingController),
+            right: _buildTextField('Surname:', rel['lastName'] as TextEditingController),
           ),
-          Row(children: [
-            Expanded(child: _buildTextField('Name:', rel['firstName'] as TextEditingController)),
-            const SizedBox(width: 16),
-            Expanded(child: _buildTextField('Surname:', rel['lastName'] as TextEditingController)),
-          ]),
-          _buildTextField('Middle name:', rel['middleName'] as TextEditingController),
-          Row(children: [
-            Expanded(child: _buildDateField('Date of birth:', null, rel['dateOfBirth'] as DateTime?, (date) {
+          _buildFieldRow(
+            left: _buildTextField('Middle name:', rel['middleName'] as TextEditingController),
+            right: _buildDateField('Date of birth:', null, rel['dateOfBirth'] as DateTime?, (date) {
               setState(() => rel['dateOfBirth'] = date);
-            })),
-            const SizedBox(width: 16),
-            Expanded(child: _buildTextField('Surname at birth:', rel['surnameAtBirth'] as TextEditingController)),
-          ]),
-          _buildCountryPickerField('Citizenship:', rel['citizenship'] as TextEditingController),
+            }),
+          ),
+          _buildFieldRow(
+            left: _buildTextField('Surname at birth:', rel['surnameAtBirth'] as TextEditingController),
+            right: _buildCountryPickerField('Citizenship:', rel['citizenship'] as TextEditingController),
+          ),
         ],
       ),
     );
