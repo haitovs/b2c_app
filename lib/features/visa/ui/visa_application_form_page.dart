@@ -143,6 +143,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
   // Marital Status & Relatives
   String _maritalStatus = 'single'; // 'single' or 'married'
   final List<Map<String, dynamic>> _relatives = [];
+  int _selectedRelativeIndex = 0;
 
   bool _confirmationChecked = false;
 
@@ -879,68 +880,167 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Color(0xFF1E1E1E)),
           ),
           const SizedBox(height: 16),
-          // Yes / No toggle
+          // Yes / No toggle (original style)
           Row(
             children: [
               SizedBox(
-                width: 80,
-                height: 38,
-                child: ElevatedButton(
+                width: 100,
+                height: 40,
+                child: OutlinedButton(
                   onPressed: () => setState(() => _maritalStatus = 'married'),
-                  style: ElevatedButton.styleFrom(
+                  style: OutlinedButton.styleFrom(
                     backgroundColor: isMarried ? _greenColor : Colors.white,
                     foregroundColor: isMarried ? Colors.white : _greenColor,
-                    side: BorderSide(color: _greenColor, width: isMarried ? 0 : 1.5),
-                    elevation: 0,
+                    side: const BorderSide(color: _greenColor, width: 1.5),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
-                    padding: EdgeInsets.zero,
                   ),
-                  child: const Text('Yes', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                  child: const Text('Yes', style: TextStyle(fontSize: 14)),
                 ),
               ),
-              const SizedBox(width: 2),
+              const SizedBox(width: 12),
               SizedBox(
-                width: 80,
-                height: 38,
-                child: ElevatedButton(
+                width: 100,
+                height: 40,
+                child: OutlinedButton(
                   onPressed: () => setState(() => _maritalStatus = 'single'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: !isMarried ? Colors.white : Colors.white,
-                    foregroundColor: !isMarried ? _redColor : Colors.grey,
-                    side: BorderSide(color: !isMarried ? _redColor : _borderColor, width: 1.5),
-                    elevation: 0,
+                  style: OutlinedButton.styleFrom(
+                    backgroundColor: !isMarried ? _redColor : Colors.white,
+                    foregroundColor: !isMarried ? Colors.white : _redColor,
+                    side: const BorderSide(color: _redColor, width: 1.5),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
-                    padding: EdgeInsets.zero,
                   ),
-                  child: const Text('No', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                  child: const Text('No', style: TextStyle(fontSize: 14)),
                 ),
               ),
             ],
           ),
           if (isMarried) ...[
+            const SizedBox(height: 20),
+            // Tabs row: each relative is a tab + "+" add button at the end
+            _buildRelativeTabs(),
             const SizedBox(height: 16),
-            // + Add button with relationship popup
-            _buildAddRelativeButton(),
-            const SizedBox(height: 16),
-            ..._relatives.asMap().entries.map((entry) {
-              return _buildRelativeSection(entry.key, entry.value);
-            }),
+            // Show fields for the selected tab
+            if (_relatives.isNotEmpty && _selectedRelativeIndex < _relatives.length)
+              _buildRelativeSection(_selectedRelativeIndex, _relatives[_selectedRelativeIndex]),
           ],
         ],
       ),
     );
   }
 
-  Widget _buildAddRelativeButton() {
-    return OutlinedButton.icon(
-      onPressed: () => _showAddRelativePopup(),
-      icon: const Icon(Icons.add, size: 16),
-      label: const Text('Add'),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: Colors.black87,
-        side: const BorderSide(color: _borderColor),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+  Widget _buildRelativeTabs() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          // Existing relative tabs
+          ..._relatives.asMap().entries.map((entry) {
+            final index = entry.key;
+            final rel = entry.value;
+            final isSelected = index == _selectedRelativeIndex;
+            final relationship = rel['relationship'] as String;
+            return Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: Material(
+                color: isSelected ? Colors.white : const Color(0xFFF5F5F5),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(6),
+                  topRight: Radius.circular(6),
+                ),
+                child: InkWell(
+                  onTap: () => setState(() => _selectedRelativeIndex = index),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(6),
+                    topRight: Radius.circular(6),
+                  ),
+                  child: Container(
+                    height: 36,
+                    padding: const EdgeInsets.only(left: 14, right: 4),
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: isSelected ? _primaryColor : _borderColor,
+                        width: isSelected ? 1.5 : 1,
+                      ),
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(6),
+                        topRight: Radius.circular(6),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          relationship,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                            color: isSelected ? _primaryColor : Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        InkWell(
+                          onTap: () {
+                            setState(() {
+                              _removeRelative(index);
+                              if (_selectedRelativeIndex >= _relatives.length && _relatives.isNotEmpty) {
+                                _selectedRelativeIndex = _relatives.length - 1;
+                              } else if (_relatives.isEmpty) {
+                                _selectedRelativeIndex = 0;
+                              }
+                            });
+                          },
+                          borderRadius: BorderRadius.circular(10),
+                          child: const Padding(
+                            padding: EdgeInsets.all(4),
+                            child: Icon(Icons.close, size: 14, color: Colors.grey),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }),
+          // "+ Add" tab
+          _buildAddTab(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAddTab() {
+    return Material(
+      color: const Color(0xFFF5F5F5),
+      borderRadius: const BorderRadius.only(
+        topLeft: Radius.circular(6),
+        topRight: Radius.circular(6),
+      ),
+      child: InkWell(
+        onTap: () => _showAddRelativePopup(),
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(6),
+          topRight: Radius.circular(6),
+        ),
+        child: Container(
+          height: 36,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            border: Border.all(color: _borderColor),
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(6),
+              topRight: Radius.circular(6),
+            ),
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.add, size: 16, color: Colors.black54),
+              SizedBox(width: 4),
+              Text('Add', style: TextStyle(fontSize: 13, color: Colors.black54)),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -949,40 +1049,20 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
     showDialog(
       context: context,
       builder: (ctx) {
-        return AlertDialog(
-          contentPadding: const EdgeInsets.symmetric(vertical: 8),
-          content: SizedBox(
-            width: 200,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: ['Wife', 'Husband', 'Daughter', 'Son'].map((type) {
-                return ListTile(
-                  dense: true,
-                  title: Text(type, style: const TextStyle(fontSize: 14)),
-                  trailing: Checkbox(
-                    value: _relatives.any((r) => r['relationship'] == type),
-                    onChanged: (checked) {
-                      setState(() {
-                        if (checked == true) {
-                          _relatives.add(_createRelativeEntry(relationship: type));
-                        } else {
-                          final idx = _relatives.indexWhere((r) => r['relationship'] == type);
-                          if (idx >= 0) _removeRelative(idx);
-                        }
-                      });
-                      Navigator.of(ctx).pop();
-                    },
-                  ),
-                  onTap: () {
-                    setState(() {
-                      _relatives.add(_createRelativeEntry(relationship: type));
-                    });
-                    Navigator.of(ctx).pop();
-                  },
-                );
-              }).toList(),
-            ),
-          ),
+        return SimpleDialog(
+          title: const Text('Select relationship', style: TextStyle(fontSize: 16)),
+          children: ['Wife', 'Husband', 'Daughter', 'Son'].map((type) {
+            return SimpleDialogOption(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                setState(() {
+                  _relatives.add(_createRelativeEntry(relationship: type));
+                  _selectedRelativeIndex = _relatives.length - 1;
+                });
+              },
+              child: Text(type, style: const TextStyle(fontSize: 14)),
+            );
+          }).toList(),
         );
       },
     );
@@ -1680,43 +1760,24 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
   // ---------------------------------------------------------------------------
 
   Widget _buildRelativeSection(int index, Map<String, dynamic> rel) {
-    final relationship = rel['relationship'] as String;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(border: Border.all(color: _borderColor), borderRadius: BorderRadius.circular(5)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(relationship, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-              IconButton(
-                icon: const Icon(Icons.close, color: _redColor, size: 20),
-                onPressed: () => _removeRelative(index),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _buildFieldRow(
-            left: _buildTextField('Name:', rel['firstName'] as TextEditingController),
-            right: _buildTextField('Surname:', rel['lastName'] as TextEditingController),
-          ),
-          _buildFieldRow(
-            left: _buildTextField('Middle name:', rel['middleName'] as TextEditingController),
-            right: _buildDateField('Date of birth:', null, rel['dateOfBirth'] as DateTime?, (date) {
-              setState(() => rel['dateOfBirth'] = date);
-            }),
-          ),
-          _buildFieldRow(
-            left: _buildTextField('Surname at birth:', rel['surnameAtBirth'] as TextEditingController),
-            right: _buildCountryPickerField('Citizenship:', rel['citizenship'] as TextEditingController),
-          ),
-        ],
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildFieldRow(
+          left: _buildTextField('Name:', rel['firstName'] as TextEditingController),
+          right: _buildTextField('Surname:', rel['lastName'] as TextEditingController),
+        ),
+        _buildFieldRow(
+          left: _buildTextField('Middle name:', rel['middleName'] as TextEditingController),
+          right: _buildDateField('Date of birth:', null, rel['dateOfBirth'] as DateTime?, (date) {
+            setState(() => rel['dateOfBirth'] = date);
+          }),
+        ),
+        _buildFieldRow(
+          left: _buildTextField('Surname at birth:', rel['surnameAtBirth'] as TextEditingController),
+          right: _buildCountryPickerField('Citizenship:', rel['citizenship'] as TextEditingController),
+        ),
+      ],
     );
   }
 
