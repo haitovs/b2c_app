@@ -76,11 +76,13 @@ const List<String> _passportTypes = [
 class VisaApplicationFormPage extends StatefulWidget {
   final int eventId;
   final String? participantId;
+  final String? visaId;
 
   const VisaApplicationFormPage({
     super.key,
     required this.eventId,
     this.participantId,
+    this.visaId,
   });
 
   @override
@@ -95,6 +97,9 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
   // Loading state
   bool _isLoading = true;
   String? _errorMessage;
+
+  // Visa ID for multi-visa support
+  String? _visaId;
 
   // Personal Information Controllers
   final _nameController = TextEditingController();
@@ -237,14 +242,23 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
       final visaService = context.read<VisaService>();
       Map<String, dynamic> visa;
       try {
-        visa = await visaService.getMyVisa(
-          participantId: widget.participantId,
-          eventId: widget.eventId,
-        );
+        if (widget.visaId != null) {
+          // Multi-visa: load specific visa by ID
+          visa = await visaService.getMyVisaById(widget.visaId!);
+        } else {
+          // Backward compat: load first/only visa (or create one)
+          visa = await visaService.getMyVisa(
+            participantId: widget.participantId,
+            eventId: widget.eventId,
+          );
+        }
       } catch (_) {
         if (mounted) setState(() => _isLoading = false);
         return;
       }
+
+      // Store visa ID for later save/submit
+      _visaId = visa['id'] as String?;
 
       if (!mounted) return;
 
@@ -638,18 +652,26 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
       // 4. Update visa application
       if (!mounted) return;
       final visaService = context.read<VisaService>();
-      await visaService.updateMyVisa(
-        participantId: widget.participantId,
-        eventId: widget.eventId,
-        data: formData,
-      );
+      if (_visaId != null) {
+        await visaService.updateMyVisaById(visaId: _visaId!, data: formData);
+      } else {
+        await visaService.updateMyVisa(
+          participantId: widget.participantId,
+          eventId: widget.eventId,
+          data: formData,
+        );
+      }
 
       // 5. Submit for review
       if (!mounted) return;
-      await visaService.submitMyVisa(
-        participantId: widget.participantId,
-        eventId: widget.eventId,
-      );
+      if (_visaId != null) {
+        await visaService.submitMyVisaById(_visaId!);
+      } else {
+        await visaService.submitMyVisa(
+          participantId: widget.participantId,
+          eventId: widget.eventId,
+        );
+      }
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -659,7 +681,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
         ),
       );
 
-      context.go('/events/${widget.eventId}/menu');
+      context.go('/events/${widget.eventId}/visa-list');
     } catch (e) {
       if (mounted) {
         final msg = e.toString().replaceAll('Exception: ', '');

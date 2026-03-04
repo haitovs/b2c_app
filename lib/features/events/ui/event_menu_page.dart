@@ -277,7 +277,7 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
       {
         'icon': 'registration.png',
         'label': 'Visa Application',
-        'route': '/events/${widget.eventId}/visa-apply',
+        'route': '/events/${widget.eventId}/visa-list',
         'isRegistrationButton': true,
       },
       // Items requiring registration

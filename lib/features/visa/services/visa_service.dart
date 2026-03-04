@@ -29,9 +29,61 @@ class VisaService {
     return '?${params.entries.map((e) => '${e.key}=${e.value}').join('&')}';
   }
 
-  /// Get or create visa application for the current user.
-  /// Uses participant path if participantId is provided,
-  /// otherwise falls back to direct user path with eventId.
+  /// List all visa applications for the current user and event.
+  Future<List<Map<String, dynamic>>> listMyVisas({int? eventId}) async {
+    final token = await _getToken();
+    final query = _buildQueryParams(eventId: eventId);
+
+    final response = await http.get(
+      Uri.parse('$_baseUrl/my-visas$query'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    if (response.statusCode == 200) {
+      final list = jsonDecode(response.body) as List<dynamic>;
+      return list.cast<Map<String, dynamic>>();
+    }
+
+    final error = jsonDecode(response.body);
+    throw Exception(error['message'] ?? error['detail'] ?? 'Failed to list visa applications');
+  }
+
+  /// Create a new blank visa application.
+  Future<Map<String, dynamic>> createMyVisa({int? eventId}) async {
+    final token = await _getToken();
+    final query = _buildQueryParams(eventId: eventId);
+
+    final response = await http.post(
+      Uri.parse('$_baseUrl/my-visa/create$query'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+
+    final error = jsonDecode(response.body);
+    throw Exception(error['message'] ?? error['detail'] ?? 'Failed to create visa application');
+  }
+
+  /// Get a specific visa application by ID.
+  Future<Map<String, dynamic>> getMyVisaById(String visaId) async {
+    final token = await _getToken();
+
+    final response = await http.get(
+      Uri.parse('$_baseUrl/my-visa/$visaId'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+
+    final error = jsonDecode(response.body);
+    throw Exception(error['message'] ?? error['detail'] ?? 'Failed to load visa application');
+  }
+
+  /// Get or create visa application for the current user (backward compat).
   Future<Map<String, dynamic>> getMyVisa({
     String? participantId,
     int? eventId,
@@ -52,8 +104,31 @@ class VisaService {
     throw Exception(error['message'] ?? error['detail'] ?? 'Failed to load visa application');
   }
 
-  /// Update visa application with form data
-  /// Can only be updated in FILL_OUT or DECLINED status
+  /// Update a specific visa application by ID.
+  Future<Map<String, dynamic>> updateMyVisaById({
+    required String visaId,
+    required Map<String, dynamic> data,
+  }) async {
+    final token = await _getToken();
+
+    final response = await http.put(
+      Uri.parse('$_baseUrl/my-visa/$visaId'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode(data),
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+
+    final error = jsonDecode(response.body);
+    throw Exception(error['message'] ?? error['detail'] ?? 'Failed to update visa application');
+  }
+
+  /// Update visa application with form data (backward compat).
   Future<Map<String, dynamic>> updateMyVisa({
     String? participantId,
     int? eventId,
@@ -79,8 +154,24 @@ class VisaService {
     throw Exception(error['message'] ?? error['detail'] ?? 'Failed to update visa application');
   }
 
-  /// Submit visa application for review
-  /// Validates completeness and changes status to PENDING
+  /// Submit a specific visa application by ID for review.
+  Future<Map<String, dynamic>> submitMyVisaById(String visaId) async {
+    final token = await _getToken();
+
+    final response = await http.post(
+      Uri.parse('$_baseUrl/my-visa/$visaId/submit'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+
+    final error = jsonDecode(response.body);
+    throw Exception(error['message'] ?? error['detail'] ?? 'Failed to submit visa application');
+  }
+
+  /// Submit visa application for review (backward compat).
   Future<Map<String, dynamic>> submitMyVisa({
     String? participantId,
     int? eventId,
@@ -102,7 +193,6 @@ class VisaService {
   }
 
   /// Validate visa application without submitting
-  /// Returns validation result with missing fields and warnings
   Future<Map<String, dynamic>> validateMyVisa({
     String? participantId,
     int? eventId,
@@ -124,7 +214,6 @@ class VisaService {
   }
 
   /// Upload visa photo to server
-  /// Returns photo URL on success
   Future<String> uploadPhoto({
     String? participantId,
     required dynamic photoData, // File for mobile, Uint8List for web

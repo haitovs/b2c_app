@@ -36,6 +36,7 @@ import '../features/participants/ui/add_participant_form_page.dart';
 import '../features/participants/ui/edit_participant_page.dart';
 import '../features/transfer/ui/transfer_page.dart';
 import '../features/visa/ui/visa_application_form_page.dart';
+import '../features/visa/ui/visa_list_page.dart';
 import '../features/visa/ui/visa_status_page.dart';
 import '../features/visa/ui/visa_details_page.dart';
 import '../shared/widgets/legal_document_page.dart';
@@ -299,13 +300,23 @@ GoRouter createRouter(AuthService authService) {
               return EventRegistrationPage(eventId: int.tryParse(idStr) ?? 0);
             },
           ),
-          // Visa Application standalone route (temporary - replaces registration button)
+          // Visa list — shows all visa applications for the user
+          GoRoute(
+            path: 'visa-list',
+            builder: (context, state) {
+              final idStr = state.pathParameters['id']!;
+              return VisaListPage(eventId: int.tryParse(idStr) ?? 0);
+            },
+          ),
+          // Visa Application form (supports optional visaId for multi-visa)
           GoRoute(
             path: 'visa-apply',
             builder: (context, state) {
               final idStr = state.pathParameters['id']!;
+              final visaId = state.uri.queryParameters['visaId'];
               return VisaApplicationFormPage(
                 eventId: int.tryParse(idStr) ?? 0,
+                visaId: visaId,
               );
             },
           ),
