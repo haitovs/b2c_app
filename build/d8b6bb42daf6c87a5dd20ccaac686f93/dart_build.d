@@ -1,1 +1,0 @@
- /Users/goldcomputers/Desktop/Projects/b2c_project/b2c_app/build/d8b6bb42daf6c87a5dd20ccaac686f93/dart_build_result.json:  /Users/goldcomputers/Desktop/Projects/b2c_project/b2c_app/.dart_tool/package_config.json /Users/goldcomputers/Desktop/Projects/b2c_project/b2c_app/pubspec.yaml /Users/goldcomputers/Documents/flutter/bin/cache/dart-sdk/version
