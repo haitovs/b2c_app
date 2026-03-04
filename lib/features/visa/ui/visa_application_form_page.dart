@@ -148,6 +148,9 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
 
   // Submission state
   bool _isSubmitting = false;
+  bool _isSwitchingTab = false;
+  bool _isCreatingVisa = false;
+  bool _isLoadingCities = false;
 
   // Marital Status & Relatives
   String _maritalStatus = 'single'; // 'single' or 'married'
@@ -225,10 +228,17 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
   }
 
   Future<void> _loadCitiesForCountry(String country) async {
-    await _loadCityCache();
-    setState(() {
-      _availableCities = _cityCache?[country] ?? [];
-    });
+    setState(() => _isLoadingCities = true);
+    try {
+      await _loadCityCache();
+      if (mounted) {
+        setState(() {
+          _availableCities = _cityCache?[country] ?? [];
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _isLoadingCities = false);
+    }
   }
 
   @override
@@ -421,6 +431,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
       'first_name': _nameController.text.trim(),
       'last_name': _surnameController.text.trim(),
       'surname_at_birth': _surnameAtBirthController.text.trim(),
+      'father_name': _fatherNameController.text.trim(),
       'gender': _gender,
       'place_of_birth': _placeOfBirthController.text.trim(),
       'country_of_birth': _countryOfBirthController.text.trim(),
@@ -488,12 +499,13 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
   Future<void> _switchToVisa(int index) async {
     if (index == _selectedVisaIndex) return;
 
-    // Auto-save current form
-    await _saveCurrentVisa();
-
-    // Reload the target visa fresh from server
-    final visaService = context.read<VisaService>();
+    setState(() => _isSwitchingTab = true);
     try {
+      // Auto-save current form
+      await _saveCurrentVisa();
+
+      // Reload the target visa fresh from server
+      final visaService = context.read<VisaService>();
       final visa = await visaService.getMyVisaById(
         _allVisas[index]['id'] as String,
       );
@@ -510,15 +522,18 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
           ),
         );
       }
+    } finally {
+      if (mounted) setState(() => _isSwitchingTab = false);
     }
   }
 
   /// Add a new visa application and switch to it.
   Future<void> _addNewVisa() async {
-    // Save current visa first
-    await _saveCurrentVisa();
-
+    setState(() => _isCreatingVisa = true);
     try {
+      // Save current visa first
+      await _saveCurrentVisa();
+
       final visaService = context.read<VisaService>();
       await visaService.createMyVisa(eventId: widget.eventId);
 
@@ -541,6 +556,8 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
           ),
         );
       }
+    } finally {
+      if (mounted) setState(() => _isCreatingVisa = false);
     }
   }
 
@@ -760,10 +777,13 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
         );
       }
 
-      // 6. Refresh visa list to update tab status
+      // 6. Refresh visa list to update tab status and reload current visa
       if (!mounted) return;
       try {
         _allVisas = await visaService.listMyVisas(eventId: widget.eventId);
+        if (mounted && _allVisas.isNotEmpty && _selectedVisaIndex < _allVisas.length) {
+          await _loadVisaIntoForm(_allVisas[_selectedVisaIndex]);
+        }
       } catch (_) {}
 
       if (!mounted) return;
@@ -773,8 +793,6 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
           backgroundColor: Colors.green,
         ),
       );
-
-      context.go('/events/${widget.eventId}/menu');
     } catch (e) {
       if (mounted) {
         final msg = e.toString().replaceAll('Exception: ', '');
@@ -855,14 +873,24 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
       );
     }
 
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        await _saveCurrentVisa();
+        if (mounted) context.pop();
+      },
+      child: Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: _primaryColor),
-          onPressed: () => context.pop(),
+          onPressed: () async {
+            await _saveCurrentVisa();
+            if (mounted) context.pop();
+          },
         ),
         title: const Text(
           'Visa',
@@ -874,34 +902,48 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
         ),
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildPageTitle(),
-                const SizedBox(height: 12),
-                _buildSeparatorLine(),
-                const SizedBox(height: 20),
-                _buildAlertBanner(),
-                const SizedBox(height: 16),
-                _buildVisaTabs(),
-                const SizedBox(height: 16),
-                _buildMainFormCard(),
-                const SizedBox(height: 24),
-                _buildMaritalStatusCard(),
-                const SizedBox(height: 24),
-                _buildConfirmationCheckbox(),
-                const SizedBox(height: 24),
-                _buildButtonRow(),
-                const SizedBox(height: 32),
-              ],
+        child: Stack(
+          children: [
+            SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildPageTitle(),
+                    const SizedBox(height: 12),
+                    _buildSeparatorLine(),
+                    const SizedBox(height: 20),
+                    _buildAlertBanner(),
+                    const SizedBox(height: 16),
+                    _buildVisaTabs(),
+                    const SizedBox(height: 16),
+                    _buildMainFormCard(),
+                    const SizedBox(height: 24),
+                    _buildMaritalStatusCard(),
+                    const SizedBox(height: 24),
+                    _buildConfirmationCheckbox(),
+                    const SizedBox(height: 24),
+                    _buildButtonRow(),
+                    const SizedBox(height: 32),
+                  ],
+                ),
+              ),
             ),
-          ),
+            if (_isSwitchingTab)
+              Positioned.fill(
+                child: Container(
+                  color: Colors.white.withAlpha(180),
+                  child: const Center(
+                    child: CircularProgressIndicator(color: _primaryColor),
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
+    ),
     );
   }
 
@@ -931,7 +973,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
                 const SizedBox(width: 8),
                 // "+ Add" button
                 InkWell(
-                  onTap: _addNewVisa,
+                  onTap: _isCreatingVisa ? null : _addNewVisa,
                   borderRadius: BorderRadius.circular(4),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -942,7 +984,13 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.add, size: 16, color: _primaryColor),
+                        if (_isCreatingVisa)
+                          const SizedBox(
+                            width: 14, height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: _primaryColor),
+                          )
+                        else
+                          const Icon(Icons.add, size: 16, color: _primaryColor),
                         const SizedBox(width: 4),
                         Text(
                           'Add (${_allVisas.length})',
@@ -1487,6 +1535,9 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
           ],
         ),
 
+        // Middle name – full width
+        _buildTextField('Middle name:', _fatherNameController, 'Middle name'),
+
         // Remaining personal info – paired rows
         _buildFieldRow(
           left: _buildGenderDropdown(),
@@ -1557,6 +1608,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
         _buildPhotoUploadSection(),
         _buildTextField('Name:', _nameController, 'John', true),
         _buildTextField('Surname:', _surnameController, 'Smith', true),
+        _buildTextField('Middle name:', _fatherNameController, 'Middle name'),
         _buildGenderDropdown(),
         _buildTextField('Surname at birth:', _surnameAtBirthController, 'Maiden name (if different)', false, false, _gender != null),
         _buildCountryPickerField('Citizenship:', _citizenshipController, true),
@@ -1922,17 +1974,25 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
             height: 50,
             child: TextFormField(
               controller: _placeOfBirthController,
-              readOnly: hasCities,
+              readOnly: hasCities || _isLoadingCities,
               onTap: hasCities ? () => _showCityPickerDialog() : null,
               validator: (v) => (v == null || v.trim().isEmpty) ? 'This field is required' : null,
               decoration: _inputDecoration(
-                hintText: hasCities ? 'Select city' : 'Enter city',
-                suffixIcon: hasCities
-                    ? Padding(
-                        padding: const EdgeInsets.all(14),
-                        child: SvgPicture.asset('assets/visa_application/icons/chevron-down.svg', width: 18, height: 18),
+                hintText: _isLoadingCities ? 'Loading cities...' : (hasCities ? 'Select city' : 'Enter city'),
+                suffixIcon: _isLoadingCities
+                    ? const Padding(
+                        padding: EdgeInsets.all(14),
+                        child: SizedBox(
+                          width: 18, height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: _primaryColor),
+                        ),
                       )
-                    : null,
+                    : hasCities
+                        ? Padding(
+                            padding: const EdgeInsets.all(14),
+                            child: SvgPicture.asset('assets/visa_application/icons/chevron-down.svg', width: 18, height: 18),
+                          )
+                        : null,
               ),
             ),
           ),
