@@ -1351,62 +1351,50 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
   }
 
   Widget _buildBirthLocationPicker() {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Country and City of birth:',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500, fontFamily: 'Inter', color: Color(0xFF1E1E1E)),
-          ),
-          const SizedBox(height: 6),
-          CSCPickerPlus(
-            showStates: false,
-            showCities: true,
-            flagState: CountryFlag.ENABLE,
-            dropdownDecoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(5),
-              border: Border.all(color: _borderColor),
-            ),
-            disabledDropdownDecoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(5),
-              border: Border.all(color: const Color(0xFFE0E0E0)),
-              color: const Color(0xFFF5F5F5),
-            ),
-            selectedItemStyle: const TextStyle(fontSize: 14, color: Colors.black),
-            dropdownHeadingStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            dropdownItemStyle: const TextStyle(fontSize: 14),
-            dropdownDialogRadius: 10,
-            searchBarRadius: 10,
-            countrySearchPlaceholder: 'Search country...',
-            citySearchPlaceholder: 'Search city...',
-            countryDropdownLabel: _countryOfBirthController.text.isEmpty
-                ? 'Select country'
-                : _countryOfBirthController.text,
-            cityDropdownLabel: _placeOfBirthController.text.isEmpty
-                ? 'Select city'
-                : _placeOfBirthController.text,
-            currentCountry: _countryOfBirthController.text.isNotEmpty
-                ? _countryOfBirthController.text
-                : null,
-            currentCity: _placeOfBirthController.text.isNotEmpty
-                ? _placeOfBirthController.text
-                : null,
-            onCountryChanged: (value) {
-              setState(() {
-                _countryOfBirthController.text = value;
-                _placeOfBirthController.clear();
-              });
-            },
-            onCityChanged: (value) {
-              setState(() {
-                _placeOfBirthController.text = value ?? '';
-              });
-            },
-          ),
-        ],
+    return CSCPickerPlus(
+      layout: Layout.vertical,
+      showStates: false,
+      showCities: true,
+      flagState: CountryFlag.ENABLE,
+      dropdownDecoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(5),
+        border: Border.all(color: _borderColor),
       ),
+      disabledDropdownDecoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(5),
+        border: Border.all(color: const Color(0xFFE0E0E0)),
+        color: const Color(0xFFF5F5F5),
+      ),
+      selectedItemStyle: const TextStyle(fontSize: 14, color: Colors.black),
+      dropdownHeadingStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+      dropdownItemStyle: const TextStyle(fontSize: 14),
+      dropdownDialogRadius: 10,
+      searchBarRadius: 10,
+      countrySearchPlaceholder: 'Search country...',
+      citySearchPlaceholder: 'Search city...',
+      countryDropdownLabel: _countryOfBirthController.text.isEmpty
+          ? 'Select country of birth'
+          : _countryOfBirthController.text,
+      cityDropdownLabel: _placeOfBirthController.text.isEmpty
+          ? 'Select city of birth'
+          : _placeOfBirthController.text,
+      currentCountry: _countryOfBirthController.text.isNotEmpty
+          ? _countryOfBirthController.text
+          : null,
+      currentCity: _placeOfBirthController.text.isNotEmpty
+          ? _placeOfBirthController.text
+          : null,
+      onCountryChanged: (value) {
+        setState(() {
+          _countryOfBirthController.text = value;
+          _placeOfBirthController.clear();
+        });
+      },
+      onCityChanged: (value) {
+        setState(() {
+          _placeOfBirthController.text = value ?? '';
+        });
+      },
     );
   }
 
