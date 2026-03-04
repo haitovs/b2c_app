@@ -19,8 +19,8 @@ class AuthNotifier extends Notifier<AuthState> implements TokenProvider {
     _prefs = ref.read(sharedPreferencesProvider);
     // Create ApiClient with self as TokenProvider
     _api = ApiClient(this);
-    // Start auto-login
-    _tryAutoLogin();
+    // Start auto-login (deferred so build() returns initial state first)
+    Future.microtask(() => _tryAutoLogin());
     return const AuthState();
   }
 
