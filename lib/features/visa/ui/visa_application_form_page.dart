@@ -14,6 +14,8 @@ import '../../../core/config/app_config.dart';
 import '../../../core/widgets/phone_input_field.dart';
 import '../../auth/services/auth_service.dart';
 
+import 'package:flutter/services.dart' show rootBundle;
+
 import '../services/visa_service.dart';
 
 const List<String> _countries = [
@@ -144,6 +146,10 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
 
   bool _confirmationChecked = false;
 
+  // City data loaded from csc_picker_plus asset
+  static Map<String, List<String>>? _cityCache;
+  List<String> _availableCities = [];
+
   // -- Figma design constants --
   static const _primaryColor = Color(0xFF3C4494);
   static const _borderColor = Color(0xFFB7B7B7);
@@ -181,6 +187,38 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
       (rel['citizenship'] as TextEditingController).dispose();
     }
     super.dispose();
+  }
+
+  Future<void> _loadCityCache() async {
+    if (_cityCache != null) return;
+    try {
+      final jsonStr = await rootBundle.loadString(
+        'packages/csc_picker_plus/assets/countries.json',
+      );
+      final List<dynamic> data = json.decode(jsonStr);
+      final map = <String, List<String>>{};
+      for (final country in data) {
+        final name = country['name'] as String;
+        final cities = <String>{};
+        for (final state in (country['state'] as List? ?? [])) {
+          for (final city in (state['city'] as List? ?? [])) {
+            cities.add(city['name'] as String);
+          }
+        }
+        final sorted = cities.toList()..sort();
+        map[name] = sorted;
+      }
+      _cityCache = map;
+    } catch (_) {
+      _cityCache = {};
+    }
+  }
+
+  Future<void> _loadCitiesForCountry(String country) async {
+    await _loadCityCache();
+    setState(() {
+      _availableCities = _cityCache?[country] ?? [];
+    });
   }
 
   @override
@@ -239,6 +277,9 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
       _gender = visa['gender'];
       _placeOfBirthController.text = visa['place_of_birth'] ?? '';
       _countryOfBirthController.text = visa['country_of_birth'] ?? '';
+      if (_countryOfBirthController.text.isNotEmpty) {
+        _loadCitiesForCountry(_countryOfBirthController.text);
+      }
       _citizenshipController.text = visa['citizenship'] ?? '';
       _emailController.text = visa['email'] ?? '';
       _phoneNumberE164 = visa['phone_number'] ?? '';
@@ -1352,12 +1393,126 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
     );
   }
 
+  void _showCityPickerDialog() {
+    String searchQuery = '';
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            final filtered = searchQuery.isEmpty
+                ? _availableCities
+                : _availableCities.where((c) => c.toLowerCase().contains(searchQuery.toLowerCase())).toList();
+            return AlertDialog(
+              title: const Text('Select City'),
+              content: SizedBox(
+                width: 340,
+                height: 450,
+                child: Column(
+                  children: [
+                    TextField(
+                      autofocus: true,
+                      decoration: InputDecoration(
+                        hintText: 'Search city...',
+                        prefixIcon: const Icon(Icons.search),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                      onChanged: (value) => setDialogState(() => searchQuery = value),
+                    ),
+                    const SizedBox(height: 8),
+                    Expanded(
+                      child: filtered.isEmpty
+                          ? Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Text('No cities found'),
+                                  if (searchQuery.isNotEmpty) ...[
+                                    const SizedBox(height: 12),
+                                    TextButton(
+                                      onPressed: () {
+                                        _placeOfBirthController.text = searchQuery;
+                                        Navigator.of(ctx).pop();
+                                        setState(() {});
+                                      },
+                                      child: Text('Use "$searchQuery"'),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            )
+                          : ListView.builder(
+                              itemCount: filtered.length,
+                              itemBuilder: (ctx, index) {
+                                final city = filtered[index];
+                                final isSelected = _placeOfBirthController.text == city;
+                                return ListTile(
+                                  dense: true,
+                                  title: Text(city, style: TextStyle(
+                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                    color: isSelected ? _primaryColor : null,
+                                  )),
+                                  trailing: isSelected ? const Icon(Icons.check, color: _primaryColor, size: 20) : null,
+                                  onTap: () {
+                                    _placeOfBirthController.text = city;
+                                    Navigator.of(ctx).pop();
+                                    setState(() {});
+                                  },
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel'))],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildCityPickerField() {
+    final hasCities = _availableCities.isNotEmpty;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Place of birth (City) *', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500, fontFamily: 'Inter', color: Color(0xFF1E1E1E))),
+          const SizedBox(height: 6),
+          SizedBox(
+            height: 50,
+            child: TextFormField(
+              controller: _placeOfBirthController,
+              readOnly: hasCities,
+              onTap: hasCities ? () => _showCityPickerDialog() : null,
+              validator: (v) => (v == null || v.trim().isEmpty) ? 'This field is required' : null,
+              decoration: _inputDecoration(
+                hintText: hasCities ? 'Select city' : 'Enter city',
+                suffixIcon: hasCities
+                    ? Padding(
+                        padding: const EdgeInsets.all(14),
+                        child: SvgPicture.asset('assets/visa_application/icons/chevron-down.svg', width: 18, height: 18),
+                      )
+                    : null,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildBirthLocationPicker() {
-    return Column(
-      children: [
-        _buildCountryPickerField('Country of birth *', _countryOfBirthController, true),
-        _buildTextField('Place of birth (City) *', _placeOfBirthController, null, true),
-      ],
+    return _buildFieldRow(
+      left: _buildCountryPickerField('Country of birth *', _countryOfBirthController, true, () {
+        _placeOfBirthController.clear();
+        _loadCitiesForCountry(_countryOfBirthController.text);
+      }),
+      right: _buildCityPickerField(),
     );
   }
 
