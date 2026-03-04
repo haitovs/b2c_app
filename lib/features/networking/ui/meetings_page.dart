@@ -7,7 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import '../../../core/config/app_config.dart';
 import '../../../core/models/api_exception.dart';
-import '../../../core/services/event_context_service.dart';
+import '../../../core/providers/event_context_provider.dart';
 import '../../../core/widgets/custom_app_bar.dart';
 import '../../events/ui/widgets/profile_dropdown.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -79,7 +79,7 @@ class _MeetingsPageState extends ConsumerState<MeetingsPage> {
     // Ensure the event context is loaded for this event
     final eventId = int.tryParse(widget.eventId);
     if (eventId != null) {
-      await eventContextService.ensureEventContext(eventId);
+      await ref.read(eventContextProvider.notifier).ensureEventContext(eventId);
     }
     _fetchData();
   }
@@ -131,7 +131,7 @@ class _MeetingsPageState extends ConsumerState<MeetingsPage> {
       }
 
       // Use EventContextService for site_id (already initialized at app startup)
-      final tourismSiteId = eventContextService.siteId;
+      final tourismSiteId = ref.read(eventContextProvider).siteId;
 
       if (tourismSiteId != null) {
         try {

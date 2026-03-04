@@ -6,7 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import '../../../core/config/app_config.dart';
-import '../../../core/services/event_context_service.dart';
+import '../../../core/providers/event_context_provider.dart';
 import '../../../core/widgets/custom_app_bar.dart';
 import '../../events/ui/widgets/profile_dropdown.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -81,8 +81,8 @@ class _MeetingB2GRequestPageState extends ConsumerState<MeetingB2GRequestPage> {
   }
 
   Future<void> _fetchAgendaDays() async {
-    // Use eventContextService for correct Tourism site_id
-    final tourismSiteId = eventContextService.siteId;
+    // Use eventContextProvider for correct Tourism site_id
+    final tourismSiteId = ref.read(eventContextProvider).siteId;
     if (tourismSiteId == null) {
       debugPrint('Warning: No Tourism site_id available');
       return;

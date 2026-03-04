@@ -8,9 +8,8 @@ import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/config/app_config.dart';
-import '../../../core/services/event_context_service.dart';
-import '../../../core/widgets/custom_app_bar.dart';
-import '../../notifications/ui/notification_drawer.dart';
+import '../../../core/providers/event_context_provider.dart';
+import '../../../shared/layouts/event_sidebar_layout.dart';
 import 'widgets/profile_dropdown.dart';
 
 class SpeakerDetailPage extends ConsumerStatefulWidget {
@@ -30,7 +29,6 @@ class SpeakerDetailPage extends ConsumerStatefulWidget {
 }
 
 class _SpeakerDetailPageState extends ConsumerState<SpeakerDetailPage> {
-  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   bool _isProfileOpen = false;
 
   Map<String, dynamic>? _speaker;
@@ -50,7 +48,7 @@ class _SpeakerDetailPageState extends ConsumerState<SpeakerDetailPage> {
   Future<void> _fetchSpeaker() async {
     try {
       // Use EventContextService for site_id
-      final siteId = eventContextService.siteId;
+      final siteId = ref.read(eventContextProvider).siteId;
       final uri = siteId != null
           ? Uri.parse(
               '${AppConfig.tourismApiBaseUrl}/speakers/${widget.speakerId}?site_id=$siteId',
@@ -73,10 +71,6 @@ class _SpeakerDetailPageState extends ConsumerState<SpeakerDetailPage> {
       debugPrint('Error fetching speaker: $e');
       setState(() => _isLoading = false);
     }
-  }
-
-  void _toggleProfile() {
-    setState(() => _isProfileOpen = !_isProfileOpen);
   }
 
   void _closeProfile() {
@@ -108,11 +102,9 @@ class _SpeakerDetailPageState extends ConsumerState<SpeakerDetailPage> {
     final isMobile = screenWidth < 600;
     final horizontalPadding = isMobile ? 16.0 : 50.0;
 
-    return Scaffold(
-      key: _scaffoldKey,
-      backgroundColor: const Color(0xFF3C4494),
-      endDrawer: const NotificationDrawer(),
-      body: GestureDetector(
+    return EventSidebarLayout(
+      title: 'Speaker',
+      child: GestureDetector(
         onTap: _closeProfile,
         behavior: HitTestBehavior.translucent,
         child: Stack(
@@ -120,16 +112,6 @@ class _SpeakerDetailPageState extends ConsumerState<SpeakerDetailPage> {
             SafeArea(
               child: Column(
                 children: [
-                  // Header
-                  Padding(
-                    padding: EdgeInsets.only(
-                      left: horizontalPadding,
-                      right: horizontalPadding,
-                      top: isMobile ? 12 : 20,
-                    ),
-                    child: _buildHeader(isMobile),
-                  ),
-
                   // Content Container
                   Expanded(
                     child: Container(
@@ -184,42 +166,6 @@ class _SpeakerDetailPageState extends ConsumerState<SpeakerDetailPage> {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildHeader(bool isMobile) {
-    return Row(
-      children: [
-        // Back button
-        IconButton(
-          icon: Icon(
-            Icons.arrow_back,
-            color: Colors.white,
-            size: isMobile ? 24 : 28,
-          ),
-          onPressed: () => context.go('/events/${widget.eventId}/speakers'),
-        ),
-        const SizedBox(width: 8),
-        // Title
-        Text(
-          'Speaker',
-          style: GoogleFonts.montserrat(
-            fontSize: isMobile ? 24 : 28,
-            fontWeight: FontWeight.w600,
-            color: Colors.white,
-          ),
-        ),
-        const Spacer(),
-        // Custom App Bar with notifications and profile
-        CustomAppBar(
-          onProfileTap: _toggleProfile,
-          onNotificationTap: () {
-            _closeProfile();
-            _scaffoldKey.currentState?.openEndDrawer();
-          },
-          isMobile: isMobile,
-        ),
-      ],
     );
   }
 

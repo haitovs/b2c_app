@@ -2,17 +2,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/auth/providers/auth_provider.dart';
+import '../../features/auth/ui/create_password_page.dart';
 import '../../features/auth/ui/forgot_password_page.dart';
 import '../../features/auth/ui/login_page.dart';
 import '../../features/auth/ui/registration_page.dart';
 import '../../features/auth/ui/verification_code_page.dart';
 import '../../features/auth/ui/verify_email_page.dart';
-import '../../features/contact/ui/contact_us_page.dart';
+import '../../features/company/ui/company_preview_page.dart';
+import '../../features/company/ui/company_profile_page.dart';
 import '../../features/events/ui/agenda_page.dart';
 import '../../features/events/ui/event_calendar_page.dart';
 import '../../features/events/ui/event_details_page.dart';
 import '../../features/events/ui/event_menu_page.dart';
-import '../../features/events/ui/event_registration_page.dart';
 import '../../features/events/ui/participant_detail_page.dart';
 import '../../features/events/ui/participant_list_page.dart';
 import '../../features/events/ui/speaker_detail_page.dart';
@@ -30,15 +31,17 @@ import '../../features/networking/ui/meeting_review_page.dart';
 import '../../features/networking/ui/new_meeting_page.dart';
 import '../../features/news/ui/news_detail_page.dart';
 import '../../features/news/ui/news_page.dart';
-import '../../features/participants/ui/add_participant_form_page.dart';
-import '../../features/participants/ui/add_participant_select_event_page.dart';
-import '../../features/participants/ui/edit_participant_page.dart';
-import '../../features/participants/ui/my_participants_page.dart';
 import '../../features/profile/ui/profile_page.dart';
+import '../../features/shop/ui/event_services_page.dart';
+import '../../features/shop/ui/service_detail_page.dart';
+import '../../features/shop/ui/shopping_cart_page.dart';
+import '../../features/team/ui/add_team_member_page.dart';
+import '../../features/team/ui/team_members_page.dart';
 import '../../features/transfer/ui/transfer_page.dart';
 import '../../features/visa/ui/visa_application_form_page.dart';
 import '../../features/visa/ui/visa_details_page.dart';
 import '../../features/visa/ui/visa_status_page.dart';
+import '../../shared/ui/coming_soon_page.dart';
 import '../../shared/widgets/legal_document_page.dart';
 import '../error_page.dart';
 import 'auth_refresh_notifier.dart';
@@ -69,18 +72,28 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isForgotPassword = location.startsWith('/forgot-password');
       final isResetPassword = location.startsWith('/reset-password');
       final isLegalPage = location.startsWith('/legal');
+      final isCreatePassword = location.startsWith('/create-password');
 
-      if (!isAuthenticated &&
-          !isLoggingIn &&
-          !isSigningUp &&
-          !isVerifyingCode &&
-          !isVerifyingEmail &&
-          !isForgotPassword &&
-          !isResetPassword &&
-          !isLegalPage) {
+      // Public pages: home (/), event details (/events/:id), legal, create-password
+      final isHome = location == '/';
+      final isEventDetails = RegExp(r'^/events/\d+$').hasMatch(location);
+      final isPublicPage =
+          isHome || isEventDetails || isLegalPage || isCreatePassword;
+
+      // Auth pages that don't require login
+      final isAuthPage = isLoggingIn ||
+          isSigningUp ||
+          isVerifyingCode ||
+          isVerifyingEmail ||
+          isForgotPassword ||
+          isResetPassword;
+
+      // Redirect to login if not authenticated and not on a public/auth page
+      if (!isAuthenticated && !isPublicPage && !isAuthPage) {
         return '/login';
       }
 
+      // After login/register, redirect to home (user picks event → menu)
       if (isAuthenticated && (isLoggingIn || isSigningUp)) {
         return '/';
       }
@@ -94,6 +107,13 @@ final routerProvider = Provider<GoRouter>((ref) {
             LegalDocumentPage(docType: state.pathParameters['docType']!),
       ),
       GoRoute(path: '/login', builder: (context, state) => const LoginPage()),
+      GoRoute(
+        path: '/create-password',
+        builder: (context, state) {
+          final token = state.uri.queryParameters['token'] ?? '';
+          return CreatePasswordPage(token: token);
+        },
+      ),
       GoRoute(
         path: '/forgot-password',
         builder: (context, state) => const ForgotPasswordPage(),
@@ -131,6 +151,84 @@ final routerProvider = Provider<GoRouter>((ref) {
               final idStr = state.pathParameters['id']!;
               return EventMenuPage(eventId: int.tryParse(idStr) ?? 0);
             },
+          ),
+          // --- NEW: Company Profile ---
+          GoRoute(
+            path: 'company-profile',
+            builder: (context, state) => const CompanyProfilePage(),
+            routes: [
+              GoRoute(
+                path: ':companyId/preview',
+                builder: (context, state) => CompanyPreviewPage(
+                  companyId: state.pathParameters['companyId']!,
+                ),
+              ),
+            ],
+          ),
+          // --- NEW: Team Members ---
+          GoRoute(
+            path: 'team',
+            builder: (context, state) => const TeamMembersPage(),
+            routes: [
+              GoRoute(
+                path: 'add',
+                builder: (context, state) => const AddTeamMemberPage(),
+              ),
+            ],
+          ),
+          // --- NEW: Event Services (Shop) ---
+          GoRoute(
+            path: 'services',
+            builder: (context, state) => const EventServicesPage(),
+            routes: [
+              GoRoute(
+                path: 'cart',
+                builder: (context, state) => const ShoppingCartPage(),
+              ),
+              GoRoute(
+                path: ':serviceId',
+                builder: (context, state) => ServiceDetailPage(
+                  serviceId: state.pathParameters['serviceId']!,
+                ),
+              ),
+            ],
+          ),
+          // --- NEW: Visa & Travel Center (replaces visa-apply) ---
+          GoRoute(
+            path: 'visa-travel',
+            builder: (context, state) {
+              final idStr = state.pathParameters['id']!;
+              return VisaApplicationFormPage(
+                eventId: int.tryParse(idStr) ?? 0,
+              );
+            },
+          ),
+          // --- Services & Add-Ons (same as Event Services) ---
+          GoRoute(
+            path: 'services-addons',
+            builder: (context, state) => const EventServicesPage(),
+          ),
+          // --- RENAMED: Schedule & Meetings (was meetings) ---
+          GoRoute(
+            path: 'schedule',
+            builder: (context, state) =>
+                MeetingGatePage(eventId: state.pathParameters['id']!),
+          ),
+          // --- NEW: Coming Soon pages ---
+          GoRoute(
+            path: 'financial',
+            builder: (context, state) =>
+                const ComingSoonPage(featureName: 'Financial Section'),
+          ),
+          GoRoute(
+            path: 'analytics',
+            builder: (context, state) =>
+                const ComingSoonPage(featureName: 'Analytics'),
+          ),
+          GoRoute(
+            path: 'hotels',
+            builder: (context, state) =>
+                const ComingSoonPage(featureName: 'Hotels'),
           ),
           GoRoute(
             path: 'agenda',
@@ -276,11 +374,6 @@ final routerProvider = Provider<GoRouter>((ref) {
             ],
           ),
           GoRoute(
-            path: 'contact',
-            builder: (context, state) =>
-                ContactUsPage(eventId: state.pathParameters['id']!),
-          ),
-          GoRoute(
             path: 'hotline',
             builder: (context, state) => const HotlinePage(),
           ),
@@ -295,23 +388,6 @@ final routerProvider = Provider<GoRouter>((ref) {
                 FeedbackPage(eventId: state.pathParameters['id']!),
           ),
           GoRoute(
-            path: 'registration',
-            builder: (context, state) {
-              final idStr = state.pathParameters['id']!;
-              return EventRegistrationPage(
-                  eventId: int.tryParse(idStr) ?? 0);
-            },
-          ),
-          GoRoute(
-            path: 'visa-apply',
-            builder: (context, state) {
-              final idStr = state.pathParameters['id']!;
-              return VisaApplicationFormPage(
-                eventId: int.tryParse(idStr) ?? 0,
-              );
-            },
-          ),
-          GoRoute(
             path: 'transfer',
             builder: (context, state) {
               final idStr = state.pathParameters['id']!;
@@ -323,26 +399,6 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (context, state) {
               final idStr = state.pathParameters['id']!;
               return FlightsPage(eventId: int.tryParse(idStr));
-            },
-          ),
-          GoRoute(
-            path: 'my-participants',
-            builder: (context, state) {
-              final idStr = state.pathParameters['id']!;
-              return MyParticipantsPage(
-                  eventId: int.tryParse(idStr) ?? 0);
-            },
-          ),
-          GoRoute(
-            path: 'participants/edit/:participantId',
-            builder: (context, state) {
-              final eventIdStr = state.pathParameters['id']!;
-              final participantId =
-                  state.pathParameters['participantId']!;
-              return EditParticipantPage(
-                participantId: participantId,
-                eventId: int.tryParse(eventIdStr) ?? 0,
-              );
             },
           ),
           GoRoute(
@@ -407,19 +463,6 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/hotline',
         builder: (context, state) => const HotlinePage(),
-      ),
-      GoRoute(
-        path: '/participants/select-event',
-        builder: (context, state) => const AddParticipantSelectEventPage(),
-      ),
-      GoRoute(
-        path: '/participants/add',
-        builder: (context, state) {
-          final eventIdStr =
-              state.uri.queryParameters['event_id'] ?? '0';
-          return AddParticipantFormPage(
-              eventId: int.tryParse(eventIdStr) ?? 0);
-        },
       ),
     ],
   );

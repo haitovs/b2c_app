@@ -1,5 +1,4 @@
 import 'package:b2c_app/core/router/app_router.dart';
-import 'package:b2c_app/core/services/event_context_service.dart';
 import 'package:b2c_app/core/theme/app_theme.dart';
 import 'package:b2c_app/l10n/generated/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -18,9 +17,6 @@ void main() async {
 
   // Pre-load SharedPreferences so it can be injected synchronously
   final prefs = await SharedPreferences.getInstance();
-
-  // Initialize EventContextService to load saved event/site context
-  await eventContextService.init();
 
   runApp(
     ProviderScope(

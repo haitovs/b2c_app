@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../shared/layouts/event_sidebar_layout.dart';
 import '../models/faq_item.dart';
 import '../providers/faq_providers.dart';
 import '../services/faq_service.dart';
@@ -86,45 +86,11 @@ class _FAQPageState extends ConsumerState<FAQPage> {
     final isMobile = screenWidth < 600;
     final horizontalPadding = isMobile ? 20.0 : 50.0;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF3C4494),
-      body: SafeArea(
+    return EventSidebarLayout(
+      title: 'FAQ',
+      child: SafeArea(
         child: Column(
           children: [
-            // Header
-            Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: horizontalPadding,
-                vertical: 20,
-              ),
-              child: Row(
-                children: [
-                  // Back button
-                  IconButton(
-                    onPressed: () {
-                      // Navigate back to menu
-                      context.go('/events/${widget.eventId}/menu');
-                    },
-                    icon: const Icon(
-                      Icons.arrow_back,
-                      color: Color(0xFFF1F1F6),
-                      size: 28,
-                    ),
-                  ),
-                  const SizedBox(width: 15),
-                  // Title
-                  Text(
-                    'FAQ',
-                    style: GoogleFonts.montserrat(
-                      fontWeight: FontWeight.w600,
-                      fontSize: isMobile ? 28 : 40,
-                      color: const Color(0xFFF1F1F6),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
             // Search bar
             Padding(
               padding: EdgeInsets.symmetric(horizontal: horizontalPadding),

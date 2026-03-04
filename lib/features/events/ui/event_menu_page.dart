@@ -10,11 +10,11 @@ import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/config/app_config.dart';
-import '../../../../core/services/event_context_service.dart';
+import '../../../../shared/layouts/event_sidebar_layout.dart';
+import '../../../../core/providers/event_context_provider.dart';
 import '../../../../core/widgets/attention_seeker.dart';
 import '../../../../l10n/generated/app_localizations.dart';
 import '../../auth/providers/auth_provider.dart';
-import '../../notifications/ui/notification_drawer.dart';
 import 'widgets/profile_dropdown.dart';
 
 class EventMenuPage extends ConsumerStatefulWidget {
@@ -58,7 +58,7 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
   Future<void> _initializeAndFetch() async {
     // Ensure the event context is loaded for this event
     // This handles direct navigation and page refreshes
-    await eventContextService.ensureEventContext(widget.eventId);
+    await ref.read(eventContextProvider.notifier).ensureEventContext(widget.eventId);
     _fetchEvent();
     _fetchSponsors(); // Initial fetch
     _startPeriodicSponsorRefresh(); // Start periodic refresh
@@ -177,7 +177,7 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
   Future<void> _fetchSponsors() async {
     try {
       // Use EventContextService for site_id
-      final siteId = eventContextService.siteId;
+      final siteId = ref.read(eventContextProvider).siteId;
       // Use query param for site_id instead of header for better compatibility
       final uri = siteId != null
           ? Uri.parse(
@@ -239,7 +239,7 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
   }
 
   void _onExitEvent() {
-    eventContextService.clearContext();
+    ref.read(eventContextProvider.notifier).clearContext();
     context.go('/');
   }
 
@@ -372,11 +372,9 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
       return true;
     }).toList();
 
-    return Scaffold(
-      key: _scaffoldKey,
-      backgroundColor: const Color(0xFF3C4494),
-      endDrawer: const NotificationDrawer(),
-      body: GestureDetector(
+    return EventSidebarLayout(
+      title: 'Dashboard',
+      child: GestureDetector(
         onTap: _closeProfile,
         behavior: HitTestBehavior.translucent,
         child: Stack(

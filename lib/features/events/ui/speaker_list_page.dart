@@ -6,10 +6,8 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import '../../../core/config/app_config.dart';
-import '../../../core/services/event_context_service.dart';
-import '../../../core/widgets/custom_app_bar.dart';
-import '../../notifications/providers/notification_providers.dart';
-import '../../notifications/ui/notification_drawer.dart';
+import '../../../core/providers/event_context_provider.dart';
+import '../../../shared/layouts/event_sidebar_layout.dart';
 import 'widgets/profile_dropdown.dart';
 
 class SpeakerListPage extends ConsumerStatefulWidget {
@@ -22,7 +20,6 @@ class SpeakerListPage extends ConsumerStatefulWidget {
 }
 
 class _SpeakerListPageState extends ConsumerState<SpeakerListPage> {
-  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   bool _isProfileOpen = false;
 
   List<Map<String, dynamic>> _speakers = [];
@@ -35,32 +32,13 @@ class _SpeakerListPageState extends ConsumerState<SpeakerListPage> {
   void initState() {
     super.initState();
     _initializeAndFetch();
-    _loadNotificationCount();
-  }
-
-  int _unreadNotificationCount = 0;
-
-  Future<void> _loadNotificationCount() async {
-    try {
-      final notificationService = ref.read(notificationServiceProvider);
-      final notifications = await notificationService.getNotifications();
-      if (mounted) {
-        setState(() {
-          _unreadNotificationCount = notifications
-              .where((n) => !n.isRead)
-              .length;
-        });
-      }
-    } catch (e) {
-      // Silently fail
-    }
   }
 
   Future<void> _initializeAndFetch() async {
     // Ensure the event context is loaded for this event
     final eventId = int.tryParse(widget.eventId);
     if (eventId != null) {
-      await eventContextService.ensureEventContext(eventId);
+      await ref.read(eventContextProvider.notifier).ensureEventContext(eventId);
     }
     _fetchSpeakers();
   }
@@ -74,7 +52,7 @@ class _SpeakerListPageState extends ConsumerState<SpeakerListPage> {
   Future<void> _fetchSpeakers() async {
     try {
       // Use EventContextService for site_id
-      final siteId = eventContextService.siteId;
+      final siteId = ref.read(eventContextProvider).siteId;
       final uri = siteId != null
           ? Uri.parse(
               '${AppConfig.tourismApiBaseUrl}/speakers/?site_id=$siteId',
@@ -118,10 +96,6 @@ class _SpeakerListPageState extends ConsumerState<SpeakerListPage> {
     });
   }
 
-  void _toggleProfile() {
-    setState(() => _isProfileOpen = !_isProfileOpen);
-  }
-
   void _closeProfile() {
     if (_isProfileOpen) setState(() => _isProfileOpen = false);
   }
@@ -138,11 +112,9 @@ class _SpeakerListPageState extends ConsumerState<SpeakerListPage> {
     final isMobile = screenWidth < 600;
     final horizontalPadding = isMobile ? 16.0 : 50.0;
 
-    return Scaffold(
-      key: _scaffoldKey,
-      backgroundColor: const Color(0xFF3C4494),
-      endDrawer: const NotificationDrawer(),
-      body: GestureDetector(
+    return EventSidebarLayout(
+      title: 'Speakers',
+      child: GestureDetector(
         onTap: _closeProfile,
         behavior: HitTestBehavior.translucent,
         child: Stack(
@@ -150,16 +122,6 @@ class _SpeakerListPageState extends ConsumerState<SpeakerListPage> {
             SafeArea(
               child: Column(
                 children: [
-                  // Header
-                  Padding(
-                    padding: EdgeInsets.only(
-                      left: horizontalPadding,
-                      right: horizontalPadding,
-                      top: isMobile ? 12 : 20,
-                    ),
-                    child: _buildHeader(isMobile),
-                  ),
-
                   // Search Bar
                   Padding(
                     padding: EdgeInsets.symmetric(
@@ -224,46 +186,6 @@ class _SpeakerListPageState extends ConsumerState<SpeakerListPage> {
               ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildHeader(bool isMobile) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(0, 0, 0, 0),
-      child: Row(
-        children: [
-          // Back button
-          IconButton(
-            icon: Icon(
-              Icons.arrow_back,
-              color: Colors.white,
-              size: isMobile ? 24 : 28,
-            ),
-            onPressed: () => context.go('/events/${widget.eventId}/menu'),
-          ),
-          const SizedBox(width: 8),
-          // Title
-          Text(
-            'Speakers',
-            style: GoogleFonts.montserrat(
-              fontSize: isMobile ? 24 : 28,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
-            ),
-          ),
-          const Spacer(),
-          // Custom App Bar with notifications and profile
-          CustomAppBar(
-            onProfileTap: _toggleProfile,
-            onNotificationTap: () {
-              _closeProfile();
-              _scaffoldKey.currentState?.openEndDrawer();
-            },
-            isMobile: isMobile,
-            unreadNotificationCount: _unreadNotificationCount,
-          ),
-        ],
       ),
     );
   }

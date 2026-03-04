@@ -8,7 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 
 import '../../../core/config/app_config.dart';
-import '../../../core/services/event_context_service.dart';
+import '../../../core/providers/event_context_provider.dart';
 import '../../../core/widgets/custom_app_bar.dart';
 import '../../events/ui/widgets/profile_dropdown.dart';
 import '../../notifications/ui/notification_drawer.dart';
@@ -49,7 +49,7 @@ class _NewsDetailPageState extends ConsumerState<NewsDetailPage> {
 
   Future<void> _fetchNewsDetail() async {
     try {
-      final siteId = eventContextService.siteId;
+      final siteId = ref.read(eventContextProvider).siteId;
       final uri = siteId != null
           ? Uri.parse(
               '${AppConfig.tourismApiBaseUrl}/news/${widget.newsId}?site_id=$siteId',

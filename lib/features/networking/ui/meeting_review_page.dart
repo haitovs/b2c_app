@@ -6,7 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import '../../../core/config/app_config.dart';
-import '../../../core/services/event_context_service.dart';
+import '../../../core/providers/event_context_provider.dart';
 import '../../../core/widgets/custom_app_bar.dart';
 import '../../events/ui/widgets/profile_dropdown.dart';
 import '../../notifications/ui/notification_drawer.dart';
@@ -67,7 +67,7 @@ class _MeetingReviewPageState extends ConsumerState<MeetingReviewPage> {
 
   Future<void> _fetchMeeting() async {
     try {
-      final siteId = eventContextService.siteId;
+      final siteId = ref.read(eventContextProvider).siteId;
       var uriString =
           '${AppConfig.tourismApiBaseUrl}/meetings/${widget.meetingId}';
       if (siteId != null) {

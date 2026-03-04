@@ -7,11 +7,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import '../../../core/config/app_config.dart';
-import '../../../core/services/event_context_service.dart';
-import '../../../core/widgets/custom_app_bar.dart';
+import '../../../core/providers/event_context_provider.dart';
+import '../../../shared/layouts/event_sidebar_layout.dart';
 import '../../events/ui/widgets/profile_dropdown.dart';
-import '../../notifications/providers/notification_providers.dart';
-import '../../notifications/ui/notification_drawer.dart';
 
 /// News Page - displays news from Tourism backend with search and infinite scroll
 class NewsPage extends ConsumerStatefulWidget {
@@ -24,7 +22,6 @@ class NewsPage extends ConsumerStatefulWidget {
 }
 
 class _NewsPageState extends ConsumerState<NewsPage> {
-  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final ScrollController _scrollController = ScrollController();
   bool _isProfileOpen = false;
 
@@ -44,25 +41,6 @@ class _NewsPageState extends ConsumerState<NewsPage> {
     super.initState();
     _fetchNews();
     _scrollController.addListener(_onScroll);
-    _loadNotificationCount();
-  }
-
-  int _unreadNotificationCount = 0;
-
-  Future<void> _loadNotificationCount() async {
-    try {
-      final notificationService = ref.read(notificationServiceProvider);
-      final notifications = await notificationService.getNotifications();
-      if (mounted) {
-        setState(() {
-          _unreadNotificationCount = notifications
-              .where((n) => !n.isRead)
-              .length;
-        });
-      }
-    } catch (e) {
-      // Silently fail
-    }
   }
 
   @override
@@ -84,7 +62,7 @@ class _NewsPageState extends ConsumerState<NewsPage> {
 
   Future<void> _fetchNews() async {
     try {
-      final siteId = eventContextService.siteId;
+      final siteId = ref.read(eventContextProvider).siteId;
       final uri = siteId != null
           ? Uri.parse(
               '${AppConfig.tourismApiBaseUrl}/news/?site_id=$siteId&skip=$_skip&limit=$_limit',
@@ -119,7 +97,7 @@ class _NewsPageState extends ConsumerState<NewsPage> {
     setState(() => _isLoadingMore = true);
 
     try {
-      final siteId = eventContextService.siteId;
+      final siteId = ref.read(eventContextProvider).siteId;
       final uri = siteId != null
           ? Uri.parse(
               '${AppConfig.tourismApiBaseUrl}/news/?site_id=$siteId&skip=$_skip&limit=$_limit',
@@ -166,10 +144,6 @@ class _NewsPageState extends ConsumerState<NewsPage> {
     });
   }
 
-  void _toggleProfile() {
-    setState(() => _isProfileOpen = !_isProfileOpen);
-  }
-
   void _closeProfile() {
     if (_isProfileOpen) setState(() => _isProfileOpen = false);
   }
@@ -196,11 +170,9 @@ class _NewsPageState extends ConsumerState<NewsPage> {
     final isMobile = screenWidth < 600;
     final horizontalPadding = isMobile ? 16.0 : 50.0;
 
-    return Scaffold(
-      key: _scaffoldKey,
-      backgroundColor: const Color(0xFF3C4494),
-      endDrawer: const NotificationDrawer(),
-      body: GestureDetector(
+    return EventSidebarLayout(
+      title: 'News',
+      child: GestureDetector(
         onTap: _closeProfile,
         behavior: HitTestBehavior.translucent,
         child: Stack(
@@ -208,16 +180,6 @@ class _NewsPageState extends ConsumerState<NewsPage> {
             SafeArea(
               child: Column(
                 children: [
-                  // Header
-                  Padding(
-                    padding: EdgeInsets.only(
-                      left: horizontalPadding,
-                      right: horizontalPadding,
-                      top: isMobile ? 12 : 20,
-                    ),
-                    child: _buildHeader(isMobile),
-                  ),
-
                   // Search Bar
                   Padding(
                     padding: EdgeInsets.symmetric(
@@ -257,37 +219,6 @@ class _NewsPageState extends ConsumerState<NewsPage> {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildHeader(bool isMobile) {
-    return Row(
-      children: [
-        // Back button
-        IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
-          onPressed: () => context.go('/events/${widget.eventId}/menu'),
-        ),
-        const SizedBox(width: 8),
-        // Title
-        Text(
-          'News',
-          style: GoogleFonts.montserrat(
-            fontSize: isMobile ? 24 : 32,
-            fontWeight: FontWeight.w600,
-            color: const Color(0xFFF1F1F6),
-          ),
-        ),
-        const Spacer(),
-        // Notification & Profile icons
-        CustomAppBar(
-          onNotificationTap: () {
-            _scaffoldKey.currentState?.openEndDrawer();
-          },
-          onProfileTap: _toggleProfile,
-          unreadNotificationCount: _unreadNotificationCount,
-        ),
-      ],
     );
   }
 

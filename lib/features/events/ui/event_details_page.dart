@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../../../core/services/event_context_service.dart';
+import '../../../../core/providers/event_context_provider.dart';
 import '../../../../core/widgets/custom_app_bar.dart';
 import '../../../../l10n/generated/app_localizations.dart';
 import '../../notifications/ui/notification_drawer.dart';
@@ -87,7 +87,7 @@ class _EventDetailsPageState extends ConsumerState<EventDetailsPage> {
     final eventId = int.tryParse(widget.id);
     if (eventId != null && _event != null) {
       final tourismSiteId = _event!['tourism_site_id'] as int?;
-      eventContextService.setEventContext(
+      ref.read(eventContextProvider.notifier).setEventContext(
         eventId: eventId,
         tourismSiteId: tourismSiteId,
       );
