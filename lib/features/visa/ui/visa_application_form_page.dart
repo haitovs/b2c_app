@@ -13,6 +13,8 @@ import 'package:provider/provider.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/widgets/phone_input_field.dart';
 import '../../auth/services/auth_service.dart';
+import 'package:csc_picker_plus/csc_picker_plus.dart';
+
 import '../services/visa_service.dart';
 
 const List<String> _countries = [
@@ -1022,12 +1024,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
             left: _buildCountryPickerField('Citizenship:', _citizenshipController, true),
             right: const SizedBox.shrink(),
           ),
-        _buildFieldRow(
-          left: _buildCountryPickerField('Country of birth:', _countryOfBirthController, true, () {
-            _placeOfBirthController.clear();
-          }),
-          right: _buildCityField(),
-        ),
+        _buildBirthLocationPicker(),
 
         // Passport section – paired rows
         _buildFieldRow(
@@ -1090,10 +1087,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
         if (_gender == 'Female')
           _buildTextField('Surname at birth:', _surnameAtBirthController, 'Maiden name (if different)'),
         _buildCountryPickerField('Citizenship:', _citizenshipController, true),
-        _buildCountryPickerField('Country of birth:', _countryOfBirthController, true, () {
-          _placeOfBirthController.clear();
-        }),
-        _buildCityField(),
+        _buildBirthLocationPicker(),
         _buildDateField('Date of birth:', null, _dateOfBirth, (date) {
           setState(() => _dateOfBirth = date);
         }, '1990-05-20'),
@@ -1356,39 +1350,60 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
     );
   }
 
-  Widget _buildCityField() {
-    final hasCountry = _countryOfBirthController.text.isNotEmpty;
+  Widget _buildBirthLocationPicker() {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Place of birth (City):',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w500,
-              fontFamily: 'Inter',
-              color: hasCountry ? const Color(0xFF1E1E1E) : const Color(0xFFB7B7B7),
-            ),
+          const Text(
+            'Country and City of birth:',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500, fontFamily: 'Inter', color: Color(0xFF1E1E1E)),
           ),
           const SizedBox(height: 6),
-          SizedBox(
-            height: 50,
-            child: TextFormField(
-              controller: _placeOfBirthController,
-              enabled: hasCountry,
-              validator: (value) {
-                if (!hasCountry) return null;
-                if (value == null || value.trim().isEmpty) return 'This field is required';
-                return null;
-              },
-              decoration: _inputDecoration(
-                hintText: hasCountry
-                    ? 'Enter city in ${_countryOfBirthController.text}'
-                    : 'Select country first',
-              ),
+          CSCPickerPlus(
+            showStates: false,
+            showCities: true,
+            flagState: CountryFlag.ENABLE,
+            dropdownDecoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(5),
+              border: Border.all(color: _borderColor),
             ),
+            disabledDropdownDecoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(5),
+              border: Border.all(color: const Color(0xFFE0E0E0)),
+              color: const Color(0xFFF5F5F5),
+            ),
+            selectedItemStyle: const TextStyle(fontSize: 14, color: Colors.black),
+            dropdownHeadingStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            dropdownItemStyle: const TextStyle(fontSize: 14),
+            dropdownDialogRadius: 10,
+            searchBarRadius: 10,
+            countrySearchPlaceholder: 'Search country...',
+            citySearchPlaceholder: 'Search city...',
+            countryDropdownLabel: _countryOfBirthController.text.isEmpty
+                ? 'Select country'
+                : _countryOfBirthController.text,
+            cityDropdownLabel: _placeOfBirthController.text.isEmpty
+                ? 'Select city'
+                : _placeOfBirthController.text,
+            currentCountry: _countryOfBirthController.text.isNotEmpty
+                ? _countryOfBirthController.text
+                : null,
+            currentCity: _placeOfBirthController.text.isNotEmpty
+                ? _placeOfBirthController.text
+                : null,
+            onCountryChanged: (value) {
+              setState(() {
+                _countryOfBirthController.text = value;
+                _placeOfBirthController.clear();
+              });
+            },
+            onCityChanged: (value) {
+              setState(() {
+                _placeOfBirthController.text = value ?? '';
+              });
+            },
           ),
         ],
       ),
