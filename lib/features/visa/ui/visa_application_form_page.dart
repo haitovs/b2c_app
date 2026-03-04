@@ -1518,7 +1518,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Name/Surname on the left, Photo uploads on the right
+        // Name/Surname/Middle name on the left, Photo uploads on the right
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1527,6 +1527,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
                 children: [
                   _buildTextField('Name:', _nameController, 'John', true),
                   _buildTextField('Surname:', _surnameController, 'Smith', true),
+                  _buildTextField('Middle name:', _fatherNameController, 'Middle name'),
                 ],
               ),
             ),
@@ -1534,9 +1535,6 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
             Expanded(child: _buildPhotoUploadSection()),
           ],
         ),
-
-        // Middle name – full width
-        _buildTextField('Middle name:', _fatherNameController, 'Middle name'),
 
         // Remaining personal info – paired rows
         _buildFieldRow(
@@ -2019,7 +2017,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 20),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildPhotoBox(
@@ -2030,7 +2028,6 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
             previewAsset: 'assets/visa_application/profile_preview.jpg',
             onUpload: _pickImage, onDelete: _deletePhoto,
           ),
-          const SizedBox(width: 24),
           _buildPhotoBox(
             width: 180, height: 154,
             buttonLabel: 'Upload files',
