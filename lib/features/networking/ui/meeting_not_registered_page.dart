@@ -146,7 +146,7 @@ class _MeetingNotRegisteredPageState extends State<MeetingNotRegisteredPage> {
           OutlinedButton(
             onPressed: () {
               // Navigate to visa application page (temporarily replaces registration)
-              context.push('/events/${widget.eventId}/visa-apply');
+              context.push('/events/${widget.eventId}/visa-travel');
             },
             style: OutlinedButton.styleFrom(
               foregroundColor: const Color(0xFF3C4494),

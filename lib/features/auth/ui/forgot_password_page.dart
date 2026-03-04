@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/app_theme.dart';
 import '../../../core/widgets/app_text_field.dart';
 import '../providers/auth_provider.dart';
-import 'forgot_password_verify_code_page.dart';
 import 'widgets/auth_info_box.dart';
 import 'widgets/auth_page_layout.dart';
 import 'widgets/auth_button.dart';
@@ -147,11 +147,8 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
 
       if (error == null) {
         // Success - navigate to verify code page
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (_) => ForgotPasswordVerifyCodePage(email: email),
-          ),
-        );
+        final encodedEmail = Uri.encodeComponent(email);
+        context.go('/forgot-password/verify?email=$encodedEmail');
       } else {
         setState(
           () => _errorMessage = "Your email is incorrect. Please try again!",

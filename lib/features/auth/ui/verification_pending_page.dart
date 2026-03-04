@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../providers/auth_provider.dart';
-import 'login_page.dart';
 
 /// Page shown after registration, prompting user to verify their email
 class VerificationPendingPage extends ConsumerStatefulWidget {
@@ -45,10 +45,7 @@ class _VerificationPendingPageState extends ConsumerState<VerificationPendingPag
   }
 
   void _goToLogin() {
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const LoginPage()),
-    );
+    context.go('/login');
   }
 
   @override

@@ -4,9 +4,12 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/providers/auth_provider.dart';
 import '../../features/auth/ui/create_password_page.dart';
 import '../../features/auth/ui/forgot_password_page.dart';
+import '../../features/auth/ui/forgot_password_verify_code_page.dart';
 import '../../features/auth/ui/login_page.dart';
 import '../../features/auth/ui/registration_page.dart';
+import '../../features/auth/ui/reset_password_page.dart';
 import '../../features/auth/ui/verification_code_page.dart';
+import '../../features/auth/ui/verification_pending_page.dart';
 import '../../features/auth/ui/verify_email_page.dart';
 import '../../features/company/ui/company_preview_page.dart';
 import '../../features/company/ui/company_profile_page.dart';
@@ -80,13 +83,17 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isPublicPage =
           isHome || isEventDetails || isLegalPage || isCreatePassword;
 
+      final isVerificationPending =
+          location.startsWith('/verification-pending');
+
       // Auth pages that don't require login
       final isAuthPage = isLoggingIn ||
           isSigningUp ||
           isVerifyingCode ||
           isVerifyingEmail ||
           isForgotPassword ||
-          isResetPassword;
+          isResetPassword ||
+          isVerificationPending;
 
       // Redirect to login if not authenticated and not on a public/auth page
       if (!isAuthenticated && !isPublicPage && !isAuthPage) {
@@ -126,7 +133,30 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/verify-code',
         builder: (context, state) {
           final email = state.uri.queryParameters['email'] ?? '';
-          return VerificationCodePage(email: email);
+          final password = state.uri.queryParameters['password'];
+          return VerificationCodePage(email: email, password: password);
+        },
+      ),
+      GoRoute(
+        path: '/verification-pending',
+        builder: (context, state) {
+          final email = state.uri.queryParameters['email'] ?? '';
+          return VerificationPendingPage(email: email);
+        },
+      ),
+      GoRoute(
+        path: '/forgot-password/verify',
+        builder: (context, state) {
+          final email = state.uri.queryParameters['email'] ?? '';
+          return ForgotPasswordVerifyCodePage(email: email);
+        },
+      ),
+      GoRoute(
+        path: '/reset-password',
+        builder: (context, state) {
+          final email = state.uri.queryParameters['email'] ?? '';
+          final code = state.uri.queryParameters['code'] ?? '';
+          return ResetPasswordPage(email: email, code: code);
         },
       ),
       GoRoute(
@@ -173,6 +203,12 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: 'add',
                 builder: (context, state) => const AddTeamMemberPage(),
+              ),
+              GoRoute(
+                path: ':memberId/edit',
+                builder: (context, state) => AddTeamMemberPage(
+                  memberId: state.pathParameters['memberId'],
+                ),
               ),
             ],
           ),

@@ -166,13 +166,7 @@ class _VerificationCodePageState extends ConsumerState<VerificationCodePage> {
               MouseRegion(
                 cursor: SystemMouseCursors.click,
                 child: GestureDetector(
-                  onTap: () {
-                    if (Navigator.canPop(context)) {
-                      Navigator.pop(context);
-                    } else {
-                      context.go('/signup');
-                    }
-                  },
+                  onTap: () => context.go('/signup'),
                   child: RichText(
                     text: TextSpan(
                       children: [

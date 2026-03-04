@@ -16,13 +16,12 @@ class VisaDetailsPage extends ConsumerWidget {
     required this.participantId,
   });
 
-  Future<Map<String, dynamic>> _loadVisa(WidgetRef ref) async {
-    final visaService = ref.read(visaServiceProvider);
-    return await visaService.getMyVisa(participantId: participantId, eventId: eventId);
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final visaAsync = ref.watch(visaDetailsProvider(
+      (eventId: eventId, participantId: participantId),
+    ));
+
     return Scaffold(
       backgroundColor: const Color(0xFF3C4494),
       appBar: AppBar(
@@ -42,49 +41,41 @@ class VisaDetailsPage extends ConsumerWidget {
         ),
       ),
       body: SafeArea(
-        child: FutureBuilder<Map<String, dynamic>>(
-          future: _loadVisa(ref),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(
-                child: CircularProgressIndicator(color: Colors.white),
-              );
-            }
-
-            if (snapshot.hasError) {
-              return Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(
-                        Icons.error_outline,
-                        size: 64,
-                        color: Colors.white70,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Error loading visa details',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        snapshot.error.toString(),
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.white70),
-                      ),
-                    ],
+        child: visaAsync.when(
+          loading: () => const Center(
+            child: CircularProgressIndicator(color: Colors.white),
+          ),
+          error: (error, _) => Center(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.error_outline,
+                    size: 64,
+                    color: Colors.white70,
                   ),
-                ),
-              );
-            }
-
-            final visa = snapshot.data!;
+                  const SizedBox(height: 16),
+                  Text(
+                    'Error loading visa details',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    error.toString(),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white70),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          data: (visa) {
             final status = visa['status'] as String;
             final isApproved = status == 'APPROVED';
             final reviewedAt = visa['reviewed_at'] as String?;

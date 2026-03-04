@@ -7,3 +7,19 @@ import '../services/visa_service.dart';
 final visaServiceProvider = Provider<VisaService>((ref) {
   return VisaService(ref.watch(authNotifierProvider.notifier));
 });
+
+/// Fetch visa details (for APPROVED/DECLINED status).
+final visaDetailsProvider = FutureProvider.family<Map<String, dynamic>,
+    ({int eventId, String participantId})>((ref, args) {
+  return ref
+      .watch(visaServiceProvider)
+      .getMyVisa(participantId: args.participantId, eventId: args.eventId);
+});
+
+/// Fetch visa status (for PENDING status).
+final visaStatusProvider = FutureProvider.family<Map<String, dynamic>,
+    ({int eventId, String participantId})>((ref, args) {
+  return ref
+      .watch(visaServiceProvider)
+      .getMyVisa(participantId: args.participantId, eventId: args.eventId);
+});

@@ -3,7 +3,6 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
@@ -15,7 +14,6 @@ import '../../../../core/providers/event_context_provider.dart';
 import '../../../../core/widgets/attention_seeker.dart';
 import '../../../../l10n/generated/app_localizations.dart';
 import '../../auth/providers/auth_provider.dart';
-import 'widgets/profile_dropdown.dart';
 
 class EventMenuPage extends ConsumerStatefulWidget {
   final int eventId;
@@ -27,13 +25,10 @@ class EventMenuPage extends ConsumerStatefulWidget {
 }
 
 class _EventMenuPageState extends ConsumerState<EventMenuPage> {
-  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  bool _isProfileOpen = false;
-
   List<Map<String, dynamic>> _sponsors = [];
   bool _isLoadingSponsors = true;
 
-  // Event data for dynamic logo and name
+  // Event data for dynamic title
   Map<String, dynamic>? _eventData;
 
   // Registration status
@@ -46,7 +41,7 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
   // For endless scrolling carousel
   late ScrollController _sponsorScrollController;
   Timer? _sponsorScrollTimer;
-  Timer? _sponsorRefreshTimer; // Refresh sponsors every 2 minutes
+  Timer? _sponsorRefreshTimer;
 
   @override
   void initState() {
@@ -56,18 +51,15 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
   }
 
   Future<void> _initializeAndFetch() async {
-    // Ensure the event context is loaded for this event
-    // This handles direct navigation and page refreshes
     await ref.read(eventContextProvider.notifier).ensureEventContext(widget.eventId);
     _fetchEvent();
-    _fetchSponsors(); // Initial fetch
-    _startPeriodicSponsorRefresh(); // Start periodic refresh
+    _fetchSponsors();
+    _startPeriodicSponsorRefresh();
     _checkRegistrationStatus();
     _checkParticipantAutoRegistration();
   }
 
   void _startPeriodicSponsorRefresh() {
-    // Refresh sponsors every 2 minutes
     _sponsorRefreshTimer = Timer.periodic(const Duration(minutes: 2), (_) {
       _fetchSponsors();
     });
@@ -94,7 +86,6 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
         final status = data['status'];
 
         setState(() {
-          // Accept SUBMITTED, APPROVED/ACCEPTED as registered
           _isRegistered =
               status == 'ACCEPTED' ||
               status == 'APPROVED' ||
@@ -118,7 +109,6 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
     }
   }
 
-  /// Check if user is a participant (auto-registered, no registration form needed)
   Future<void> _checkParticipantAutoRegistration() async {
     try {
       final token = await ref.read(authNotifierProvider.notifier).getToken();
@@ -136,7 +126,6 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
       if (!mounted) return;
 
       if (response.statusCode == 200) {
-        // User is a participant - they are auto-registered
         setState(() {
           _isRegistered = true;
         });
@@ -148,7 +137,6 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
 
   Future<void> _fetchEvent() async {
     try {
-      // Events are in B2C API, not Tourism API
       final uri = Uri.parse(
         '${AppConfig.b2cApiBaseUrl}/api/v1/events/${widget.eventId}',
       );
@@ -169,23 +157,21 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
   @override
   void dispose() {
     _sponsorScrollTimer?.cancel();
-    _sponsorRefreshTimer?.cancel(); // Stop periodic refresh
+    _sponsorRefreshTimer?.cancel();
     _sponsorScrollController.dispose();
     super.dispose();
   }
 
   Future<void> _fetchSponsors() async {
     try {
-      // Use EventContextService for site_id
       final siteId = ref.read(eventContextProvider).siteId;
-      // Use query param for site_id instead of header for better compatibility
       final uri = siteId != null
           ? Uri.parse(
               '${AppConfig.tourismApiBaseUrl}/sponsors/?site_id=$siteId',
             )
           : Uri.parse('${AppConfig.tourismApiBaseUrl}/sponsors/');
       final response = await http.get(uri);
-      if (!mounted) return; // Check if widget is still mounted
+      if (!mounted) return;
 
       if (response.statusCode == 200) {
         final List data = jsonDecode(response.body);
@@ -193,7 +179,6 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
           _sponsors = data.cast<Map<String, dynamic>>();
           _isLoadingSponsors = false;
         });
-        // Start auto-scroll after data loads
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) _startAutoScroll();
         });
@@ -222,20 +207,6 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
         }
       }
     });
-  }
-
-  void _toggleProfile() {
-    setState(() {
-      _isProfileOpen = !_isProfileOpen;
-    });
-  }
-
-  void _closeProfile() {
-    if (_isProfileOpen) {
-      setState(() {
-        _isProfileOpen = false;
-      });
-    }
   }
 
   void _onExitEvent() {
@@ -268,13 +239,14 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
 
-    // Menu Items - Registration first, then items requiring registration, then always-available items
-    final menuItems = [
-      // VISA APPLICATION - First position, always accessible (temporarily replaces Registration)
+    final eventTitle = _eventData?['title'] ?? 'Dashboard';
+
+    final menuItems = <Map<String, dynamic>>[
+      // Visa Application — first position, always accessible
       {
         'icon': 'registration.png',
         'label': 'Visa Application',
-        'route': '/events/${widget.eventId}/visa-apply',
+        'route': '/events/${widget.eventId}/visa-travel',
         'isRegistrationButton': true,
       },
       // Items requiring registration
@@ -305,25 +277,10 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
         'requiresRegistration': true,
         'requiresAgreement': true,
       },
-      // My Participants - Show after registration is SUBMITTED/APPROVED
-      {
-        'icon': 'my_participants.png',
-        'label': l10n.myParticipants,
-        'route': '/events/${widget.eventId}/my-participants',
-        'requiresRegistration': true,
-        'requiresAgreement': true,
-      },
       {
         'icon': 'flights.png',
         'label': l10n.flights,
         'route': '/events/${widget.eventId}/flights',
-        'requiresRegistration': true,
-        'requiresAgreement': true,
-      },
-      {
-        'icon': 'accommodation.png',
-        'label': l10n.accommodation,
-        'route': '/events/${widget.eventId}/accommodation',
         'requiresRegistration': true,
         'requiresAgreement': true,
       },
@@ -334,7 +291,7 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
         'requiresRegistration': true,
         'requiresAgreement': true,
       },
-      // Always available items - News moved before Hotline
+      // Always available items
       {
         'icon': 'news.png',
         'label': l10n.news,
@@ -355,555 +312,369 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
         'label': l10n.faq,
         'route': '/events/${widget.eventId}/faq',
       },
-      {
-        'icon': 'contact_us.png',
-        'label': l10n.contactUs,
-        'route': '/events/${widget.eventId}/contact',
-      },
       {'icon': 'exit', 'label': l10n.exitEvent, 'route': null, 'isExit': true},
     ];
 
-    // Filter menu items - hide "My Participants" until registered
-    final filteredMenuItems = menuItems.where((item) {
-      final showOnlyWhenRegistered = item['showOnlyWhenRegistered'] == true;
-      if (showOnlyWhenRegistered && !_isRegistered) {
-        return false; // Hide "My Participants" until status is SUBMITTED/APPROVED
-      }
-      return true;
-    }).toList();
-
     return EventSidebarLayout(
-      title: 'Dashboard',
-      child: GestureDetector(
-        onTap: _closeProfile,
-        behavior: HitTestBehavior.translucent,
-        child: Stack(
+      title: eventTitle,
+      child: SingleChildScrollView(
+        padding: EdgeInsets.symmetric(
+          horizontal: isMobile ? 0 : 40,
+          vertical: 20,
+        ),
+        child: Column(
           children: [
-            Column(
-              children: [
-                // 1. Header with Logo + Title + AppBar Icons
-                Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: isMobile ? 20 : 40,
-                    vertical: 20,
-                  ),
-                  child: Row(
-                    children: [
-                      // Logo
-                      Container(
-                        width: isMobile ? 60 : 80,
-                        height: isMobile ? 60 : 80,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: _eventData?['logo_url'] != null
-                              ? Image.network(
-                                  _eventData!['logo_url'].startsWith('http')
-                                      ? _eventData!['logo_url']
-                                      : '${AppConfig.tourismApiBaseUrl}${_eventData!['logo_url']}',
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (c, e, s) => const Icon(
-                                    Icons.event,
-                                    color: Colors.white,
-                                    size: 40,
-                                  ),
-                                )
-                              : const Icon(
-                                  Icons.event,
-                                  color: Colors.white,
-                                  size: 40,
-                                ),
-                        ),
-                      ),
-                      const SizedBox(width: 15),
-                      // Title - Event name from API
-                      Expanded(
-                        child: Text(
-                          _eventData?['title'] ?? l10n.eventMenuLine1,
-                          style: GoogleFonts.montserrat(
-                            fontWeight: FontWeight.w600,
-                            fontSize: isMobile ? 20 : 28,
-                            color: const Color(0xFFF1F1F6),
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      // AppBar Icons (Notifications, Profile)
-                      Row(
-                        children: [
-                          Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(50),
-                              onTap: () {
-                                _closeProfile();
-                                _scaffoldKey.currentState?.openEndDrawer();
-                              },
-                              child: Padding(
-                                padding: const EdgeInsets.all(8.0),
-                                child: SvgPicture.asset(
-                                  'assets/event_calendar/bell.svg',
-                                  width: 28,
-                                  height: 28,
-                                  colorFilter: const ColorFilter.mode(
-                                    Colors.white,
-                                    BlendMode.srcIn,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(50),
-                              onTap: _toggleProfile,
-                              child: Padding(
-                                padding: const EdgeInsets.all(8.0),
-                                child: SvgPicture.asset(
-                                  'assets/event_calendar/user.svg',
-                                  width: 28,
-                                  height: 28,
-                                  colorFilter: const ColorFilter.mode(
-                                    Colors.white,
-                                    BlendMode.srcIn,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+            // Sponsors Carousel (endless scrolling)
+            if (_isLoadingSponsors)
+              const SizedBox(
+                height: 100,
+                child: Center(
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
                   ),
                 ),
+              )
+            else if (_sponsors.isNotEmpty)
+              SizedBox(
+                height: 100,
+                child: ListView.builder(
+                  controller: _sponsorScrollController,
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _sponsors.length * 100,
+                  itemBuilder: (context, index) {
+                    final s = _sponsors[index % _sponsors.length];
+                    final tier = s['tier'] as String? ?? 'general';
+                    final tierColor = _getTierColor(tier);
+                    final rawLogoUrl = s['logo'] as String?;
+                    final website = s['website'] as String?;
 
-                // 2. Main Content
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: isMobile ? 0 : 40,
-                    ),
-                    child: Column(
-                      children: [
-                        // Sponsors Carousel (endless scrolling)
-                        if (_isLoadingSponsors)
-                          const SizedBox(
-                            height: 100,
-                            child: Center(
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                              ),
+                    String? fullLogoUrl;
+                    if (rawLogoUrl != null && rawLogoUrl.isNotEmpty) {
+                      if (rawLogoUrl.startsWith('http')) {
+                        fullLogoUrl = rawLogoUrl;
+                      } else {
+                        fullLogoUrl =
+                            '${AppConfig.tourismApiBaseUrl}$rawLogoUrl';
+                      }
+                    }
+
+                    return Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(8),
+                        onTap: () async {
+                          if (website != null && website.isNotEmpty) {
+                            String url = website;
+                            if (!url.startsWith('http://') &&
+                                !url.startsWith('https://')) {
+                              url = 'https://$url';
+                            }
+                            try {
+                              final uri = Uri.parse(url);
+                              await launchUrl(
+                                uri,
+                                mode: LaunchMode.externalApplication,
+                              );
+                            } catch (e) {
+                              debugPrint('Could not launch $url: $e');
+                            }
+                          }
+                        },
+                        child: Container(
+                          width: 160,
+                          margin: const EdgeInsets.only(right: 15),
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 8,
+                            horizontal: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: tierColor.withValues(alpha: 0.5),
                             ),
-                          )
-                        else if (_sponsors.isNotEmpty)
-                          SizedBox(
-                            height: 100,
-                            child: ListView.builder(
-                              controller: _sponsorScrollController,
-                              scrollDirection: Axis.horizontal,
-                              // Duplicate list for endless effect
-                              itemCount: _sponsors.length * 100,
-                              itemBuilder: (context, index) {
-                                final s = _sponsors[index % _sponsors.length];
-                                final tier = s['tier'] as String? ?? 'general';
-                                final tierColor = _getTierColor(tier);
-                                final rawLogoUrl = s['logo'] as String?;
-                                final website = s['website'] as String?;
-
-                                // Build full logo URL
-                                String? fullLogoUrl;
-                                if (rawLogoUrl != null &&
-                                    rawLogoUrl.isNotEmpty) {
-                                  if (rawLogoUrl.startsWith('http')) {
-                                    fullLogoUrl = rawLogoUrl;
-                                  } else {
-                                    fullLogoUrl =
-                                        '${AppConfig.tourismApiBaseUrl}$rawLogoUrl';
-                                  }
-                                }
-
-                                return Material(
-                                  color: Colors.transparent,
-                                  child: InkWell(
-                                    borderRadius: BorderRadius.circular(8),
-                                    onTap: () async {
-                                      if (website != null &&
-                                          website.isNotEmpty) {
-                                        // Add http:// if missing
-                                        String url = website;
-                                        if (!url.startsWith('http://') &&
-                                            !url.startsWith('https://')) {
-                                          url = 'https://$url';
-                                        }
-                                        try {
-                                          final uri = Uri.parse(url);
-                                          await launchUrl(
-                                            uri,
-                                            mode:
-                                                LaunchMode.externalApplication,
-                                          );
-                                        } catch (e) {
-                                          debugPrint(
-                                            'Could not launch $url: $e',
-                                          );
-                                        }
-                                      }
-                                    },
-                                    child: Container(
-                                      width: 160,
-                                      margin: const EdgeInsets.only(right: 15),
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 8,
-                                        horizontal: 10,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white,
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(
-                                          color: tierColor.withValues(
-                                            alpha: 0.5,
-                                          ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.1),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Expanded(
+                                child: (fullLogoUrl != null)
+                                    ? Image.network(
+                                        fullLogoUrl,
+                                        fit: BoxFit.contain,
+                                        errorBuilder: (c, e, s) => Icon(
+                                          Icons.business,
+                                          color: tierColor,
+                                          size: 40,
                                         ),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withValues(
-                                              alpha: 0.1,
-                                            ),
-                                            blurRadius: 4,
-                                            offset: const Offset(0, 2),
-                                          ),
-                                        ],
+                                      )
+                                    : Icon(
+                                        Icons.business,
+                                        color: tierColor,
+                                        size: 40,
                                       ),
-                                      child: Column(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          // Logo - takes most of the space
-                                          Expanded(
-                                            child: (fullLogoUrl != null)
-                                                ? Image.network(
-                                                    fullLogoUrl,
-                                                    fit: BoxFit.contain,
-                                                    errorBuilder: (c, e, s) =>
-                                                        Icon(
-                                                          Icons.business,
-                                                          color: tierColor,
-                                                          size: 40,
-                                                        ),
-                                                  )
-                                                : Icon(
-                                                    Icons.business,
-                                                    color: tierColor,
-                                                    size: 40,
-                                                  ),
+                              ),
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 4,
+                                  horizontal: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF262B60)
+                                      .withValues(alpha: 0.85),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  tier.toUpperCase(),
+                                  textAlign: TextAlign.center,
+                                  style: GoogleFonts.roboto(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              )
+            else
+              const SizedBox(height: 100),
+
+            const SizedBox(height: 25),
+
+            // Menu Grid (responsive: 3 columns mobile, 5 columns desktop)
+            Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: isMobile ? 16 : 24,
+              ),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: isMobile ? double.infinity : 900,
+                  ),
+                  child: GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate:
+                        SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: isMobile ? 3 : 5,
+                          mainAxisSpacing: isMobile ? 10 : 20,
+                          crossAxisSpacing: isMobile ? 10 : 20,
+                          childAspectRatio: isMobile ? 0.9 : 1.0,
+                        ),
+                    itemCount: menuItems.length,
+                    itemBuilder: (context, index) {
+                      final item = menuItems[index];
+                      final isExit = item['isExit'] == true;
+                      final iconName = item['icon'] as String;
+                      final isRegistrationButton =
+                          item['isRegistrationButton'] == true;
+                      final requiresRegistration =
+                          item['requiresRegistration'] == true;
+
+                      final isDisabled =
+                          requiresRegistration &&
+                          !_isRegistered &&
+                          !_isCheckingRegistration;
+
+                      Widget cardContent = Container(
+                        decoration: BoxDecoration(
+                          color: isExit
+                              ? Colors.orange.withValues(alpha: 0.15)
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isExit
+                                ? Colors.orange.withValues(alpha: 0.3)
+                                : Colors.white.withValues(alpha: 0.1),
+                          ),
+                        ),
+                        child: Stack(
+                          children: [
+                            Center(
+                              child: Opacity(
+                                opacity: isDisabled ? 0.4 : 1.0,
+                                child: Column(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.center,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (isExit)
+                                      Icon(
+                                        Icons.exit_to_app,
+                                        color: Colors.orange,
+                                        size: isMobile ? 48 : 52,
+                                      )
+                                    else
+                                      Image.asset(
+                                        'assets/event_menu/$iconName',
+                                        width: isMobile ? 64 : 58,
+                                        height: isMobile ? 64 : 58,
+                                        errorBuilder: (c, e, s) =>
+                                            const Icon(
+                                              Icons.image,
+                                              color: Colors.white54,
+                                              size: 24,
+                                            ),
+                                      ),
+                                    SizedBox(
+                                      height: isMobile ? 4 : 8,
+                                    ),
+                                    Padding(
+                                      padding:
+                                          const EdgeInsets.symmetric(
+                                            horizontal: 4.0,
                                           ),
-                                          // Tier label with dark bg strip
-                                          Container(
-                                            width: double.infinity,
-                                            padding: const EdgeInsets.symmetric(
-                                              vertical: 4,
-                                              horizontal: 8,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: const Color(
-                                                0xFF262B60,
-                                              ).withValues(alpha: 0.85),
-                                              borderRadius:
-                                                  BorderRadius.circular(4),
-                                            ),
-                                            child: Text(
-                                              tier.toUpperCase(),
-                                              textAlign: TextAlign.center,
-                                              style: GoogleFonts.roboto(
-                                                color: Colors.white,
-                                                fontWeight: FontWeight.w600,
-                                                fontSize: 11,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
+                                      child: Text(
+                                        item['label'] as String,
+                                        textAlign: TextAlign.center,
+                                        style: GoogleFonts.roboto(
+                                          fontSize: isMobile ? 14 : 18,
+                                          fontWeight: FontWeight.w500,
+                                          color: isExit
+                                              ? Colors.orange
+                                              : const Color(0xFFF1F1F6),
+                                        ),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            if (isDisabled)
+                              Positioned(
+                                top: 6,
+                                right: 6,
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black54,
+                                    borderRadius:
+                                        BorderRadius.circular(12),
+                                  ),
+                                  child: const Icon(
+                                    Icons.lock_outline,
+                                    color: Colors.white70,
+                                    size: 14,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      );
+
+                      if (isRegistrationButton) {
+                        cardContent = AttentionSeeker(
+                          animate: _showRegistrationHighlight,
+                          glowColor: Colors.greenAccent,
+                          repeatCount: 3,
+                          onAnimationComplete: () {
+                            if (mounted) {
+                              setState(
+                                () => _showRegistrationHighlight = false,
+                              );
+                            }
+                          },
+                          child: cardContent,
+                        );
+                      }
+
+                      return Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () {
+                            if (isDisabled) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Please register for this event first',
+                                  ),
+                                  backgroundColor: Color(0xFF3C4494),
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                              setState(
+                                () => _showRegistrationHighlight = true,
+                              );
+                              return;
+                            }
+
+                            if (isExit) {
+                              _onExitEvent();
+                            } else if (item['route'] != null) {
+                              final requiresAgreement =
+                                  item['requiresAgreement'] == true;
+                              final hasAgreed = ref
+                                  .read(authNotifierProvider)
+                                  .hasAgreedTerms;
+
+                              if (requiresAgreement && !hasAgreed) {
+                                showDialog(
+                                  context: context,
+                                  builder: (ctx) => AlertDialog(
+                                    title: const Text(
+                                      'Agreement Required',
+                                    ),
+                                    content: const Text(
+                                      'Please complete the Participation Agreement Process in your Profile before accessing this feature.',
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(ctx),
+                                        child: const Text('Cancel'),
+                                      ),
+                                      ElevatedButton(
+                                        onPressed: () {
+                                          Navigator.pop(ctx);
+                                          context.go(
+                                            '/profile?tab=0&returnTo=/events/${widget.eventId}/menu',
+                                          );
+                                        },
+                                        child: const Text(
+                                          'Go to Profile',
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 );
-                              },
-                            ),
-                          )
-                        else
-                          const SizedBox(height: 100),
-
-                        const SizedBox(height: 25),
-
-                        // Grid (responsive: 2 columns mobile, 5 columns desktop)
-                        Padding(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: isMobile ? 16 : 24,
-                          ),
-                          child: Center(
-                            child: ConstrainedBox(
-                              constraints: BoxConstraints(
-                                maxWidth: isMobile ? double.infinity : 900,
-                              ),
-                              child: GridView.builder(
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                gridDelegate:
-                                    SliverGridDelegateWithFixedCrossAxisCount(
-                                      crossAxisCount: isMobile ? 3 : 5,
-                                      mainAxisSpacing: isMobile ? 10 : 20,
-                                      crossAxisSpacing: isMobile ? 10 : 20,
-                                      childAspectRatio: isMobile ? 0.9 : 1.0,
-                                    ),
-                                itemCount: filteredMenuItems.length,
-                                itemBuilder: (context, index) {
-                                  final item = filteredMenuItems[index];
-                                  final isExit = item['isExit'] == true;
-                                  final iconName = item['icon'] as String;
-                                  final isRegistrationButton =
-                                      item['isRegistrationButton'] == true;
-                                  final requiresRegistration =
-                                      item['requiresRegistration'] == true;
-                                  final requiresAgreement =
-                                      item['requiresAgreement'] == true;
-
-                                  // Items requiring registration are disabled until registered
-                                  // Agreement check happens on tap via redirect to Profile
-                                  final isDisabled =
-                                      requiresRegistration &&
-                                      !_isRegistered &&
-                                      !_isCheckingRegistration;
-
-                                  // Build the menu card content
-                                  Widget cardContent = Container(
-                                    decoration: BoxDecoration(
-                                      color: isExit
-                                          ? Colors.orange.withValues(
-                                              alpha: 0.15,
-                                            )
-                                          : Colors.transparent,
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                        color: isExit
-                                            ? Colors.orange.withValues(
-                                                alpha: 0.3,
-                                              )
-                                            : Colors.white.withValues(
-                                                alpha: 0.1,
-                                              ),
-                                      ),
-                                    ),
-                                    child: Stack(
-                                      children: [
-                                        // Main content - centered
-                                        Center(
-                                          child: Opacity(
-                                            opacity: isDisabled ? 0.4 : 1.0,
-                                            child: Column(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.center,
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                if (isExit)
-                                                  Icon(
-                                                    Icons.exit_to_app,
-                                                    color: Colors.orange,
-                                                    size: isMobile ? 48 : 52,
-                                                  )
-                                                else
-                                                  Image.asset(
-                                                    'assets/event_menu/$iconName',
-                                                    width: isMobile ? 64 : 58,
-                                                    height: isMobile ? 64 : 58,
-                                                    errorBuilder: (c, e, s) =>
-                                                        const Icon(
-                                                          Icons.image,
-                                                          color: Colors.white54,
-                                                          size: 24,
-                                                        ),
-                                                  ),
-                                                SizedBox(
-                                                  height: isMobile ? 4 : 8,
-                                                ),
-                                                Padding(
-                                                  padding:
-                                                      const EdgeInsets.symmetric(
-                                                        horizontal: 4.0,
-                                                      ),
-                                                  child: Text(
-                                                    item['label'] as String,
-                                                    textAlign: TextAlign.center,
-                                                    style: GoogleFonts.roboto(
-                                                      fontSize: isMobile
-                                                          ? 14
-                                                          : 18,
-                                                      fontWeight:
-                                                          FontWeight.w500,
-                                                      color: isExit
-                                                          ? Colors.orange
-                                                          : const Color(
-                                                              0xFFF1F1F6,
-                                                            ),
-                                                    ),
-                                                    maxLines: 2,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                        // Lock icon overlay for disabled buttons
-                                        if (isDisabled)
-                                          Positioned(
-                                            top: 6,
-                                            right: 6,
-                                            child: Container(
-                                              padding: const EdgeInsets.all(4),
-                                              decoration: BoxDecoration(
-                                                color: Colors.black54,
-                                                borderRadius:
-                                                    BorderRadius.circular(12),
-                                              ),
-                                              child: const Icon(
-                                                Icons.lock_outline,
-                                                color: Colors.white70,
-                                                size: 14,
-                                              ),
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  );
-
-                                  // Wrap registration button with AttentionSeeker animation
-                                  if (isRegistrationButton) {
-                                    cardContent = AttentionSeeker(
-                                      animate: _showRegistrationHighlight,
-                                      glowColor: Colors.greenAccent,
-                                      repeatCount: 3,
-                                      onAnimationComplete: () {
-                                        if (mounted) {
-                                          setState(
-                                            () => _showRegistrationHighlight =
-                                                false,
-                                          );
-                                        }
-                                      },
-                                      child: cardContent,
-                                    );
-                                  }
-
-                                  return Material(
-                                    color: Colors.transparent,
-                                    child: InkWell(
-                                      onTap: () {
-                                        // Handle disabled button tap
-                                        if (isDisabled) {
-                                          // Registration required
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            const SnackBar(
-                                              content: Text(
-                                                'Please register for this event first',
-                                              ),
-                                              backgroundColor: Color(
-                                                0xFF3C4494,
-                                              ),
-                                              duration: Duration(seconds: 2),
-                                            ),
-                                          );
-                                          // Trigger registration button highlight
-                                          setState(
-                                            () => _showRegistrationHighlight =
-                                                true,
-                                          );
-                                          return;
-                                        }
-
-                                        if (isExit) {
-                                          _onExitEvent();
-                                        } else if (item['route'] != null) {
-                                          // Check if menu item requires agreement
-                                          final requiresAgreement =
-                                              item['requiresAgreement'] == true;
-                                          final hasAgreed = ref
-                                              .read(authNotifierProvider)
-                                              .hasAgreedTerms;
-
-                                          if (requiresAgreement && !hasAgreed) {
-                                            // Show dialog to guide user to agreement
-                                            showDialog(
-                                              context: context,
-                                              builder: (ctx) => AlertDialog(
-                                                title: const Text(
-                                                  'Agreement Required',
-                                                ),
-                                                content: const Text(
-                                                  'Please complete the Participation Agreement Process in your Profile before accessing this feature.',
-                                                ),
-                                                actions: [
-                                                  TextButton(
-                                                    onPressed: () =>
-                                                        Navigator.pop(ctx),
-                                                    child: const Text('Cancel'),
-                                                  ),
-                                                  ElevatedButton(
-                                                    onPressed: () {
-                                                      Navigator.pop(ctx);
-                                                      context.go(
-                                                        '/profile?tab=0&returnTo=/events/${widget.eventId}/menu',
-                                                      );
-                                                    },
-                                                    child: const Text(
-                                                      'Go to Profile',
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            );
-                                            return;
-                                          }
-                                          context.go(item['route'] as String);
-                                        }
-                                      },
-                                      borderRadius: BorderRadius.circular(12),
-                                      splashColor: isDisabled
-                                          ? Colors.transparent
-                                          : Colors.white24,
-                                      highlightColor: isDisabled
-                                          ? Colors.transparent
-                                          : Colors.white10,
-                                      child: cardContent,
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
-                          ),
+                                return;
+                              }
+                              context.go(item['route'] as String);
+                            }
+                          },
+                          borderRadius: BorderRadius.circular(12),
+                          splashColor: isDisabled
+                              ? Colors.transparent
+                              : Colors.white24,
+                          highlightColor: isDisabled
+                              ? Colors.transparent
+                              : Colors.white10,
+                          child: cardContent,
                         ),
-
-                        const SizedBox(height: 30),
-                      ],
-                    ),
+                      );
+                    },
                   ),
                 ),
-              ],
+              ),
             ),
 
-            // Profile Dropdown Overlay
-            if (_isProfileOpen)
-              Positioned(
-                top: 100,
-                right: isMobile ? 20 : 65,
-                child: ProfileDropdown(onLogout: _onExitEvent),
-              ),
+            const SizedBox(height: 30),
           ],
         ),
       ),

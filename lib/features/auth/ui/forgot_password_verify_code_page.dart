@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/app_theme.dart';
 import '../providers/auth_provider.dart';
-import 'reset_password_page.dart';
 import 'widgets/auth_info_box.dart';
 import 'widgets/auth_page_layout.dart';
 import 'widgets/auth_button.dart';
@@ -134,14 +134,9 @@ class _ForgotPasswordVerifyCodePageState
 
       if (error == null) {
         // Success - navigate to reset password page
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (_) => ResetPasswordPage(
-              email: widget.email,
-              code: code,
-            ),
-          ),
-        );
+        final encodedEmail = Uri.encodeComponent(widget.email);
+        final encodedCode = Uri.encodeComponent(code);
+        context.go('/reset-password?email=$encodedEmail&code=$encodedCode');
       } else {
         _showError(error);
       }

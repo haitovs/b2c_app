@@ -6,7 +6,6 @@ import 'package:go_router/go_router.dart';
 import '../../../core/app_theme.dart';
 import '../../../core/widgets/app_text_field.dart';
 import '../providers/auth_provider.dart';
-import 'verification_pending_page.dart';
 import 'widgets/auth_page_layout.dart';
 import 'widgets/auth_button.dart';
 import 'widgets/hover_text.dart';
@@ -187,14 +186,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         );
         context.go('/');
       } else if (errorMessage == 'EMAIL_NOT_VERIFIED') {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => VerificationPendingPage(
-              email: _usernameController.text.trim(),
-            ),
-          ),
-        );
+        final email = Uri.encodeComponent(_usernameController.text.trim());
+        context.go('/verification-pending?email=$email');
       } else {
         _showError(errorMessage);
       }

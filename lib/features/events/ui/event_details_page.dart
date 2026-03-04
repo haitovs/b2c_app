@@ -3,11 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/providers/event_context_provider.dart';
-import '../../../../core/widgets/custom_app_bar.dart';
+import '../../../../shared/layouts/event_sidebar_layout.dart';
 import '../../../../l10n/generated/app_localizations.dart';
-import '../../notifications/ui/notification_drawer.dart';
 import '../providers/event_providers.dart';
-import 'widgets/profile_dropdown.dart';
 
 class EventDetailsPage extends ConsumerStatefulWidget {
   final String id;
@@ -18,9 +16,6 @@ class EventDetailsPage extends ConsumerStatefulWidget {
 }
 
 class _EventDetailsPageState extends ConsumerState<EventDetailsPage> {
-  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  bool _isProfileOpen = false;
-
   Map<String, dynamic>? _event;
   bool _isLoading = true;
 
@@ -68,22 +63,7 @@ class _EventDetailsPageState extends ConsumerState<EventDetailsPage> {
     }
   }
 
-  void _toggleProfile() {
-    setState(() {
-      _isProfileOpen = !_isProfileOpen;
-    });
-  }
-
-  void _closeProfile() {
-    if (_isProfileOpen) {
-      setState(() {
-        _isProfileOpen = false;
-      });
-    }
-  }
-
   void _onOpenTap() {
-    // Save event context using EventContextService
     final eventId = int.tryParse(widget.id);
     if (eventId != null && _event != null) {
       final tourismSiteId = _event!['tourism_site_id'] as int?;
@@ -92,17 +72,13 @@ class _EventDetailsPageState extends ConsumerState<EventDetailsPage> {
         tourismSiteId: tourismSiteId,
       );
     }
-
-    // Use go() for proper URL update on web
     context.go('/events/${widget.id}/menu');
   }
 
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    // Show mobile layout on medium screens too (up to 900px)
     final isMobile = screenWidth < 900;
-    final horizontalPadding = isMobile ? 20.0 : 50.0;
 
     if (_isLoading) {
       return const Scaffold(
@@ -123,300 +99,199 @@ class _EventDetailsPageState extends ConsumerState<EventDetailsPage> {
       );
     }
 
-    return Scaffold(
-      key: _scaffoldKey,
-      backgroundColor: const Color(0xFF3C4494),
-      endDrawer: const NotificationDrawer(),
-      body: GestureDetector(
-        onTap: _closeProfile,
-        behavior: HitTestBehavior.translucent,
-        child: Stack(
+    return EventSidebarLayout(
+      title: 'Event Details',
+      child: SingleChildScrollView(
+        child: Column(
           children: [
-            // Main Content
-            SingleChildScrollView(
-              child: Column(
-                children: [
-                  // Top Bar Area
-                  Padding(
-                    padding: EdgeInsets.only(
-                      left: horizontalPadding,
-                      right: horizontalPadding - 10,
-                      top: isMobile ? 15 : 20,
-                    ),
-                    child: Row(
+            SizedBox(height: isMobile ? 20 : 30),
+
+            // Title Row: Logo + Event Name
+            Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: isMobile ? 20 : 50,
+              ),
+              child: isMobile
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Back Arrow
-                        Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(25),
-                            onTap: () {
-                              if (context.canPop()) {
-                                context.pop();
-                              } else {
-                                context.go('/');
-                              }
-                            },
-                            child: Container(
-                              width: isMobile ? 40 : 50,
-                              height: isMobile ? 40 : 50,
-                              alignment: Alignment.center,
-                              child: const Icon(
-                                Icons.arrow_back,
-                                color: Color(0xFFF1F1F6),
+                        Container(
+                          width: 80,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(10),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.25),
+                                blurRadius: 4,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: _event!['logo_url'] != null
+                                ? Image.network(
+                                    _event!['logo_url'],
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (c, e, s) => const Icon(
+                                      Icons.event,
+                                      size: 40,
+                                      color: Colors.white70,
+                                    ),
+                                  )
+                                : const Icon(
+                                    Icons.event,
+                                    size: 40,
+                                    color: Colors.white70,
+                                  ),
+                          ),
+                        ),
+                        const SizedBox(height: 15),
+                        Text(
+                          _event!['name'],
+                          style: GoogleFonts.montserrat(
+                            fontWeight: FontWeight.w500,
+                            fontSize: 24,
+                            height: 1.2,
+                            color: const Color(0xFFF1F1F6),
+                          ),
+                        ),
+                      ],
+                    )
+                  : Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 130,
+                          height: 130,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(10),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.25),
+                                blurRadius: 4,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: _event!['logo_url'] != null
+                                ? Image.network(
+                                    _event!['logo_url'],
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (c, e, s) => const Icon(
+                                      Icons.event,
+                                      size: 50,
+                                      color: Colors.white70,
+                                    ),
+                                  )
+                                : const Icon(
+                                    Icons.event,
+                                    size: 50,
+                                    color: Colors.white70,
+                                  ),
+                          ),
+                        ),
+                        const SizedBox(width: 30),
+                        Expanded(
+                          child: Text(
+                            _event!['name'],
+                            style: GoogleFonts.montserrat(
+                              fontWeight: FontWeight.w500,
+                              fontSize: 45,
+                              height: 67 / 55,
+                              color: const Color(0xFFF1F1F6),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+
+            SizedBox(height: isMobile ? 25 : 50),
+
+            // Content Area: Text Box + Image/Button
+            Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: isMobile ? 20 : 50,
+              ),
+              child: isMobile
+                  ? Column(
+                      children: [
+                        _buildDescriptionBox(isMobile: true),
+                        const SizedBox(height: 20),
+                        GestureDetector(
+                          onTap: _onOpenTap,
+                          child: Container(
+                            width: double.infinity,
+                            height: 60,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF9CA4CC),
+                              borderRadius: BorderRadius.circular(15),
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              AppLocalizations.of(context)!.openButton,
+                              style: GoogleFonts.montserrat(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w500,
+                                color: const Color(0xFFF1F1F6),
                               ),
                             ),
                           ),
                         ),
-                        const Spacer(),
-                        // App Bar Icons
-                        CustomAppBar(
-                          onProfileTap: _toggleProfile,
-                          onNotificationTap: () {
-                            _closeProfile();
-                            _scaffoldKey.currentState?.openEndDrawer();
-                          },
-                          isMobile: isMobile,
-                        ),
                       ],
-                    ),
-                  ),
-
-                  SizedBox(height: isMobile ? 20 : 30),
-
-                  // Title Row: Logo + Event Name
-                  Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: horizontalPadding,
-                    ),
-                    child: isMobile
-                        ? Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Logo
-                              Container(
-                                width: 80,
-                                height: 80,
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(10),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withValues(
-                                        alpha: 0.25,
-                                      ),
-                                      blurRadius: 4,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ],
-                                ),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(10),
-                                  child: _event!['logo_url'] != null
-                                      ? Image.network(
-                                          _event!['logo_url'],
-                                          fit: BoxFit.cover,
-                                          errorBuilder: (c, e, s) => const Icon(
-                                            Icons.event,
-                                            size: 40,
-                                            color: Colors.white70,
-                                          ),
-                                        )
-                                      : const Icon(
-                                          Icons.event,
-                                          size: 40,
-                                          color: Colors.white70,
-                                        ),
-                                ),
-                              ),
-                              const SizedBox(height: 15),
-                              // Event Name
-                              Text(
-                                _event!['name'],
-                                style: GoogleFonts.montserrat(
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: 24,
-                                  height: 1.2,
-                                  color: const Color(0xFFF1F1F6),
-                                ),
-                              ),
-                            ],
-                          )
-                        : Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              // Logo
-                              Container(
-                                width: 130,
-                                height: 130,
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(10),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withValues(
-                                        alpha: 0.25,
-                                      ),
-                                      blurRadius: 4,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ],
-                                ),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(10),
-                                  child: _event!['logo_url'] != null
-                                      ? Image.network(
-                                          _event!['logo_url'],
-                                          fit: BoxFit.cover,
-                                          errorBuilder: (c, e, s) => const Icon(
-                                            Icons.event,
-                                            size: 50,
-                                            color: Colors.white70,
-                                          ),
-                                        )
-                                      : const Icon(
-                                          Icons.event,
-                                          size: 50,
-                                          color: Colors.white70,
-                                        ),
-                                ),
-                              ),
-                              const SizedBox(width: 30),
-                              // Event Name
-                              Expanded(
-                                child: Text(
-                                  _event!['name'],
-                                  style: GoogleFonts.montserrat(
-                                    fontWeight: FontWeight.w500,
-                                    fontSize: 45,
-                                    height: 67 / 55,
-                                    color: const Color(0xFFF1F1F6),
-                                  ),
-                                ),
-                              ),
-                            ],
+                    )
+                  : IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(
+                            flex: 2,
+                            child: _buildDescriptionBox(isMobile: false),
                           ),
-                  ),
-
-                  SizedBox(height: isMobile ? 25 : 50),
-
-                  // Content Area: Text Box + Image/Button
-                  Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: horizontalPadding,
-                    ),
-                    child: isMobile
-                        ? Column(
+                          const SizedBox(width: 30),
+                          Column(
                             children: [
-                              // Text Box - Mobile
                               Container(
-                                padding: const EdgeInsets.all(20),
+                                width: 381,
+                                height: 497,
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFF1F1F6),
-                                  border: Border.all(
-                                    color: Colors.black,
-                                    width: 1,
-                                  ),
-                                  borderRadius: BorderRadius.circular(15),
+                                  borderRadius: BorderRadius.circular(20),
                                 ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    // Key Themes Title
-                                    Text(
-                                      AppLocalizations.of(
-                                        context,
-                                      )!.keyThemesTurkmenistanChina,
-                                      style: GoogleFonts.montserrat(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w500,
-                                        color: const Color(0xFF231C1C),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(20),
+                                  child: Image.asset(
+                                    'assets/event_detail/event_photo.png',
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (c, e, s) => Container(
+                                      color: Colors.grey,
+                                      child: const Icon(
+                                        Icons.image,
+                                        size: 100,
+                                        color: Colors.white,
                                       ),
                                     ),
-                                    const SizedBox(height: 15),
-                                    // Description as bullet list
-                                    ...(_event!['description'] as String)
-                                        .split(';')
-                                        .where((item) => item.trim().isNotEmpty)
-                                        .map(
-                                          (item) => Padding(
-                                            padding: const EdgeInsets.only(
-                                              bottom: 6,
-                                            ),
-                                            child: Row(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  '• ',
-                                                  style: GoogleFonts.roboto(
-                                                    fontSize: 14,
-                                                    fontWeight: FontWeight.w400,
-                                                    color: const Color(
-                                                      0xD9474551,
-                                                    ),
-                                                  ),
-                                                ),
-                                                Expanded(
-                                                  child: Text(
-                                                    item.trim(),
-                                                    style: GoogleFonts.roboto(
-                                                      fontSize: 14,
-                                                      fontWeight:
-                                                          FontWeight.w400,
-                                                      height: 1.4,
-                                                      color: const Color(
-                                                        0xD9474551,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                    const SizedBox(height: 15),
-                                    // Dear Participants
-                                    Text(
-                                      AppLocalizations.of(
-                                        context,
-                                      )!.dearParticipants,
-                                      style: GoogleFonts.montserrat(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w500,
-                                        color: const Color(0xFF231C1C),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 10),
-                                    // Instructions
-                                    Text(
-                                      AppLocalizations.of(
-                                        context,
-                                      )!.participantInstructions,
-                                      style: GoogleFonts.roboto(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w400,
-                                        height: 1.4,
-                                        color: const Color(0xD9474551),
-                                      ),
-                                    ),
-                                  ],
+                                  ),
                                 ),
                               ),
-                              const SizedBox(height: 20),
-                              // Open Button - Mobile (smaller)
+                              const SizedBox(height: 27),
                               GestureDetector(
                                 onTap: _onOpenTap,
                                 child: Container(
-                                  width: double.infinity,
-                                  height: 60,
+                                  width: 381,
+                                  height: 121,
                                   decoration: BoxDecoration(
                                     color: const Color(0xFF9CA4CC),
-                                    borderRadius: BorderRadius.circular(15),
+                                    borderRadius: BorderRadius.circular(20),
                                   ),
                                   alignment: Alignment.center,
                                   child: Text(
                                     AppLocalizations.of(context)!.openButton,
                                     style: GoogleFonts.montserrat(
-                                      fontSize: 22,
+                                      fontSize: 45,
                                       fontWeight: FontWeight.w500,
                                       color: const Color(0xFFF1F1F6),
                                     ),
@@ -424,203 +299,95 @@ class _EventDetailsPageState extends ConsumerState<EventDetailsPage> {
                                 ),
                               ),
                             ],
-                          )
-                        : IntrinsicHeight(
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                // Text Box - matches height of right column
-                                Expanded(
-                                  flex: 2,
-                                  child: Container(
-                                    padding: const EdgeInsets.all(30),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFF1F1F6),
-                                      border: Border.all(
-                                        color: Colors.black,
-                                        width: 1,
-                                      ),
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    child: SingleChildScrollView(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          // Key Themes Title
-                                          Text(
-                                            AppLocalizations.of(
-                                              context,
-                                            )!.keyThemesTurkmenistanChina,
-                                            style: GoogleFonts.montserrat(
-                                              fontSize: 30,
-                                              fontWeight: FontWeight.w500,
-                                              height: 37 / 30,
-                                              color: const Color(0xFF231C1C),
-                                            ),
-                                          ),
-                                          const SizedBox(height: 15),
-                                          // Description as bullet list
-                                          ...(_event!['description'] as String)
-                                              .split(';')
-                                              .where(
-                                                (item) =>
-                                                    item.trim().isNotEmpty,
-                                              )
-                                              .map(
-                                                (item) => Padding(
-                                                  padding:
-                                                      const EdgeInsets.only(
-                                                        bottom: 6,
-                                                      ),
-                                                  child: Row(
-                                                    crossAxisAlignment:
-                                                        CrossAxisAlignment
-                                                            .start,
-                                                    children: [
-                                                      Text(
-                                                        '• ',
-                                                        style:
-                                                            GoogleFonts.roboto(
-                                                              fontSize: 20,
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .w400,
-                                                              color:
-                                                                  const Color(
-                                                                    0xD9474551,
-                                                                  ),
-                                                            ),
-                                                      ),
-                                                      Expanded(
-                                                        child: Text(
-                                                          item.trim(),
-                                                          style:
-                                                              GoogleFonts.roboto(
-                                                                fontSize: 20,
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .w400,
-                                                                height: 35 / 20,
-                                                                color:
-                                                                    const Color(
-                                                                      0xD9474551,
-                                                                    ),
-                                                              ),
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                              ),
-                                          const SizedBox(height: 20),
-                                          // Dear Participants
-                                          Text(
-                                            AppLocalizations.of(
-                                              context,
-                                            )!.dearParticipants,
-                                            style: GoogleFonts.montserrat(
-                                              fontSize: 25,
-                                              fontWeight: FontWeight.w500,
-                                              height: 37 / 25,
-                                              color: const Color(0xFF231C1C),
-                                            ),
-                                          ),
-                                          const SizedBox(height: 12),
-                                          // Instructions
-                                          Text(
-                                            AppLocalizations.of(
-                                              context,
-                                            )!.participantInstructions,
-                                            style: GoogleFonts.roboto(
-                                              fontSize: 20,
-                                              fontWeight: FontWeight.w400,
-                                              height: 35 / 20,
-                                              color: const Color(0xD9474551),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 30),
-                                // Image + Button Column
-                                Column(
-                                  children: [
-                                    // Event Photo
-                                    Container(
-                                      width: 381,
-                                      height: 497,
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(20),
-                                      ),
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(20),
-                                        child: Image.asset(
-                                          'assets/event_detail/event_photo.png',
-                                          fit: BoxFit.cover,
-                                          errorBuilder: (c, e, s) => Container(
-                                            color: Colors.grey,
-                                            child: const Icon(
-                                              Icons.image,
-                                              size: 100,
-                                              color: Colors.white,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 27),
-                                    // Open Button
-                                    GestureDetector(
-                                      onTap: _onOpenTap,
-                                      child: Container(
-                                        width: 381,
-                                        height: 121,
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFF9CA4CC),
-                                          borderRadius: BorderRadius.circular(
-                                            20,
-                                          ),
-                                        ),
-                                        alignment: Alignment.center,
-                                        child: Text(
-                                          AppLocalizations.of(
-                                            context,
-                                          )!.openButton,
-                                          style: GoogleFonts.montserrat(
-                                            fontSize: 45,
-                                            fontWeight: FontWeight.w500,
-                                            color: const Color(0xFFF1F1F6),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
                           ),
-                  ),
-
-                  SizedBox(height: isMobile ? 30 : 50),
-                ],
-              ),
+                        ],
+                      ),
+                    ),
             ),
 
-            // Profile Dropdown Overlay
-            if (_isProfileOpen)
-              Positioned(
-                top: isMobile ? 60 : 80,
-                right: isMobile ? 20 : 65,
-                left: isMobile ? 20 : null,
-                child: ProfileDropdown(
-                  onLogout: () {
-                    context.go('/login');
-                  },
-                ),
+            SizedBox(height: isMobile ? 30 : 50),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDescriptionBox({required bool isMobile}) {
+    final l10n = AppLocalizations.of(context)!;
+
+    return Container(
+      padding: EdgeInsets.all(isMobile ? 20 : 30),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F1F6),
+        border: Border.all(color: Colors.black, width: 1),
+        borderRadius: BorderRadius.circular(isMobile ? 15 : 20),
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              l10n.keyThemesTurkmenistanChina,
+              style: GoogleFonts.montserrat(
+                fontSize: isMobile ? 18 : 30,
+                fontWeight: FontWeight.w500,
+                height: isMobile ? null : 37 / 30,
+                color: const Color(0xFF231C1C),
               ),
+            ),
+            const SizedBox(height: 15),
+            ...(_event!['description'] as String)
+                .split(';')
+                .where((item) => item.trim().isNotEmpty)
+                .map(
+                  (item) => Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '• ',
+                          style: GoogleFonts.roboto(
+                            fontSize: isMobile ? 14 : 20,
+                            fontWeight: FontWeight.w400,
+                            color: const Color(0xD9474551),
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(
+                            item.trim(),
+                            style: GoogleFonts.roboto(
+                              fontSize: isMobile ? 14 : 20,
+                              fontWeight: FontWeight.w400,
+                              height: isMobile ? 1.4 : 35 / 20,
+                              color: const Color(0xD9474551),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            SizedBox(height: isMobile ? 15 : 20),
+            Text(
+              l10n.dearParticipants,
+              style: GoogleFonts.montserrat(
+                fontSize: isMobile ? 16 : 25,
+                fontWeight: FontWeight.w500,
+                height: isMobile ? null : 37 / 25,
+                color: const Color(0xFF231C1C),
+              ),
+            ),
+            SizedBox(height: isMobile ? 10 : 12),
+            Text(
+              l10n.participantInstructions,
+              style: GoogleFonts.roboto(
+                fontSize: isMobile ? 14 : 20,
+                fontWeight: FontWeight.w400,
+                height: isMobile ? 1.4 : 35 / 20,
+                color: const Color(0xD9474551),
+              ),
+            ),
           ],
         ),
       ),

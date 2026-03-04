@@ -32,3 +32,9 @@ final ordersProvider =
     FutureProvider.family<List<Order>, int>((ref, eventId) {
   return ref.watch(shopServiceProvider).getOrders(eventId);
 });
+
+/// Fetch a single service detail by ID.
+final serviceDetailProvider =
+    FutureProvider.family<EventServiceItem, int>((ref, serviceId) {
+  return ref.watch(shopServiceProvider).getServiceDetail(serviceId);
+});

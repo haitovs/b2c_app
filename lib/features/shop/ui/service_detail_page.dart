@@ -20,31 +20,25 @@ class ServiceDetailPage extends ConsumerWidget {
     final eventIdStr = routerState.pathParameters['id'] ?? '0';
     final eventId = int.tryParse(eventIdStr) ?? 0;
 
+    final serviceAsync = ref.watch(
+      serviceDetailProvider(int.tryParse(serviceId) ?? 0),
+    );
+
     return EventSidebarLayout(
       title: 'Service Details',
-      child: FutureBuilder<EventServiceItem>(
-        future: ref.read(shopServiceProvider).getServiceDetail(
-              int.tryParse(serviceId) ?? 0,
-            ),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: CircularProgressIndicator(color: AppTheme.primaryColor),
+      child: serviceAsync.when(
+        loading: () => const Center(
+          child: CircularProgressIndicator(color: AppTheme.primaryColor),
+        ),
+        error: (error, _) => _DetailErrorView(
+          message: error.toString(),
+          onRetry: () {
+            ref.invalidate(
+              serviceDetailProvider(int.tryParse(serviceId) ?? 0),
             );
-          }
-
-          if (snapshot.hasError) {
-            return _DetailErrorView(
-              message: snapshot.error.toString(),
-              onRetry: () {
-                // Force rebuild by navigating to the same page
-                context.go('/events/$eventIdStr/services/$serviceId');
-              },
-            );
-          }
-
-          final service = snapshot.data!;
-
+          },
+        ),
+        data: (service) {
           return SingleChildScrollView(
             padding: const EdgeInsets.all(24),
             child: Column(

@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/providers/reference_data_provider.dart';
+import '../../../core/providers/upload_provider.dart';
 import '../../../shared/layouts/event_sidebar_layout.dart';
 import '../../../shared/widgets/multi_select_field.dart';
 import '../../../shared/widgets/country_city_picker.dart';
@@ -1159,15 +1161,52 @@ class _CompanyProfilePageState extends ConsumerState<CompanyProfilePage> {
     );
   }
 
-  /// Placeholder for image upload action. In a real implementation, this would
-  /// open a file picker, upload to the server, and set the URL in state.
-  void _onImageUpload(String imageType) {
-    // TODO: integrate with file picker and upload service
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Image upload for "$imageType" coming soon'),
-        backgroundColor: Colors.grey.shade700,
-      ),
+  Future<void> _onImageUpload(String imageType) async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1200,
+      maxHeight: 1200,
+      imageQuality: 85,
     );
+    if (picked == null) return;
+
+    try {
+      final bytes = await picked.readAsBytes();
+      final uploadService = ref.read(uploadServiceProvider);
+      final url = await uploadService.uploadFile(
+        fileData: bytes,
+        folder: 'company-branding',
+        filename: '${imageType}_${DateTime.now().millisecondsSinceEpoch}.jpg',
+      );
+
+      if (!mounted) return;
+      setState(() {
+        switch (imageType) {
+          case 'brand_icon':
+            _brandIconUrl = url;
+          case 'full_logo':
+            _fullLogoUrl = url;
+          case 'cover':
+            _coverImageUrl = url;
+          default:
+            // Gallery images: gallery_0, gallery_1, ...
+            if (imageType.startsWith('gallery_')) {
+              final idx = int.tryParse(imageType.replaceFirst('gallery_', ''));
+              if (idx != null && idx < _galleryUrls.length) {
+                _galleryUrls[idx] = url;
+              }
+            }
+        }
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Upload failed: $e'),
+          backgroundColor: AppTheme.errorColor,
+        ),
+      );
+    }
   }
 }

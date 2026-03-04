@@ -2,13 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/providers/upload_provider.dart';
 import '../../../shared/layouts/event_sidebar_layout.dart';
 import '../../../shared/widgets/step_wizard.dart';
 import '../../../shared/widgets/country_city_picker.dart';
 import '../../../core/providers/reference_data_provider.dart';
 import '../../company/providers/company_providers.dart';
+import '../models/team_member.dart';
 import '../providers/team_providers.dart';
 
 /// Add Team Member page with a 2-step wizard.
@@ -19,7 +22,8 @@ import '../providers/team_providers.dart';
 /// **Step 2 — Role in Event:** company selector (if multiple), role
 /// selector (USER / ADMINISTRATOR), and profile photo upload area.
 class AddTeamMemberPage extends ConsumerStatefulWidget {
-  const AddTeamMemberPage({super.key});
+  final String? memberId;
+  const AddTeamMemberPage({super.key, this.memberId});
 
   @override
   ConsumerState<AddTeamMemberPage> createState() => _AddTeamMemberPageState();
@@ -28,6 +32,7 @@ class AddTeamMemberPage extends ConsumerStatefulWidget {
 class _AddTeamMemberPageState extends ConsumerState<AddTeamMemberPage> {
   int _currentStep = 0;
   bool _isSubmitting = false;
+  bool _didPopulate = false;
 
   // Step 1 form key
   final _step1Key = GlobalKey<FormState>();
@@ -48,6 +53,8 @@ class _AddTeamMemberPageState extends ConsumerState<AddTeamMemberPage> {
   String _selectedRole = 'USER';
   String? _profilePhotoUrl;
 
+  bool get _isEditing => widget.memberId != null;
+
   @override
   void dispose() {
     _firstNameController.dispose();
@@ -57,13 +64,50 @@ class _AddTeamMemberPageState extends ConsumerState<AddTeamMemberPage> {
     super.dispose();
   }
 
+  void _populateFromMember(TeamMember member) {
+    if (_didPopulate) return;
+    _didPopulate = true;
+    _firstNameController.text = member.firstName;
+    _lastNameController.text = member.lastName;
+    _emailController.text = member.email;
+    _mobileController.text = member.mobile ?? '';
+    _selectedCountry = member.country;
+    _selectedCity = member.city;
+    _selectedPosition = member.position;
+    _selectedCompanyId = member.companyId;
+    _selectedRole = member.role == TeamMemberRole.administrator
+        ? 'ADMINISTRATOR'
+        : 'USER';
+    _profilePhotoUrl = member.profilePhotoUrl;
+  }
+
   @override
   Widget build(BuildContext context) {
     final eventIdStr = GoRouterState.of(context).pathParameters['id'] ?? '';
     final eventId = int.tryParse(eventIdStr) ?? 0;
 
+    // Pre-populate form when editing an existing member
+    if (_isEditing) {
+      final memberAsync = ref.watch(teamMemberProvider(widget.memberId!));
+      memberAsync.whenData((member) => _populateFromMember(member));
+
+      if (memberAsync.isLoading && !_didPopulate) {
+        return EventSidebarLayout(
+          title: 'Edit Team Member',
+          child: const Center(child: CircularProgressIndicator()),
+        );
+      }
+
+      if (memberAsync.hasError && !_didPopulate) {
+        return EventSidebarLayout(
+          title: 'Edit Team Member',
+          child: Center(child: Text('Error: ${memberAsync.error}')),
+        );
+      }
+    }
+
     return EventSidebarLayout(
-      title: 'Add Team Member',
+      title: _isEditing ? 'Edit Team Member' : 'Add Team Member',
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Center(
@@ -151,8 +195,8 @@ class _AddTeamMemberPageState extends ConsumerState<AddTeamMemberPage> {
             color: AppTheme.primaryColor.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(10),
           ),
-          child: const Icon(
-            Icons.person_add,
+          child: Icon(
+            _isEditing ? Icons.edit : Icons.person_add,
             color: AppTheme.primaryColor,
             size: 24,
           ),
@@ -163,7 +207,7 @@ class _AddTeamMemberPageState extends ConsumerState<AddTeamMemberPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Add Team Member',
+                _isEditing ? 'Edit Team Member' : 'Add Team Member',
                 style: GoogleFonts.montserrat(
                   fontSize: 22,
                   fontWeight: FontWeight.w600,
@@ -984,7 +1028,11 @@ class _AddTeamMemberPageState extends ConsumerState<AddTeamMemberPage> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        _currentStep == 0 ? 'Next' : 'Add Team Member',
+                        _currentStep == 0
+                            ? 'Next'
+                            : _isEditing
+                                ? 'Save Changes'
+                                : 'Add Team Member',
                       ),
                       if (_currentStep == 0) ...[
                         const SizedBox(width: 6),
@@ -1053,17 +1101,26 @@ class _AddTeamMemberPageState extends ConsumerState<AddTeamMemberPage> {
         data['profile_photo_url'] = _profilePhotoUrl;
       }
 
-      await service.createTeamMember(data);
+      if (_isEditing) {
+        await service.updateTeamMember(widget.memberId!, data);
+      } else {
+        await service.createTeamMember(data);
+      }
 
       // Invalidate the team members list for this company
       ref.invalidate(teamMembersProvider(_selectedCompanyId!));
+      if (_isEditing) {
+        ref.invalidate(teamMemberProvider(widget.memberId!));
+      }
 
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Team member added successfully!',
+            _isEditing
+                ? 'Team member updated successfully!'
+                : 'Team member added successfully!',
             style: GoogleFonts.inter(fontSize: 14),
           ),
           backgroundColor: AppTheme.successColor,
@@ -1076,7 +1133,7 @@ class _AddTeamMemberPageState extends ConsumerState<AddTeamMemberPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Failed to add team member: $e',
+            'Failed to ${_isEditing ? 'update' : 'add'} team member: $e',
             style: GoogleFonts.inter(fontSize: 14),
           ),
           backgroundColor: AppTheme.errorColor,
@@ -1087,17 +1144,41 @@ class _AddTeamMemberPageState extends ConsumerState<AddTeamMemberPage> {
     }
   }
 
-  void _onPhotoUpload() {
-    // TODO: integrate with file picker and upload service
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Photo upload coming soon',
-          style: GoogleFonts.inter(fontSize: 14),
-        ),
-        backgroundColor: Colors.grey.shade700,
-      ),
+  Future<void> _onPhotoUpload() async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 800,
+      maxHeight: 800,
+      imageQuality: 85,
     );
+    if (picked == null) return;
+
+    try {
+      final bytes = await picked.readAsBytes();
+      final uploadService = ref.read(uploadServiceProvider);
+      final url = await uploadService.uploadFile(
+        fileData: bytes,
+        folder: 'team-photos',
+        filename: 'team_${DateTime.now().millisecondsSinceEpoch}.jpg',
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _profilePhotoUrl = url;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Upload failed: $e',
+            style: GoogleFonts.inter(fontSize: 14),
+          ),
+          backgroundColor: AppTheme.errorColor,
+        ),
+      );
+    }
   }
 
   // ---------------------------------------------------------------------------

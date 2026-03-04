@@ -14,3 +14,9 @@ final teamMembersProvider =
     FutureProvider.family<List<TeamMember>, String>((ref, companyId) {
   return ref.watch(teamServiceProvider).getTeamMembers(companyId);
 });
+
+/// Fetch a single team member by ID (for edit form pre-population).
+final teamMemberProvider =
+    FutureProvider.family<TeamMember, String>((ref, memberId) {
+  return ref.watch(teamServiceProvider).getTeamMember(memberId);
+});

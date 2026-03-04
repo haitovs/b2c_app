@@ -2,11 +2,11 @@ import 'package:b2c_app/l10n/generated/app_localizations.dart';
 import 'package:country_code_picker/country_code_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/app_theme.dart';
 import '../../../core/widgets/app_text_field.dart';
 import '../providers/auth_provider.dart';
-import 'verification_code_page.dart';
 import 'widgets/auth_page_layout.dart';
 import 'widgets/auth_button.dart';
 
@@ -148,7 +148,7 @@ class _RegistrationPageState extends ConsumerState<RegistrationPage> {
               // Return to login
               Center(
                 child: GestureDetector(
-                  onTap: () => Navigator.of(context).pop(),
+                  onTap: () => context.go('/login'),
                   child: RichText(
                     text: TextSpan(
                       text: "Already have an account? ",
@@ -354,14 +354,9 @@ class _RegistrationPageState extends ConsumerState<RegistrationPage> {
           ),
         );
 
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (_) => VerificationCodePage(
-              email: _emailController.text.trim(),
-              password: _passwordController.text,
-            ),
-          ),
-        );
+        final email = Uri.encodeComponent(_emailController.text.trim());
+        final password = Uri.encodeComponent(_passwordController.text);
+        context.go('/verify-code?email=$email&password=$password');
       } else {
         final cleanError = errorMessage.replaceFirst(
           RegExp(r'^(?:Error\s*)?\d+\s*:\s*'),
