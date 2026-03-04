@@ -1023,8 +1023,10 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
             right: const SizedBox.shrink(),
           ),
         _buildFieldRow(
-          left: _buildCountryPickerField('Country of birth:', _countryOfBirthController, true),
-          right: _buildTextField('Place of birth (City):', _placeOfBirthController, 'New York', true),
+          left: _buildCountryPickerField('Country of birth:', _countryOfBirthController, true, () {
+            _placeOfBirthController.clear();
+          }),
+          right: _buildCityField(),
         ),
 
         // Passport section – paired rows
@@ -1088,8 +1090,10 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
         if (_gender == 'Female')
           _buildTextField('Surname at birth:', _surnameAtBirthController, 'Maiden name (if different)'),
         _buildCountryPickerField('Citizenship:', _citizenshipController, true),
-        _buildCountryPickerField('Country of birth:', _countryOfBirthController, true),
-        _buildTextField('Place of birth (City):', _placeOfBirthController, 'New York', true),
+        _buildCountryPickerField('Country of birth:', _countryOfBirthController, true, () {
+          _placeOfBirthController.clear();
+        }),
+        _buildCityField(),
         _buildDateField('Date of birth:', null, _dateOfBirth, (date) {
           setState(() => _dateOfBirth = date);
         }, '1990-05-20'),
@@ -1259,7 +1263,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
     );
   }
 
-  void _showCountryPickerDialog(TextEditingController controller) {
+  void _showCountryPickerDialog(TextEditingController controller, [VoidCallback? onSelected]) {
     String searchQuery = '';
     showDialog(
       context: context,
@@ -1306,6 +1310,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
                                     controller.text = country;
                                     Navigator.of(ctx).pop();
                                     setState(() {});
+                                    onSelected?.call();
                                   },
                                 );
                               },
@@ -1322,7 +1327,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
     );
   }
 
-  Widget _buildCountryPickerField(String label, TextEditingController controller, [bool isRequired = false]) {
+  Widget _buildCountryPickerField(String label, TextEditingController controller, [bool isRequired = false, VoidCallback? onSelected]) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Column(
@@ -1335,7 +1340,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
             child: TextFormField(
               controller: controller,
               readOnly: true,
-              onTap: () => _showCountryPickerDialog(controller),
+              onTap: () => _showCountryPickerDialog(controller, onSelected),
               validator: isRequired ? (v) => (v == null || v.trim().isEmpty) ? 'This field is required' : null : null,
               decoration: _inputDecoration(
                 hintText: 'Select country',
@@ -1343,6 +1348,45 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
                   padding: const EdgeInsets.all(14),
                   child: SvgPicture.asset('assets/visa_application/icons/chevron-down.svg', width: 18, height: 18),
                 ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCityField() {
+    final hasCountry = _countryOfBirthController.text.isNotEmpty;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Place of birth (City):',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w500,
+              fontFamily: 'Inter',
+              color: hasCountry ? const Color(0xFF1E1E1E) : const Color(0xFFB7B7B7),
+            ),
+          ),
+          const SizedBox(height: 6),
+          SizedBox(
+            height: 50,
+            child: TextFormField(
+              controller: _placeOfBirthController,
+              enabled: hasCountry,
+              validator: (value) {
+                if (!hasCountry) return null;
+                if (value == null || value.trim().isEmpty) return 'This field is required';
+                return null;
+              },
+              decoration: _inputDecoration(
+                hintText: hasCountry
+                    ? 'Enter city in ${_countryOfBirthController.text}'
+                    : 'Select country first',
               ),
             ),
           ),
