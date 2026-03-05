@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/providers/event_context_provider.dart';
+import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../events/providers/event_providers.dart';
 import '../../registration/providers/registration_providers.dart';
@@ -22,11 +23,21 @@ class _PostLoginDispatcherPageState
   @override
   void initState() {
     super.initState();
-    _dispatch();
+    // Defer navigation to avoid setState/markNeedsBuild during build
+    WidgetsBinding.instance.addPostFrameCallback((_) => _dispatch());
   }
 
   Future<void> _dispatch() async {
     try {
+      // 0. Check for a stored redirect URL (user was trying to reach a page before login)
+      final redirectUrl = postLoginRedirectUrl;
+      if (redirectUrl != null) {
+        postLoginRedirectUrl = null;
+        if (!mounted) return;
+        context.go(redirectUrl);
+        return;
+      }
+
       // 1. Check for a persisted last-visited event (survives logout)
       final lastEventId = ref.read(eventContextProvider).eventId;
       if (lastEventId != null) {

@@ -8,6 +8,11 @@ final visaServiceProvider = Provider<VisaService>((ref) {
   return VisaService(ref.watch(authNotifierProvider.notifier));
 });
 
+/// List all visa applications for a given event.
+final visaListProvider = FutureProvider.family<List<Map<String, dynamic>>, int?>((ref, eventId) {
+  return ref.watch(visaServiceProvider).listMyVisas(eventId: eventId);
+});
+
 /// Fetch visa details (for APPROVED/DECLINED status).
 final visaDetailsProvider = FutureProvider.family<Map<String, dynamic>,
     ({int eventId, String participantId})>((ref, args) {

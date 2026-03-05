@@ -29,9 +29,117 @@ class VisaService {
     return '?${params.entries.map((e) => '${e.key}=${e.value}').join('&')}';
   }
 
-  /// Get or create visa application for the current user.
-  /// Uses participant path if participantId is provided,
-  /// otherwise falls back to direct user path with eventId.
+  /// List all visa applications for the current user and event.
+  Future<List<Map<String, dynamic>>> listMyVisas({int? eventId}) async {
+    final token = await _getToken();
+    final query = _buildQueryParams(eventId: eventId);
+
+    final response = await http.get(
+      Uri.parse('$_baseUrl/my-visas$query'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    if (response.statusCode == 200) {
+      final list = jsonDecode(response.body) as List<dynamic>;
+      return list.cast<Map<String, dynamic>>();
+    }
+
+    final error = jsonDecode(response.body);
+    throw Exception(error['message'] ?? error['detail'] ?? 'Failed to list visa applications');
+  }
+
+  /// Create a new blank visa application.
+  Future<Map<String, dynamic>> createMyVisa({int? eventId}) async {
+    final token = await _getToken();
+    final query = _buildQueryParams(eventId: eventId);
+
+    final response = await http.post(
+      Uri.parse('$_baseUrl/my-visa/create$query'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+
+    final error = jsonDecode(response.body);
+    throw Exception(error['message'] ?? error['detail'] ?? 'Failed to create visa application');
+  }
+
+  /// Get a specific visa application by ID.
+  Future<Map<String, dynamic>> getMyVisaById(String visaId) async {
+    final token = await _getToken();
+
+    final response = await http.get(
+      Uri.parse('$_baseUrl/my-visa/$visaId'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+
+    final error = jsonDecode(response.body);
+    throw Exception(error['message'] ?? error['detail'] ?? 'Failed to load visa application');
+  }
+
+  /// Update a specific visa application by ID.
+  Future<Map<String, dynamic>> updateMyVisaById({
+    required String visaId,
+    required Map<String, dynamic> data,
+  }) async {
+    final token = await _getToken();
+
+    final response = await http.put(
+      Uri.parse('$_baseUrl/my-visa/$visaId'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode(data),
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+
+    final error = jsonDecode(response.body);
+    throw Exception(error['message'] ?? error['detail'] ?? 'Failed to update visa application');
+  }
+
+  /// Submit a specific visa application by ID for review.
+  Future<Map<String, dynamic>> submitMyVisaById(String visaId) async {
+    final token = await _getToken();
+
+    final response = await http.post(
+      Uri.parse('$_baseUrl/my-visa/$visaId/submit'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+
+    final error = jsonDecode(response.body);
+    throw Exception(error['message'] ?? error['detail'] ?? 'Failed to submit visa application');
+  }
+
+  /// Delete a specific visa application by ID.
+  Future<void> deleteMyVisaById(String visaId) async {
+    final token = await _getToken();
+
+    final response = await http.delete(
+      Uri.parse('$_baseUrl/my-visa/$visaId'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    if (response.statusCode == 200) return;
+
+    final error = jsonDecode(response.body);
+    throw Exception(error['message'] ?? error['detail'] ?? 'Failed to delete visa application');
+  }
+
+  /// Get or create visa application for the current user (backward compat).
   Future<Map<String, dynamic>> getMyVisa({
     String? participantId,
     int? eventId,

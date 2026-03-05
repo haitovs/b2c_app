@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/auth/providers/auth_provider.dart';
+import '../providers/event_context_provider.dart';
 import '../../features/auth/ui/create_password_page.dart';
 import '../../features/auth/ui/forgot_password_page.dart';
 import '../../features/auth/ui/forgot_password_verify_code_page.dart';
@@ -49,6 +50,10 @@ import '../../shared/ui/coming_soon_page.dart';
 import '../../shared/widgets/legal_document_page.dart';
 import '../error_page.dart';
 import 'auth_refresh_notifier.dart';
+
+/// Stores the URL the user was trying to reach before being redirected to login.
+/// Simple in-memory value — consumed once by PostLoginDispatcherPage.
+String? postLoginRedirectUrl;
 
 /// Riverpod provider for the app's GoRouter instance.
 final routerProvider = Provider<GoRouter>((ref) {
@@ -98,11 +103,25 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       // Redirect to login if not authenticated and not on a public/auth page
       if (!isAuthenticated && !isPublicPage && !isAuthPage) {
+        // Remember where the user wanted to go so we can redirect after login
+        postLoginRedirectUrl = location;
         return '/login';
       }
 
-      // After login/register, smart redirect via dispatcher
+      // After login/register, smart redirect (synchronous checks first)
       if (isAuthenticated && (isLoggingIn || isSigningUp)) {
+        // 1. Stored redirect URL (user was trying to reach a protected page)
+        final redirect = postLoginRedirectUrl;
+        if (redirect != null) {
+          postLoginRedirectUrl = null;
+          return redirect;
+        }
+        // 2. Persisted last-visited event
+        final eventId = ref.read(eventContextProvider).eventId;
+        if (eventId != null) {
+          return '/events/$eventId/menu';
+        }
+        // 3. Fall back to async dispatcher (checks registrations)
         return '/post-login';
       }
 

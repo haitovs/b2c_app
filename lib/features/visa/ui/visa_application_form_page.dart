@@ -70,11 +70,13 @@ const List<String> _passportTypes = [
 class VisaApplicationFormPage extends ConsumerStatefulWidget {
   final int eventId;
   final String? participantId;
+  final String? visaId;
 
   const VisaApplicationFormPage({
     super.key,
     required this.eventId,
     this.participantId,
+    this.visaId,
   });
 
   @override
@@ -90,6 +92,13 @@ class _VisaApplicationFormPageState
   // Loading state
   bool _isLoading = true;
   String? _errorMessage;
+
+  // Multi-visa tab management
+  List<Map<String, dynamic>> _allVisas = [];
+  int _selectedVisaIndex = 0;
+  String? _visaId;
+  bool _isSwitchingTab = false;
+  bool _isCreatingVisa = false;
 
   // Personal Information Controllers
   final _nameController = TextEditingController();
@@ -191,132 +200,40 @@ class _VisaApplicationFormPageState
       if (!mounted) return;
 
       final visaService = ref.read(visaServiceProvider);
-      Map<String, dynamic> visa;
+
+      // Load all visas for this event
+      List<Map<String, dynamic>> visas;
       try {
-        visa = await visaService.getMyVisa(
-          participantId: widget.participantId,
-          eventId: widget.eventId,
-        );
+        visas = await visaService.listMyVisas(eventId: widget.eventId);
       } catch (_) {
-        if (mounted) setState(() => _isLoading = false);
-        return;
+        visas = [];
+      }
+
+      // If no visas exist, create one automatically
+      if (visas.isEmpty) {
+        try {
+          await visaService.createMyVisa(eventId: widget.eventId);
+          visas = await visaService.listMyVisas(eventId: widget.eventId);
+        } catch (_) {
+          if (mounted) setState(() => _isLoading = false);
+          return;
+        }
       }
 
       if (!mounted) return;
 
-      final status = visa['status'] as String? ?? 'NOT_STARTED';
+      _allVisas = visas;
 
-      if (status == 'PENDING') {
-        if (mounted) {
-          context.replace(
-            '/events/${widget.eventId}/visa/status/${widget.participantId!}',
-          );
-        }
-        return;
+      // Determine which visa tab to select
+      if (widget.visaId != null) {
+        final idx = visas.indexWhere((v) => v['id'] == widget.visaId);
+        _selectedVisaIndex = idx >= 0 ? idx : 0;
+      } else {
+        _selectedVisaIndex = 0;
       }
 
-      if (status == 'APPROVED') {
-        if (mounted) {
-          context.replace(
-            '/events/${widget.eventId}/visa/details/${widget.participantId!}',
-          );
-        }
-        return;
-      }
-
-      // Pre-fill form data
-      _nameController.text = visa['first_name'] ?? '';
-      _surnameController.text = visa['last_name'] ?? '';
-      _surnameAtBirthController.text = visa['surname_at_birth'] ?? '';
-      _gender = visa['gender'];
-      _placeOfBirthController.text = visa['place_of_birth'] ?? '';
-      _countryOfBirthController.text = visa['country_of_birth'] ?? '';
-      _citizenshipController.text = visa['citizenship'] ?? '';
-      _emailController.text = visa['email'] ?? '';
-      _phoneNumberE164 = visa['phone_number'] ?? '';
-      if (visa['date_of_birth'] != null) {
-        _dateOfBirth = DateTime.parse(visa['date_of_birth']);
-      }
-
-      // Passport
-      _typeOfPassport = visa['type_of_passport'];
-      _passportNumberController.text = visa['passport_number'] ?? '';
-      if (visa['passport_date_of_issue'] != null) {
-        _passportDateIssue = DateTime.parse(visa['passport_date_of_issue']);
-      }
-      if (visa['passport_expiry'] != null) {
-        _passportExpiry = DateTime.parse(visa['passport_expiry']);
-      }
-      _passportIssuingCountryController.text =
-          visa['passport_issuing_country'] ?? '';
-
-      // Professional
-      _educationController.text = visa['education_level'] ?? '';
-      _placeOfStudyController.text = visa['place_of_study'] ?? '';
-      _specialtyController.text = visa['specialty'] ?? '';
-      _jobTitleController.text = visa['job_title'] ?? '';
-      _employerNameController.text = visa['employer_name'] ?? '';
-
-      // Residential
-      _homeAddressController.text = visa['home_address'] ?? '';
-      _plannedResidentialAddressController.text =
-          visa['planned_residential_address'] ?? '';
-
-      // Marital Status
-      if (visa['marital_status'] != null) {
-        _maritalStatus = (visa['marital_status'] as String).toLowerCase();
-      }
-
-      // Load relatives from unified array (with fallback to legacy)
-      final relativesList = visa['relatives'] as List<dynamic>?;
-      if (relativesList != null && relativesList.isNotEmpty) {
-        for (var rel in relativesList) {
-          _relatives.add(_createRelativeEntry(
-            relationship: rel['relationship'] ?? 'Wife',
-            firstName: rel['first_name'] ?? '',
-            lastName: rel['last_name'] ?? '',
-            middleName: rel['middle_name'] ?? '',
-            surnameAtBirth: rel['surname_at_birth'] ?? '',
-            citizenship: rel['citizenship'] ?? '',
-            dateOfBirth: rel['date_of_birth'] != null
-                ? DateTime.parse(rel['date_of_birth'])
-                : null,
-          ));
-        }
-      } else if (_maritalStatus == 'married') {
-        final spouseFirst = visa['spouse_first_name'] ?? '';
-        final spouseLast = visa['spouse_last_name'] ?? '';
-        if (spouseFirst.isNotEmpty || spouseLast.isNotEmpty) {
-          _relatives.add(_createRelativeEntry(
-            relationship: visa['spouse_relationship'] ?? 'Wife',
-            firstName: spouseFirst,
-            lastName: spouseLast,
-            citizenship: visa['spouse_citizenship'] ?? '',
-            dateOfBirth: visa['spouse_date_of_birth'] != null
-                ? DateTime.parse(visa['spouse_date_of_birth'])
-                : null,
-          ));
-        }
-        final childrenList = visa['children'] as List<dynamic>?;
-        if (childrenList != null) {
-          for (var child in childrenList) {
-            _relatives.add(_createRelativeEntry(
-              relationship: 'Son',
-              firstName: child['first_name'] ?? '',
-              lastName: child['last_name'] ?? '',
-              citizenship: child['citizenship'] ?? '',
-              dateOfBirth: child['date_of_birth'] != null
-                  ? DateTime.parse(child['date_of_birth'])
-                  : null,
-            ));
-          }
-        }
-      }
-
-      // Pre-fill from participant data if visa fields are empty
-      if (_nameController.text.isEmpty && _surnameController.text.isEmpty) {
-        await _prefillFromParticipant();
-      }
+      // Load selected visa into form controllers
+      await _loadVisaIntoForm(_allVisas[_selectedVisaIndex]);
 
       setState(() {
         _isLoading = false;
@@ -327,6 +244,313 @@ class _VisaApplicationFormPageState
           _errorMessage = e.toString().replaceAll('Exception: ', '');
           _isLoading = false;
         });
+      }
+    }
+  }
+
+  /// Load a single visa's data into all form controllers.
+  Future<void> _loadVisaIntoForm(Map<String, dynamic> visa) async {
+    _visaId = visa['id'] as String?;
+
+    // Pre-fill form data
+    _nameController.text = visa['first_name'] ?? '';
+    _surnameController.text = visa['last_name'] ?? '';
+    _surnameAtBirthController.text = visa['surname_at_birth'] ?? '';
+    _gender = visa['gender'];
+    _placeOfBirthController.text = visa['place_of_birth'] ?? '';
+    _countryOfBirthController.text = visa['country_of_birth'] ?? '';
+    _citizenshipController.text = visa['citizenship'] ?? '';
+    _emailController.text = visa['email'] ?? '';
+    _phoneNumberE164 = visa['phone_number'] ?? '';
+    _dateOfBirth = visa['date_of_birth'] != null
+        ? DateTime.parse(visa['date_of_birth'])
+        : null;
+
+    // Passport
+    _typeOfPassport = visa['type_of_passport'];
+    _passportNumberController.text = visa['passport_number'] ?? '';
+    _passportDateIssue = visa['passport_date_of_issue'] != null
+        ? DateTime.parse(visa['passport_date_of_issue'])
+        : null;
+    _passportExpiry = visa['passport_expiry'] != null
+        ? DateTime.parse(visa['passport_expiry'])
+        : null;
+    _passportIssuingCountryController.text =
+        visa['passport_issuing_country'] ?? '';
+
+    // Professional
+    _educationController.text = visa['education_level'] ?? '';
+    _placeOfStudyController.text = visa['place_of_study'] ?? '';
+    _specialtyController.text = visa['specialty'] ?? '';
+    _jobTitleController.text = visa['job_title'] ?? '';
+    _employerNameController.text = visa['employer_name'] ?? '';
+
+    // Residential
+    _homeAddressController.text = visa['home_address'] ?? '';
+    _plannedResidentialAddressController.text =
+        visa['planned_residential_address'] ?? '';
+
+    // Marital Status
+    if (visa['marital_status'] != null) {
+      _maritalStatus = (visa['marital_status'] as String).toLowerCase();
+    } else {
+      _maritalStatus = 'single';
+    }
+
+    // Clear existing relatives
+    for (final rel in _relatives) {
+      (rel['firstName'] as TextEditingController).dispose();
+      (rel['lastName'] as TextEditingController).dispose();
+      (rel['middleName'] as TextEditingController).dispose();
+      (rel['surnameAtBirth'] as TextEditingController).dispose();
+      (rel['citizenship'] as TextEditingController).dispose();
+    }
+    _relatives.clear();
+
+    // Load relatives from unified array (with fallback to legacy)
+    final relativesList = visa['relatives'] as List<dynamic>?;
+    if (relativesList != null && relativesList.isNotEmpty) {
+      for (var rel in relativesList) {
+        _relatives.add(_createRelativeEntry(
+          relationship: rel['relationship'] ?? 'Wife',
+          firstName: rel['first_name'] ?? '',
+          lastName: rel['last_name'] ?? '',
+          middleName: rel['middle_name'] ?? '',
+          surnameAtBirth: rel['surname_at_birth'] ?? '',
+          citizenship: rel['citizenship'] ?? '',
+          dateOfBirth: rel['date_of_birth'] != null
+              ? DateTime.parse(rel['date_of_birth'])
+              : null,
+        ));
+      }
+    } else if (_maritalStatus == 'married') {
+      final spouseFirst = visa['spouse_first_name'] ?? '';
+      final spouseLast = visa['spouse_last_name'] ?? '';
+      if (spouseFirst.isNotEmpty || spouseLast.isNotEmpty) {
+        _relatives.add(_createRelativeEntry(
+          relationship: visa['spouse_relationship'] ?? 'Wife',
+          firstName: spouseFirst,
+          lastName: spouseLast,
+          citizenship: visa['spouse_citizenship'] ?? '',
+          dateOfBirth: visa['spouse_date_of_birth'] != null
+              ? DateTime.parse(visa['spouse_date_of_birth'])
+              : null,
+        ));
+      }
+      final childrenList = visa['children'] as List<dynamic>?;
+      if (childrenList != null) {
+        for (var child in childrenList) {
+          _relatives.add(_createRelativeEntry(
+            relationship: 'Son',
+            firstName: child['first_name'] ?? '',
+            lastName: child['last_name'] ?? '',
+            citizenship: child['citizenship'] ?? '',
+            dateOfBirth: child['date_of_birth'] != null
+                ? DateTime.parse(child['date_of_birth'])
+                : null,
+          ));
+        }
+      }
+    }
+
+    // Reset photo/scan state for new visa
+    _photoFile = null;
+    _photoBytes = null;
+    _passportScanFile = null;
+    _passportScanBytes = null;
+    _confirmationChecked = false;
+
+    // Pre-fill from participant data if visa fields are empty
+    if (_nameController.text.isEmpty && _surnameController.text.isEmpty) {
+      await _prefillFromParticipant();
+    }
+  }
+
+  /// Build form data map from current controller state.
+  Map<String, dynamic> _buildFormData({String? photoUrl, String? passportScanUrl}) {
+    return {
+      'first_name': _nameController.text.trim(),
+      'last_name': _surnameController.text.trim(),
+      'surname_at_birth': _surnameAtBirthController.text.trim(),
+      'gender': _gender,
+      'place_of_birth': _placeOfBirthController.text.trim(),
+      'country_of_birth': _countryOfBirthController.text.trim(),
+      if (_dateOfBirth != null)
+        'date_of_birth': _dateOfBirth!.toIso8601String().split('T')[0],
+      'citizenship': _citizenshipController.text.trim(),
+      'email': _emailController.text.trim(),
+      'phone_number': _phoneNumberE164,
+      'type_of_passport': _typeOfPassport ?? '',
+      'passport_number': _passportNumberController.text.trim(),
+      if (_passportDateIssue != null)
+        'passport_date_of_issue':
+            _passportDateIssue!.toIso8601String().split('T')[0],
+      if (_passportExpiry != null)
+        'passport_expiry':
+            _passportExpiry!.toIso8601String().split('T')[0],
+      'passport_issuing_country':
+          _passportIssuingCountryController.text.trim(),
+      'education_level': _educationController.text.trim(),
+      'place_of_study': _placeOfStudyController.text.trim(),
+      'specialty': _specialtyController.text.trim(),
+      'job_title': _jobTitleController.text.trim(),
+      'employer_name': _employerNameController.text.trim(),
+      'home_address': _homeAddressController.text.trim(),
+      'planned_residential_address':
+          _plannedResidentialAddressController.text.trim(),
+      if (photoUrl != null) 'photo_url': photoUrl,
+      if (passportScanUrl != null) 'passport_scan_url': passportScanUrl,
+      'marital_status': _maritalStatus == 'single' ? 'Single' : 'Married',
+      'relatives': _relatives.map((rel) {
+        return {
+          'relationship': rel['relationship'],
+          'first_name':
+              (rel['firstName'] as TextEditingController).text.trim(),
+          'last_name':
+              (rel['lastName'] as TextEditingController).text.trim(),
+          'middle_name':
+              (rel['middleName'] as TextEditingController).text.trim(),
+          'surname_at_birth':
+              (rel['surnameAtBirth'] as TextEditingController).text.trim(),
+          'citizenship':
+              (rel['citizenship'] as TextEditingController).text.trim(),
+          if (rel['dateOfBirth'] != null)
+            'date_of_birth': (rel['dateOfBirth'] as DateTime)
+                .toIso8601String()
+                .split('T')[0],
+        };
+      }).toList(),
+    };
+  }
+
+  /// Silently save current visa form data without submitting.
+  Future<void> _saveCurrentVisa() async {
+    if (_visaId == null) return;
+    try {
+      final visaService = ref.read(visaServiceProvider);
+      final formData = _buildFormData();
+      await visaService.updateMyVisaById(visaId: _visaId!, data: formData);
+    } catch (e) {
+      debugPrint('Auto-save failed: $e');
+    }
+  }
+
+  /// Switch to a different visa tab.
+  Future<void> _switchToVisa(int index) async {
+    if (index == _selectedVisaIndex) return;
+
+    setState(() => _isSwitchingTab = true);
+    try {
+      // Auto-save current form
+      await _saveCurrentVisa();
+
+      // Reload the target visa fresh from server
+      final visaService = ref.read(visaServiceProvider);
+      final visa = await visaService.getMyVisaById(
+        _allVisas[index]['id'] as String,
+      );
+      if (!mounted) return;
+      _selectedVisaIndex = index;
+      await _loadVisaIntoForm(visa);
+      setState(() {});
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load visa: ${e.toString().replaceAll('Exception: ', '')}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSwitchingTab = false);
+    }
+  }
+
+  /// Add a new visa application and switch to it.
+  Future<void> _addNewVisa() async {
+    setState(() => _isCreatingVisa = true);
+    try {
+      // Save current visa first
+      await _saveCurrentVisa();
+
+      final visaService = ref.read(visaServiceProvider);
+      await visaService.createMyVisa(eventId: widget.eventId);
+
+      // Refresh list
+      final visas = await visaService.listMyVisas(eventId: widget.eventId);
+      if (!mounted) return;
+
+      _allVisas = visas;
+      // Switch to the newly created visa (last in list)
+      final newIndex = visas.length - 1;
+      _selectedVisaIndex = newIndex;
+      await _loadVisaIntoForm(_allVisas[newIndex]);
+      setState(() {});
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceAll('Exception: ', '')),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isCreatingVisa = false);
+    }
+  }
+
+  /// Show confirmation dialog then delete the current visa.
+  Future<void> _confirmDeleteVisa() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Visa Application'),
+        content: Text(
+          'Are you sure you want to delete Visa ${_selectedVisaIndex + 1}? This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      final visaId = _allVisas[_selectedVisaIndex]['id'] as String;
+      final visaService = ref.read(visaServiceProvider);
+      await visaService.deleteMyVisaById(visaId);
+
+      // Refresh list
+      final visas = await visaService.listMyVisas(eventId: widget.eventId);
+      if (!mounted) return;
+
+      _allVisas = visas;
+      if (_selectedVisaIndex >= _allVisas.length) {
+        _selectedVisaIndex = _allVisas.length - 1;
+      }
+      if (_allVisas.isNotEmpty) {
+        await _loadVisaIntoForm(_allVisas[_selectedVisaIndex]);
+      }
+      setState(() {});
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceAll('Exception: ', '')),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }
@@ -522,88 +746,43 @@ class _VisaApplicationFormPageState
       // 3. Prepare data
       if (!mounted) return;
 
-      final formData = <String, dynamic>{
-        // Personal Information
-        'first_name': _nameController.text.trim(),
-        'last_name': _surnameController.text.trim(),
-        'surname_at_birth': _surnameAtBirthController.text.trim(),
-        'gender': _gender,
-        'place_of_birth': _placeOfBirthController.text.trim(),
-        'country_of_birth': _countryOfBirthController.text.trim(),
-        if (_dateOfBirth != null)
-          'date_of_birth': _dateOfBirth!.toIso8601String().split('T')[0],
-        'citizenship': _citizenshipController.text.trim(),
-        'email': _emailController.text.trim(),
-        'phone_number': _phoneNumberE164,
-
-        // Passport Details
-        'type_of_passport': _typeOfPassport ?? '',
-        'passport_number': _passportNumberController.text.trim(),
-        if (_passportDateIssue != null)
-          'passport_date_of_issue':
-              _passportDateIssue!.toIso8601String().split('T')[0],
-        if (_passportExpiry != null)
-          'passport_expiry':
-              _passportExpiry!.toIso8601String().split('T')[0],
-        'passport_issuing_country':
-            _passportIssuingCountryController.text.trim(),
-
-        // Professional/Academic
-        'education_level': _educationController.text.trim(),
-        'place_of_study': _placeOfStudyController.text.trim(),
-        'specialty': _specialtyController.text.trim(),
-        'job_title': _jobTitleController.text.trim(),
-        'employer_name': _employerNameController.text.trim(),
-
-        // Residential
-        'home_address': _homeAddressController.text.trim(),
-        'planned_residential_address':
-            _plannedResidentialAddressController.text.trim(),
-
-        // Photo
-        if (photoUrl != null) 'photo_url': photoUrl,
-        if (passportScanUrl != null) 'passport_scan_url': passportScanUrl,
-
-        // Marital Status
-        'marital_status': _maritalStatus == 'single' ? 'Single' : 'Married',
-
-        // Unified relatives array
-        'relatives': _relatives.map((rel) {
-          return {
-            'relationship': rel['relationship'],
-            'first_name':
-                (rel['firstName'] as TextEditingController).text.trim(),
-            'last_name':
-                (rel['lastName'] as TextEditingController).text.trim(),
-            'middle_name':
-                (rel['middleName'] as TextEditingController).text.trim(),
-            'surname_at_birth':
-                (rel['surnameAtBirth'] as TextEditingController).text.trim(),
-            'citizenship':
-                (rel['citizenship'] as TextEditingController).text.trim(),
-            if (rel['dateOfBirth'] != null)
-              'date_of_birth': (rel['dateOfBirth'] as DateTime)
-                  .toIso8601String()
-                  .split('T')[0],
-          };
-        }).toList(),
-      };
+      final formData = _buildFormData(
+        photoUrl: photoUrl,
+        passportScanUrl: passportScanUrl,
+      );
 
       // 4. Update visa application
       if (!mounted) return;
       final visaService = ref.read(visaServiceProvider);
-      await visaService.updateMyVisa(
-        participantId: widget.participantId,
-        eventId: widget.eventId,
-        data: formData,
-      );
+      if (_visaId != null) {
+        await visaService.updateMyVisaById(visaId: _visaId!, data: formData);
+      } else {
+        await visaService.updateMyVisa(
+          participantId: widget.participantId,
+          eventId: widget.eventId,
+          data: formData,
+        );
+      }
 
       // 5. Submit for review
       if (!mounted) return;
-      await visaService.submitMyVisa(
-        participantId: widget.participantId,
-        eventId: widget.eventId,
-      );
+      if (_visaId != null) {
+        await visaService.submitMyVisaById(_visaId!);
+      } else {
+        await visaService.submitMyVisa(
+          participantId: widget.participantId,
+          eventId: widget.eventId,
+        );
+      }
+
+      // 6. Refresh visa list to update tab status
+      if (!mounted) return;
+      try {
+        _allVisas = await visaService.listMyVisas(eventId: widget.eventId);
+        if (mounted && _allVisas.isNotEmpty && _selectedVisaIndex < _allVisas.length) {
+          await _loadVisaIntoForm(_allVisas[_selectedVisaIndex]);
+        }
+      } catch (_) {}
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -612,8 +791,6 @@ class _VisaApplicationFormPageState
           backgroundColor: Colors.green,
         ),
       );
-
-      context.pop(true);
     } catch (e) {
       if (mounted) {
         final msg = e.toString().replaceAll('Exception: ', '');
@@ -694,61 +871,89 @@ class _VisaApplicationFormPageState
       );
     }
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        await _saveCurrentVisa();
+        if (mounted) context.pop();
+      },
+      child: Scaffold(
         backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: _primaryColor),
-          onPressed: () => context.pop(),
-        ),
-        title: const Text(
-          'Visa',
-          style: TextStyle(
-            color: _primaryColor,
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: _primaryColor),
+            onPressed: () async {
+              await _saveCurrentVisa();
+              if (mounted) context.pop();
+            },
+          ),
+          title: const Text(
+            'Visa',
+            style: TextStyle(
+              color: _primaryColor,
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 1. Page title
-                _buildPageTitle(),
-                const SizedBox(height: 12),
+        body: SafeArea(
+          child: Stack(
+            children: [
+              SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 1. Page title
+                      _buildPageTitle(),
+                      const SizedBox(height: 12),
 
-                // 2. Separator line
-                _buildSeparatorLine(),
-                const SizedBox(height: 20),
+                      // 2. Separator line
+                      _buildSeparatorLine(),
+                      const SizedBox(height: 20),
 
-                // 3. Alert banner
-                _buildAlertBanner(),
-                const SizedBox(height: 24),
+                      // 3. Alert banner
+                      _buildAlertBanner(),
+                      const SizedBox(height: 16),
 
-                // 4. Main form card
-                _buildMainFormCard(),
-                const SizedBox(height: 24),
+                      // 4. Visa tabs
+                      _buildVisaTabs(),
+                      const SizedBox(height: 16),
 
-                // 5. Marital status card
-                _buildMaritalStatusCard(),
-                const SizedBox(height: 24),
+                      // 5. Main form card
+                      _buildMainFormCard(),
+                      const SizedBox(height: 24),
 
-                // 6. Confirmation checkbox
-                _buildConfirmationCheckbox(),
-                const SizedBox(height: 24),
+                      // 6. Marital status card
+                      _buildMaritalStatusCard(),
+                      const SizedBox(height: 24),
 
-                // 7. Cancel + Submit buttons
-                _buildButtonRow(),
-                const SizedBox(height: 32),
-              ],
-            ),
+                      // 7. Confirmation checkbox
+                      _buildConfirmationCheckbox(),
+                      const SizedBox(height: 24),
+
+                      // 8. Cancel + Submit buttons
+                      _buildButtonRow(),
+                      const SizedBox(height: 32),
+                    ],
+                  ),
+                ),
+              ),
+              if (_isSwitchingTab)
+                Positioned.fill(
+                  child: Container(
+                    color: Colors.white.withAlpha(180),
+                    child: const Center(
+                      child: CircularProgressIndicator(color: _primaryColor),
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
       ),
@@ -758,6 +963,127 @@ class _VisaApplicationFormPageState
   // ---------------------------------------------------------------------------
   // TOP-LEVEL WIDGET BUILDERS
   // ---------------------------------------------------------------------------
+
+  Widget _buildVisaTabs() {
+    final currentVisa = _allVisas.isNotEmpty ? _allVisas[_selectedVisaIndex] : null;
+    final currentStatus = currentVisa?['status'] as String? ?? 'FILL_OUT';
+    final canDelete = _allVisas.length > 1 &&
+        currentStatus != 'PENDING' &&
+        currentStatus != 'APPROVED';
+
+    return Row(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                // Visa tabs
+                for (int i = 0; i < _allVisas.length; i++) ...[
+                  if (i > 0) const SizedBox(width: 8),
+                  _buildVisaTab(i),
+                ],
+                const SizedBox(width: 8),
+                // "+ Add" button
+                InkWell(
+                  onTap: _isCreatingVisa ? null : _addNewVisa,
+                  borderRadius: BorderRadius.circular(4),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: _borderColor),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (_isCreatingVisa)
+                          const SizedBox(
+                            width: 14, height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: _primaryColor),
+                          )
+                        else
+                          const Icon(Icons.add, size: 16, color: _primaryColor),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Add (${_allVisas.length})',
+                          style: const TextStyle(
+                            color: _primaryColor,
+                            fontWeight: FontWeight.w500,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        // Delete current visa button
+        if (canDelete) ...[
+          const SizedBox(width: 8),
+          InkWell(
+            onTap: _confirmDeleteVisa,
+            borderRadius: BorderRadius.circular(4),
+            child: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: Colors.red.withAlpha(100)),
+              ),
+              child: const Icon(Icons.close, size: 18, color: Colors.red),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildVisaTab(int index) {
+    final isActive = index == _selectedVisaIndex;
+    final visa = _allVisas[index];
+    final status = visa['status'] as String? ?? 'FILL_OUT';
+    final isSubmitted = status == 'PENDING' || status == 'APPROVED';
+
+    return InkWell(
+      onTap: () => _switchToVisa(index),
+      borderRadius: BorderRadius.circular(4),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(
+            color: isActive ? _primaryColor : _borderColor,
+            width: isActive ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Visa ${index + 1}',
+              style: TextStyle(
+                color: isActive ? _primaryColor : const Color(0xFF666666),
+                fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+                fontSize: 14,
+              ),
+            ),
+            if (isSubmitted) ...[
+              const SizedBox(width: 6),
+              Icon(
+                status == 'APPROVED' ? Icons.check_circle : Icons.schedule,
+                size: 14,
+                color: status == 'APPROVED' ? _greenColor : const Color(0xFFB39656),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _buildPageTitle() {
     return const Text(
