@@ -33,6 +33,16 @@ final ordersProvider =
   return ref.watch(shopServiceProvider).getOrders(eventId);
 });
 
+/// Whether the user has an APPROVED order for a given event.
+final purchaseStatusProvider = FutureProvider.family<bool, int>((ref, eventId) {
+  return ref.watch(shopServiceProvider).hasPurchasedService(eventId);
+});
+
+/// Sync convenience — returns false while loading (safe default = locked).
+final hasPurchasedProvider = Provider.family<bool, int>((ref, eventId) {
+  return ref.watch(purchaseStatusProvider(eventId)).whenOrNull(data: (v) => v) ?? false;
+});
+
 /// Fetch a single service detail by ID.
 final serviceDetailProvider =
     FutureProvider.family<EventServiceItem, int>((ref, serviceId) {

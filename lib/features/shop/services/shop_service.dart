@@ -160,6 +160,15 @@ class ShopService {
   // Orders
   // ---------------------------------------------------------------------------
 
+  Future<bool> hasPurchasedService(int eventId) async {
+    final result = await _api.get<Map<String, dynamic>>(
+      '/api/v1/shop/purchase-status',
+      queryParams: {'event_id': eventId.toString()},
+      auth: true,
+    );
+    return result.isSuccess && result.data?['has_approved_purchase'] == true;
+  }
+
   Future<List<Order>> getOrders(int eventId) async {
     final result = await _api.get<List<dynamic>>(
       '/api/v1/shop/orders',

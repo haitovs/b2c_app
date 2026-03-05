@@ -6,6 +6,7 @@ import '../../features/auth/ui/create_password_page.dart';
 import '../../features/auth/ui/forgot_password_page.dart';
 import '../../features/auth/ui/forgot_password_verify_code_page.dart';
 import '../../features/auth/ui/login_page.dart';
+import '../../features/auth/ui/post_login_dispatcher_page.dart';
 import '../../features/auth/ui/registration_page.dart';
 import '../../features/auth/ui/reset_password_page.dart';
 import '../../features/auth/ui/verification_code_page.dart';
@@ -100,9 +101,9 @@ final routerProvider = Provider<GoRouter>((ref) {
         return '/login';
       }
 
-      // After login/register, redirect to home (user picks event → menu)
+      // After login/register, smart redirect via dispatcher
       if (isAuthenticated && (isLoggingIn || isSigningUp)) {
-        return '/';
+        return '/post-login';
       }
 
       return null;
@@ -165,6 +166,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           final token = state.uri.queryParameters['token'] ?? '';
           return VerifyEmailPage(token: token);
         },
+      ),
+      GoRoute(
+        path: '/post-login',
+        builder: (context, state) => const PostLoginDispatcherPage(),
       ),
       GoRoute(
         path: '/',
@@ -234,8 +239,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: 'visa-travel',
             builder: (context, state) {
               final idStr = state.pathParameters['id']!;
+              final visaId = state.uri.queryParameters['visaId'];
               return VisaApplicationFormPage(
                 eventId: int.tryParse(idStr) ?? 0,
+                visaId: visaId,
               );
             },
           ),
@@ -443,9 +450,11 @@ final routerProvider = Provider<GoRouter>((ref) {
               final eventIdStr = state.pathParameters['id']!;
               final participantId =
                   state.pathParameters['participantId']!;
+              final visaId = state.uri.queryParameters['visaId'];
               return VisaApplicationFormPage(
                 eventId: int.tryParse(eventIdStr) ?? 0,
                 participantId: participantId,
+                visaId: visaId,
               );
             },
           ),
@@ -495,10 +504,6 @@ final routerProvider = Provider<GoRouter>((ref) {
             highlightConfirmButton: highlight,
           );
         },
-      ),
-      GoRoute(
-        path: '/hotline',
-        builder: (context, state) => const HotlinePage(),
       ),
     ],
   );

@@ -204,6 +204,7 @@ class _ShoppingCartPageState extends ConsumerState<ShoppingCartPage> {
       await shopService.checkout(eventId, promocode: _appliedPromocode);
       ref.invalidate(cartProvider(eventId));
       ref.invalidate(cartBadgeCountProvider(eventId));
+      ref.invalidate(purchaseStatusProvider(eventId));
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
