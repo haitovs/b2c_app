@@ -790,26 +790,14 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
       // 4. Update visa application
       if (!mounted) return;
       final visaService = context.read<VisaService>();
-      if (_visaId != null) {
-        await visaService.updateMyVisaById(visaId: _visaId!, data: formData);
-      } else {
-        await visaService.updateMyVisa(
-          participantId: widget.participantId,
-          eventId: widget.eventId,
-          data: formData,
-        );
+      if (_visaId == null) {
+        throw Exception('Visa application ID is missing. Please reload the page and try again.');
       }
+      await visaService.updateMyVisaById(visaId: _visaId!, data: formData);
 
       // 5. Submit for review
       if (!mounted) return;
-      if (_visaId != null) {
-        await visaService.submitMyVisaById(_visaId!);
-      } else {
-        await visaService.submitMyVisa(
-          participantId: widget.participantId,
-          eventId: widget.eventId,
-        );
-      }
+      await visaService.submitMyVisaById(_visaId!);
 
       // 6. Refresh visa list to update tab status and reload current visa
       if (!mounted) return;
