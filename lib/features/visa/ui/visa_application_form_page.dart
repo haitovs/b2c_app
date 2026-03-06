@@ -324,8 +324,13 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
         ? DateTime.parse(visa['date_of_birth'])
         : null;
 
-    // Passport
-    _typeOfPassport = visa['type_of_passport'];
+    // Passport — migrate legacy values
+    final rawPassportType = visa['type_of_passport'] as String?;
+    if (rawPassportType == 'Ordinary') {
+      _typeOfPassport = 'P - Milli Pasport (National)';
+    } else {
+      _typeOfPassport = rawPassportType;
+    }
     _passportNumberController.text = visa['passport_number'] ?? '';
     _passportDateIssue = visa['passport_date_of_issue'] != null
         ? DateTime.parse(visa['passport_date_of_issue'])
@@ -1209,14 +1214,17 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
             ),
           ),
           const SizedBox(height: 20),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              if (constraints.maxWidth > 600) {
-                return _buildTwoColumnLayout();
-              } else {
-                return _buildSingleColumnLayout();
-              }
-            },
+          KeyedSubtree(
+            key: ValueKey(_visaId),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                if (constraints.maxWidth > 600) {
+                  return _buildTwoColumnLayout();
+                } else {
+                  return _buildSingleColumnLayout();
+                }
+              },
+            ),
           ),
         ],
       ),
@@ -1727,7 +1735,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
           SizedBox(
             height: 50,
             child: DropdownButtonFormField<String>(
-              initialValue: _typeOfPassport,
+              initialValue: _passportTypes.contains(_typeOfPassport) ? _typeOfPassport : null,
               isExpanded: true,
               icon: SvgPicture.asset('assets/visa_application/icons/chevron-down.svg', width: 18, height: 18),
               decoration: _inputDecoration(),
