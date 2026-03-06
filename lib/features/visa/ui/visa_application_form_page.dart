@@ -65,7 +65,7 @@ const List<String> _countries = [
 ];
 
 const List<String> _passportTypes = [
-  'Ordinary',
+  'P - Milli Pasport (National)',
   'Diplomatic',
   'Service (Official)',
   'Special',
@@ -1576,7 +1576,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
           right: _buildTextField('Speciality:', _specialtyController, 'Computer Science', true),
         ),
         _buildFieldRow(
-          left: _buildTextField('Place of work (Company name):', _employerNameController, 'Tech Corp'),
+          left: _buildTextField('Place of work, Experience, Co. No.:', _employerNameController, 'Tech Corp, 5 yrs, 12345'),
           right: PhoneInputField(
             initialPhone: _phoneNumberE164,
             labelText: 'Personal mobile number:',
@@ -1590,7 +1590,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
         ),
 
         // Planned residential address – full width
-        _buildTextField('Planned residential address:', _plannedResidentialAddressController, 'Address during stay'),
+        _buildTextField('Planned residential address:', _plannedResidentialAddressController, 'Address during stay', true),
       ],
     );
   }
@@ -1633,10 +1633,10 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
         _buildTextField('Personal Address:', _homeAddressController, 'Street, Building, Apt', true),
         _buildTextField('Education:', _educationController, "Bachelor's Degree", true),
         _buildTextField('Speciality:', _specialtyController, 'Computer Science', true),
-        _buildTextField('Place of work (Company name):', _employerNameController, 'Tech Corp'),
+        _buildTextField('Place of work, Experience, Co. No.:', _employerNameController, 'Tech Corp, 5 yrs, 12345'),
         _buildTextField('Position:', _jobTitleController, 'Software Engineer', true),
         _buildTextField('Place of education:', _placeOfStudyController, 'Harvard University', true),
-        _buildTextField('Planned residential address:', _plannedResidentialAddressController, 'Address during stay'),
+        _buildTextField('Planned residential address:', _plannedResidentialAddressController, 'Address during stay', true),
       ],
     );
   }
