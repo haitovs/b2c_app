@@ -941,12 +941,28 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
                     const SizedBox(height: 16),
                     _buildVisaTabs(),
                     const SizedBox(height: 16),
-                    _buildMainFormCard(),
+                    if (!_isVisaEditable) ...[
+                      _buildStatusBanner(),
+                      const SizedBox(height: 16),
+                    ],
+                    IgnorePointer(
+                      ignoring: !_isVisaEditable,
+                      child: Opacity(
+                        opacity: _isVisaEditable ? 1.0 : 0.6,
+                        child: Column(
+                          children: [
+                            _buildMainFormCard(),
+                            const SizedBox(height: 24),
+                            _buildMaritalStatusCard(),
+                          ],
+                        ),
+                      ),
+                    ),
                     const SizedBox(height: 24),
-                    _buildMaritalStatusCard(),
-                    const SizedBox(height: 24),
-                    _buildConfirmationCheckbox(),
-                    const SizedBox(height: 24),
+                    if (_isVisaEditable) ...[
+                      _buildConfirmationCheckbox(),
+                      const SizedBox(height: 24),
+                    ],
                     _buildButtonRow(),
                     const SizedBox(height: 32),
                   ],
@@ -1117,22 +1133,49 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
     }
   }
 
+  Color _statusColor(String status) {
+    switch (status) {
+      case 'PENDING':
+        return const Color(0xFFE89B0C);
+      case 'APPROVED':
+        return _greenColor;
+      case 'DECLINED':
+        return _redColor;
+      default:
+        return _primaryColor;
+    }
+  }
+
+  String _statusLabel(String status) {
+    switch (status) {
+      case 'PENDING':
+        return 'Under Review';
+      case 'APPROVED':
+        return 'Approved';
+      case 'DECLINED':
+        return 'Declined';
+      default:
+        return 'Draft';
+    }
+  }
+
   Widget _buildVisaTab(int index) {
     final isActive = index == _selectedVisaIndex;
     final visa = _allVisas[index];
     final status = visa['status'] as String? ?? 'FILL_OUT';
-    final isSubmitted = status == 'PENDING' || status == 'APPROVED';
+    final isEditable = status == 'FILL_OUT' || status == 'NOT_STARTED' || status == 'DECLINED';
+    final statusCol = _statusColor(status);
 
     return InkWell(
       onTap: () => _switchToVisa(index),
       borderRadius: BorderRadius.circular(4),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isActive && !isEditable ? statusCol.withAlpha(20) : Colors.white,
           borderRadius: BorderRadius.circular(4),
           border: Border.all(
-            color: isActive ? _primaryColor : _borderColor,
+            color: isActive ? (isEditable ? _primaryColor : statusCol) : _borderColor,
             width: isActive ? 2 : 1,
           ),
         ),
@@ -1142,17 +1185,23 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
             Text(
               'Visa ${index + 1}',
               style: TextStyle(
-                color: isActive ? _primaryColor : const Color(0xFF666666),
+                color: isActive ? (isEditable ? _primaryColor : statusCol) : const Color(0xFF666666),
                 fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
                 fontSize: 14,
               ),
             ),
-            if (isSubmitted) ...[
+            if (!isEditable) ...[
               const SizedBox(width: 6),
-              Icon(
-                status == 'APPROVED' ? Icons.check_circle : Icons.schedule,
-                size: 14,
-                color: status == 'APPROVED' ? _greenColor : const Color(0xFFB39656),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: statusCol.withAlpha(30),
+                  borderRadius: BorderRadius.circular(3),
+                ),
+                child: Text(
+                  _statusLabel(status),
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: statusCol),
+                ),
               ),
             ],
           ],
@@ -1201,6 +1250,66 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
             child: Text(
               'If the application form is not completed correctly or required information is missing, there is a risk that the visa may be denied.',
               style: TextStyle(color: _alertTextColor, fontSize: 14, height: 1.4),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusBanner() {
+    final isPending = _currentVisaStatus == 'PENDING';
+    final isApproved = _currentVisaStatus == 'APPROVED';
+    final statusCol = _statusColor(_currentVisaStatus);
+
+    final String title;
+    final String message;
+    final IconData icon;
+
+    if (isPending) {
+      title = 'Application Under Review';
+      message = 'This visa application has been submitted and is being reviewed. You cannot edit it. To apply for another person, tap "+ Add" above.';
+      icon = Icons.schedule;
+    } else if (isApproved) {
+      title = 'Visa Approved';
+      message = 'This visa application has been approved. To apply for another person, tap "+ Add" above.';
+      icon = Icons.check_circle;
+    } else {
+      title = 'Visa Declined';
+      message = 'This visa was declined. You can edit and resubmit it.';
+      icon = Icons.cancel;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: statusCol.withAlpha(15),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: statusCol.withAlpha(80), width: 1.5),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: statusCol, size: 24),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: statusCol,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  message,
+                  style: TextStyle(fontSize: 14, height: 1.4, color: statusCol.withAlpha(200)),
+                ),
+              ],
             ),
           ),
         ],
@@ -1484,7 +1593,41 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
   }
 
   Widget _buildButtonRow() {
-    final editable = _isVisaEditable;
+    if (!_isVisaEditable) {
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          SizedBox(
+            width: 183,
+            height: 43,
+            child: OutlinedButton(
+              onPressed: () => context.pop(),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF666666),
+                side: const BorderSide(color: _borderColor),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+              ),
+              child: const Text('Back', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+            ),
+          ),
+          const SizedBox(width: 16),
+          SizedBox(
+            height: 43,
+            child: ElevatedButton.icon(
+              onPressed: _isCreatingVisa ? null : _addNewVisa,
+              icon: const Icon(Icons.add, size: 20),
+              label: const Text('Add New Visa', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _primaryColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
@@ -1507,7 +1650,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
           width: 183,
           height: 43,
           child: ElevatedButton(
-            onPressed: (!editable || _isSubmitting) ? null : submitForm,
+            onPressed: _isSubmitting ? null : submitForm,
             style: ElevatedButton.styleFrom(
               backgroundColor: _primaryColor,
               foregroundColor: Colors.white,
@@ -1519,10 +1662,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
                     height: 20, width: 20,
                     child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                   )
-                : Text(
-                    editable ? 'Submit' : (_currentVisaStatus == 'PENDING' ? 'Under Review' : 'Approved'),
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                  ),
+                : const Text('Submit', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
           ),
         ),
       ],
