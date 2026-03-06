@@ -104,6 +104,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
 
   // Visa ID for multi-visa support
   String? _visaId;
+  String _currentVisaStatus = 'FILL_OUT';
 
   // Personal Information Controllers
   final _nameController = TextEditingController();
@@ -253,6 +254,14 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
     try {
       if (!mounted) return;
 
+      if (widget.eventId <= 0) {
+        setState(() {
+          _errorMessage = 'Invalid event. Please go back and try again.';
+          _isLoading = false;
+        });
+        return;
+      }
+
       final visaService = context.read<VisaService>();
 
       // Load all visas for this event
@@ -305,6 +314,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
   /// Load a single visa's data into all form controllers.
   Future<void> _loadVisaIntoForm(Map<String, dynamic> visa) async {
     _visaId = visa['id'] as String?;
+    _currentVisaStatus = visa['status'] as String? ?? 'FILL_OUT';
 
     // Pre-fill form data
     _nameController.text = visa['first_name'] ?? '';
@@ -490,7 +500,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
 
   /// Silently save current visa form data without submitting.
   Future<void> _saveCurrentVisa() async {
-    if (_visaId == null) return;
+    if (_visaId == null || !_isVisaEditable) return;
     try {
       final visaService = context.read<VisaService>();
       final formData = _buildFormData();
@@ -710,7 +720,26 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
     });
   }
 
+  bool get _isVisaEditable =>
+      _currentVisaStatus == 'FILL_OUT' ||
+      _currentVisaStatus == 'NOT_STARTED' ||
+      _currentVisaStatus == 'DECLINED';
+
   Future<void> submitForm() async {
+    if (!_isVisaEditable) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _currentVisaStatus == 'PENDING'
+                ? 'Your visa application is under review and cannot be edited.'
+                : 'This visa application has been approved and cannot be modified.',
+          ),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -1467,6 +1496,8 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
   }
 
   Widget _buildButtonRow() {
+    final editable = _isVisaEditable;
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
@@ -1488,7 +1519,7 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
           width: 183,
           height: 43,
           child: ElevatedButton(
-            onPressed: _isSubmitting ? null : submitForm,
+            onPressed: (!editable || _isSubmitting) ? null : submitForm,
             style: ElevatedButton.styleFrom(
               backgroundColor: _primaryColor,
               foregroundColor: Colors.white,
@@ -1500,7 +1531,10 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
                     height: 20, width: 20,
                     child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                   )
-                : const Text('Submit', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                : Text(
+                    editable ? 'Submit' : (_currentVisaStatus == 'PENDING' ? 'Under Review' : 'Approved'),
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
           ),
         ),
       ],
