@@ -1,49 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../core/theme/app_theme.dart';
-
-/// A product / service card for the shop section.
-///
-/// Displays an image, product name, optional subtitle, dual-currency pricing,
-/// an optional discount badge, and an "Add to Cart" button.
-///
-/// ```dart
-/// ProductCard(
-///   name: 'VIP Ticket',
-///   imageUrl: 'https://example.com/ticket.jpg',
-///   priceUsd: 100,
-///   priceTmt: 350,
-///   discountPercent: 15,
-///   subtitle: 'Full access pass',
-///   onTap: () => context.go('/shop/1'),
-///   onAddToCart: () => ref.read(cartProvider.notifier).add(item),
-/// )
-/// ```
+/// Product card — pixel-matched to Figma (184x246 proportions).
+/// Card: 5px radius, shadow 0 1 5 rgba(0,0,0,0.25)
+/// Image border: 0.5px #DDD, 5px radius, 10px inset
+/// Name: Roboto 16px Regular
+/// Price: Roboto 16px SemiBold + discount badge
+/// Cart button: #519672, 5px radius, 29px height
 class ProductCard extends StatelessWidget {
-  /// Product display name.
   final String name;
-
-  /// Optional image URL shown at the top of the card.
   final String? imageUrl;
-
-  /// Price in US dollars.
   final double priceUsd;
-
-  /// Price in Turkmen manat.
   final double priceTmt;
-
-  /// Discount percentage. When greater than 0 a badge is shown on the image.
   final double discountPercent;
-
-  /// Optional secondary text displayed below the name.
   final String? subtitle;
-
-  /// Callback when the card body is tapped (navigate to detail view).
+  final int cartQuantity;
   final VoidCallback? onTap;
-
-  /// Callback when the "Add to Cart" button is pressed.
   final VoidCallback? onAddToCart;
+  final VoidCallback? onIncrement;
+  final VoidCallback? onDecrement;
 
   const ProductCard({
     super.key,
@@ -53,189 +28,306 @@ class ProductCard extends StatelessWidget {
     required this.priceTmt,
     this.discountPercent = 0,
     this.subtitle,
+    this.cartQuantity = 0,
     this.onTap,
     this.onAddToCart,
+    this.onIncrement,
+    this.onDecrement,
   });
 
   @override
   Widget build(BuildContext context) {
+    final hasDiscount = discountPercent > 0;
+    final discountedPrice =
+        hasDiscount ? priceUsd * (1 - discountPercent / 100) : priceUsd;
+
     return Material(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(12),
-      elevation: 0,
+      borderRadius: BorderRadius.circular(5),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(5),
         child: Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey.shade200),
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(5),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
+                color: Colors.black.withValues(alpha: 0.25),
+                blurRadius: 5,
+                offset: const Offset(0, 1),
               ),
             ],
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Image section with optional discount badge
-              _ImageSection(
-                imageUrl: imageUrl,
-                discountPercent: discountPercent,
-              ),
-
-              // Text and pricing
-              Padding(
-                padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Name
-                    Text(
-                      name,
-                      style: GoogleFonts.montserrat(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black87,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-
-                    if (subtitle != null) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        subtitle!,
-                        style: GoogleFonts.inter(
-                          fontSize: 13,
-                          color: Colors.grey.shade600,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-
-                    const SizedBox(height: 8),
-
-                    // Dual currency price
-                    Text(
-                      '\$${_formatNumber(priceUsd)} / ${_formatNumber(priceTmt)} TMT',
-                      style: GoogleFonts.inter(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.primaryColor,
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Image border box — expands to fill available space
+                Expanded(
+                  child: Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(5),
+                      border: Border.all(
+                        color: const Color(0xFFDDDDDD),
+                        width: 0.5,
                       ),
                     ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 12),
-
-              // Add to cart button
-              Padding(
-                padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: onAddToCart,
-                    icon: const Icon(Icons.add_shopping_cart, size: 18),
-                    label: Text(
-                      'Add to Cart',
-                      style: GoogleFonts.inter(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primaryColor,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(5),
+                      child: imageUrl != null
+                          ? Image.network(
+                              imageUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => _placeholder(),
+                            )
+                          : _placeholder(),
                     ),
                   ),
                 ),
-              ),
-            ],
+
+                const SizedBox(height: 6),
+
+                // Name — Roboto Regular 16px
+                SizedBox(
+                  height: 38,
+                  child: Text(
+                    name,
+                    style: GoogleFonts.roboto(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w400,
+                      color: Colors.black,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+
+                const SizedBox(height: 4),
+
+                // Price row — Roboto SemiBold 16px
+                _PriceRow(
+                  currentPrice: discountedPrice,
+                  originalPrice: hasDiscount ? priceUsd : null,
+                  discountPercent: hasDiscount ? discountPercent : null,
+                ),
+
+                const SizedBox(height: 8),
+
+                // Cart button or quantity controls — 29px height
+                SizedBox(
+                  height: 29,
+                  child: cartQuantity > 0
+                      ? _QuantityControls(
+                          quantity: cartQuantity,
+                          onIncrement: onIncrement,
+                          onDecrement: onDecrement,
+                        )
+                      : _CartButton(onPressed: onAddToCart),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  /// Formats a number, removing the decimal part when it is `.0`.
-  static String _formatNumber(double value) {
-    return value == value.roundToDouble()
-        ? value.toInt().toString()
-        : value.toStringAsFixed(2);
+  static Widget _placeholder() {
+    return Container(
+      color: Colors.grey.shade100,
+      child: Center(
+        child: Icon(Icons.image_outlined, size: 36, color: Colors.grey.shade400),
+      ),
+    );
   }
 }
 
-class _ImageSection extends StatelessWidget {
-  final String? imageUrl;
-  final double discountPercent;
+// ---------------------------------------------------------------------------
+// Price row: current price + optional strikethrough + discount badge
+// ---------------------------------------------------------------------------
+class _PriceRow extends StatelessWidget {
+  final double currentPrice;
+  final double? originalPrice;
+  final double? discountPercent;
 
-  const _ImageSection({this.imageUrl, required this.discountPercent});
+  const _PriceRow({
+    required this.currentPrice,
+    this.originalPrice,
+    this.discountPercent,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-      child: Stack(
-        children: [
-          // Product image or placeholder
-          AspectRatio(
-            aspectRatio: 16 / 10,
-            child: imageUrl != null
-                ? Image.network(
-                    imageUrl!,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => _placeholder(),
-                  )
-                : _placeholder(),
+    return Row(
+      children: [
+        Flexible(
+          child: Text(
+            '${_fmt(currentPrice)} \$',
+            style: GoogleFonts.roboto(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.black,
+            ),
+            overflow: TextOverflow.ellipsis,
           ),
+        ),
+        if (originalPrice != null) ...[
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              '${_fmt(originalPrice!)} \$',
+              style: GoogleFonts.roboto(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFFB2B2B2),
+                decoration: TextDecoration.lineThrough,
+                decorationColor: const Color(0xFF828282),
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+        const Spacer(),
+        if (discountPercent != null)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFF0000),
+              borderRadius: BorderRadius.circular(5),
+            ),
+            child: Text(
+              '-${discountPercent!.round()}%',
+              style: GoogleFonts.roboto(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
 
-          // Discount badge
-          if (discountPercent > 0)
-            Positioned(
-              top: 8,
-              left: 8,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.red.shade600,
-                  borderRadius: BorderRadius.circular(4),
-                ),
+  static String _fmt(double v) =>
+      v == v.roundToDouble() ? v.toInt().toString() : v.toStringAsFixed(2);
+}
+
+// ---------------------------------------------------------------------------
+// Green cart button — #519672, 5px radius, 29px tall
+// ---------------------------------------------------------------------------
+class _CartButton extends StatelessWidget {
+  final VoidCallback? onPressed;
+
+  const _CartButton({this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      height: 29,
+      child: ElevatedButton(
+        onPressed: onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF519672),
+          foregroundColor: Colors.white,
+          padding: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(5),
+          ),
+          elevation: 0,
+        ),
+        child: Image.asset(
+          'assets/event_services/shopping-cart.png',
+          width: 16,
+          height: 16,
+          color: Colors.white,
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Quantity controls — green – count + bar, 29px tall
+// ---------------------------------------------------------------------------
+class _QuantityControls extends StatelessWidget {
+  final int quantity;
+  final VoidCallback? onIncrement;
+  final VoidCallback? onDecrement;
+
+  const _QuantityControls({
+    required this.quantity,
+    this.onIncrement,
+    this.onDecrement,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      height: 29,
+      decoration: BoxDecoration(
+        color: const Color(0xFF519672),
+        borderRadius: BorderRadius.circular(5),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: InkWell(
+              onTap: onDecrement,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(5),
+                bottomLeft: Radius.circular(5),
+              ),
+              child: const Center(
                 child: Text(
-                  '${discountPercent.round()}% OFF',
-                  style: GoogleFonts.inter(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
+                  '\u2013',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
                     color: Colors.white,
                   ),
                 ),
               ),
             ),
+          ),
+          Container(width: 1, color: Colors.white.withValues(alpha: 0.3)),
+          Expanded(
+            child: Center(
+              child: Text(
+                quantity.toString(),
+                style: GoogleFonts.roboto(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+          Container(width: 1, color: Colors.white.withValues(alpha: 0.3)),
+          Expanded(
+            child: InkWell(
+              onTap: onIncrement,
+              borderRadius: const BorderRadius.only(
+                topRight: Radius.circular(5),
+                bottomRight: Radius.circular(5),
+              ),
+              child: const Center(
+                child: Text(
+                  '+',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ),
         ],
-      ),
-    );
-  }
-
-  Widget _placeholder() {
-    return Container(
-      color: Colors.grey.shade100,
-      child: Center(
-        child: Icon(
-          Icons.image_outlined,
-          size: 40,
-          color: Colors.grey.shade400,
-        ),
       ),
     );
   }

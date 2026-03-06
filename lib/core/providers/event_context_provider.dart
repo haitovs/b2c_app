@@ -14,6 +14,8 @@ import 'shared_preferences_provider.dart';
 class EventContextNotifier extends Notifier<EventContextState> {
   static const String _siteIdKey = 'current_site_id';
   static const String _eventIdKey = 'current_event_id';
+  static const String _eventNameKey = 'current_event_name';
+  static const String _logoUrlKey = 'current_logo_url';
 
   late final SharedPreferences _prefs;
 
@@ -23,9 +25,13 @@ class EventContextNotifier extends Notifier<EventContextState> {
     // Restore from storage synchronously
     final siteId = _prefs.getInt(_siteIdKey);
     final eventId = _prefs.getInt(_eventIdKey);
+    final eventName = _prefs.getString(_eventNameKey);
+    final logoUrl = _prefs.getString(_logoUrlKey);
     return EventContextState(
       eventId: eventId,
       siteId: siteId,
+      eventName: eventName,
+      logoUrl: logoUrl,
       isInitialized: true,
     );
   }
@@ -33,7 +39,8 @@ class EventContextNotifier extends Notifier<EventContextState> {
   /// Ensure the event context is loaded for the given event ID.
   /// Fetches from API if needed. Returns true on success.
   Future<bool> ensureEventContext(int requiredEventId) async {
-    if (state.eventId == requiredEventId && state.hasSiteId) {
+    if (state.eventId == requiredEventId &&
+        state.eventName != null) {
       return true;
     }
 
@@ -45,9 +52,14 @@ class EventContextNotifier extends Notifier<EventContextState> {
       if (response.statusCode == 200) {
         final eventData = jsonDecode(response.body);
         final tourismSiteId = eventData['tourism_site_id'] as int?;
+        final name =
+            eventData['name'] as String? ?? eventData['title'] as String?;
+        final logoUrl = eventData['logo_url'] as String?;
         await setEventContext(
           eventId: requiredEventId,
           tourismSiteId: tourismSiteId,
+          eventName: name,
+          logoUrl: logoUrl,
         );
         return true;
       } else {
@@ -66,10 +78,14 @@ class EventContextNotifier extends Notifier<EventContextState> {
   Future<void> setEventContext({
     required int eventId,
     required int? tourismSiteId,
+    String? eventName,
+    String? logoUrl,
   }) async {
     state = EventContextState(
       eventId: eventId,
       siteId: tourismSiteId,
+      eventName: eventName,
+      logoUrl: logoUrl,
       isInitialized: true,
     );
 
@@ -79,6 +95,16 @@ class EventContextNotifier extends Notifier<EventContextState> {
     } else {
       await _prefs.remove(_siteIdKey);
     }
+    if (eventName != null) {
+      await _prefs.setString(_eventNameKey, eventName);
+    } else {
+      await _prefs.remove(_eventNameKey);
+    }
+    if (logoUrl != null) {
+      await _prefs.setString(_logoUrlKey, logoUrl);
+    } else {
+      await _prefs.remove(_logoUrlKey);
+    }
   }
 
   /// Clear the event context.
@@ -86,6 +112,8 @@ class EventContextNotifier extends Notifier<EventContextState> {
     state = const EventContextState(isInitialized: true);
     await _prefs.remove(_eventIdKey);
     await _prefs.remove(_siteIdKey);
+    await _prefs.remove(_eventNameKey);
+    await _prefs.remove(_logoUrlKey);
   }
 
   /// Get site_id or throw if not available.
@@ -102,8 +130,8 @@ class EventContextNotifier extends Notifier<EventContextState> {
 /// The main event context provider.
 final eventContextProvider =
     NotifierProvider<EventContextNotifier, EventContextState>(
-  EventContextNotifier.new,
-);
+      EventContextNotifier.new,
+    );
 
 /// Convenience provider: current site ID.
 final currentSiteIdProvider = Provider<int?>((ref) {

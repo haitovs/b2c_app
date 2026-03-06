@@ -34,11 +34,25 @@ class EventSidebarLayout extends ConsumerWidget {
     final currentPath = routerState.uri.toString();
 
     final eventContext = ref.watch(eventContextProvider);
-    final eventName = eventContext.hasEventContext
-        ? 'Event #${eventContext.eventId}'
-        : 'Event';
 
+    // Ensure event context is loaded when we have a route eventId
+    // but name/logo are missing (e.g. direct navigation to a sub-page).
     final eventIdInt = int.tryParse(eventId) ?? 0;
+    if (eventIdInt > 0 &&
+        (eventContext.eventName == null || eventContext.logoUrl == null)) {
+      Future.microtask(() {
+        ref
+            .read(eventContextProvider.notifier)
+            .ensureEventContext(eventIdInt);
+      });
+    }
+
+    final eventName =
+        eventContext.eventName ??
+        (eventContext.hasEventContext
+            ? 'Event #${eventContext.eventId}'
+            : 'Event');
+    final logoUrl = eventContext.logoUrl;
     final unreadCount = ref.watch(unreadNotificationCountProvider);
 
     if (isDesktop) {
@@ -47,24 +61,59 @@ class EventSidebarLayout extends ConsumerWidget {
         body: Column(
           children: [
             _EventTopBar(
-              title: title,
+              title: eventName,
               eventName: eventName,
               eventId: eventId,
+              logoUrl: logoUrl,
               unreadCount: unreadCount,
             ),
             Expanded(
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 260,
-                    child: _EventSidebar(
-                      eventId: eventId,
-                      eventIdInt: eventIdInt,
-                      currentPath: currentPath,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+                child: Row(
+                  children: [
+                    // Sidebar — separate rounded card
+                    Container(
+                      width: 260,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.08),
+                            blurRadius: 16,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: _EventSidebar(
+                        eventId: eventId,
+                        eventIdInt: eventIdInt,
+                        currentPath: currentPath,
+                      ),
                     ),
-                  ),
-                  Expanded(child: child),
-                ],
+                    const SizedBox(width: 16),
+                    // Content — separate rounded card
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.08),
+                              blurRadius: 16,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: child,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -81,6 +130,7 @@ class EventSidebarLayout extends ConsumerWidget {
           title: title,
           eventName: eventName,
           eventId: eventId,
+          logoUrl: logoUrl,
           unreadCount: unreadCount,
           showMenuButton: true,
           onMenuPressed: () => Scaffold.of(context).openDrawer(),
@@ -110,6 +160,7 @@ class _EventTopBar extends StatelessWidget {
   final String title;
   final String eventName;
   final String eventId;
+  final String? logoUrl;
   final int unreadCount;
   final bool showMenuButton;
   final VoidCallback? onMenuPressed;
@@ -118,6 +169,7 @@ class _EventTopBar extends StatelessWidget {
     required this.title,
     required this.eventName,
     required this.eventId,
+    this.logoUrl,
     required this.unreadCount,
     this.showMenuButton = false,
     this.onMenuPressed,
@@ -125,12 +177,18 @@ class _EventTopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final barHeight = isMobile ? 64.0 : 100.0;
+    final titleFontSize = isMobile ? 20.0 : 40.0;
+    final logoSize = isMobile ? 40.0 : 56.0;
+    final logoIconSize = isMobile ? 20.0 : 28.0;
+    final actionIconSize = isMobile ? 24.0 : 28.0;
+
     return Container(
-      height: 64,
-      decoration: const BoxDecoration(
-        color: AppTheme.primaryColor,
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      height: barHeight,
+      decoration: const BoxDecoration(color: AppTheme.primaryColor),
+      padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 28),
       child: Row(
         children: [
           if (showMenuButton)
@@ -144,26 +202,37 @@ class _EventTopBar extends StatelessWidget {
             ),
           // Event logo
           Container(
-            width: 40,
-            height: 40,
+            width: logoSize,
+            height: logoSize,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(color: Colors.white38, width: 2),
               color: Colors.white.withValues(alpha: 0.15),
             ),
-            child: const Icon(
-              Icons.diamond_outlined,
-              color: Colors.white,
-              size: 20,
-            ),
+            clipBehavior: Clip.antiAlias,
+            child: logoUrl != null
+                ? Image.network(
+                    logoUrl!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Icon(
+                      Icons.diamond_outlined,
+                      color: Colors.white,
+                      size: logoIconSize,
+                    ),
+                  )
+                : Icon(
+                    Icons.diamond_outlined,
+                    color: Colors.white,
+                    size: logoIconSize,
+                  ),
           ),
           const SizedBox(width: 16),
-          // Event title
+          // Event name
           Expanded(
             child: Text(
-              title,
+              eventName,
               style: GoogleFonts.montserrat(
-                fontSize: 20,
+                fontSize: titleFontSize,
                 fontWeight: FontWeight.w700,
                 color: Colors.white,
               ),
@@ -179,10 +248,10 @@ class _EventTopBar extends StatelessWidget {
                 style: const TextStyle(fontSize: 10, color: Colors.white),
               ),
               backgroundColor: AppTheme.errorColor,
-              child: const Icon(
-                Icons.notifications_outlined,
-                size: 24,
-                color: Colors.white,
+              child: Image.asset(
+                'assets/header/bell.png',
+                width: actionIconSize,
+                height: actionIconSize,
               ),
             ),
             tooltip: 'Notifications',
@@ -191,10 +260,10 @@ class _EventTopBar extends StatelessWidget {
           const SizedBox(width: 4),
           // Profile
           IconButton(
-            icon: const Icon(
-              Icons.person_outline,
-              size: 24,
-              color: Colors.white,
+            icon: Image.asset(
+              'assets/header/user.png',
+              width: actionIconSize,
+              height: actionIconSize,
             ),
             tooltip: 'Profile',
             onPressed: () => context.go('/profile'),
@@ -282,7 +351,6 @@ class _EventSidebar extends ConsumerWidget {
   Widget _buildNavSection(BuildContext context, bool hasPurchased) {
     const lockedUntilPurchase = {
       'Visa & Travel Center',
-      'Services & Add-Ons',
       'Schedule & Meetings',
       'Financial Section',
       'Analytics',
@@ -290,37 +358,70 @@ class _EventSidebar extends ConsumerWidget {
 
     final basePath = '/events/$eventId';
     final items = <_NavItemData>[
-      _NavItemData('Visa & Travel Center', Icons.public_outlined, '$basePath/visa-travel'),
-      _NavItemData('Services & Add-Ons', Icons.grid_view_outlined, '$basePath/services'),
-      _NavItemData('Schedule & Meetings', Icons.people_alt_outlined, '$basePath/schedule'),
-      _NavItemData('Financial Section', Icons.account_balance_wallet_outlined, '$basePath/financial'),
-      _NavItemData('Analytics', Icons.insights_outlined, '$basePath/analytics'),
-      _NavItemData('Speakers', Icons.record_voice_over_outlined, '$basePath/speakers'),
-      _NavItemData('Participants of event', Icons.groups_outlined, '$basePath/participants'),
-      _NavItemData('News', Icons.article_outlined, '$basePath/news'),
-      _NavItemData('Hotline', Icons.support_agent_outlined, '$basePath/hotline'),
-      _NavItemData('Feedback', Icons.chat_bubble_outline, '$basePath/feedback'),
-      _NavItemData('FAQ', Icons.help_outline, '$basePath/faq'),
+      _NavItemData(
+        'Services & Add-Ons',
+        'assets/sidebar/services.png',
+        '$basePath/services',
+      ),
+      _NavItemData(
+        'Visa & Travel Center',
+        'assets/sidebar/visa.png',
+        '$basePath/visa-travel',
+      ),
+      _NavItemData(
+        'Schedule & Meetings',
+        'assets/sidebar/meetings.png',
+        '$basePath/schedule',
+      ),
+      _NavItemData(
+        'Financial Section',
+        'assets/sidebar/financial.png',
+        '$basePath/financial',
+      ),
+      _NavItemData('Analytics', 'assets/sidebar/analytics.png', '$basePath/analytics'),
+      _NavItemData(
+        'Speakers',
+        'assets/sidebar/speakers.png',
+        '$basePath/speakers',
+      ),
+      _NavItemData(
+        'Participants of event',
+        'assets/sidebar/participants.png',
+        '$basePath/participants',
+      ),
+      _NavItemData('News', 'assets/sidebar/news.png', '$basePath/news'),
+      _NavItemData(
+        'Hotline',
+        'assets/sidebar/hotline.png',
+        '$basePath/hotline',
+      ),
+      _NavItemData('Feedback', 'assets/sidebar/feedback.png', '$basePath/feedback'),
+      _NavItemData('FAQ', 'assets/sidebar/faq.png', '$basePath/faq'),
     ];
 
     return Column(
       children: items.map((item) {
         final isActive = _isPathActive(currentPath, item.path);
-        final isLocked = lockedUntilPurchase.contains(item.label) && !hasPurchased;
+        final isLocked =
+            lockedUntilPurchase.contains(item.label) && !hasPurchased;
         return _NavItem(
           label: item.label,
-          icon: item.icon,
+          iconAsset: item.iconAsset,
           isActive: isActive,
           isLocked: isLocked,
           onTap: () {
             if (isLocked) {
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                content: const Text('Purchase a service package to unlock this feature'),
-                action: SnackBarAction(
-                  label: 'View Services',
-                  onPressed: () => context.go('/events/$eventId/services'),
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: const Text(
+                    'Purchase a service package to unlock this feature',
+                  ),
+                  action: SnackBarAction(
+                    label: 'View Services',
+                    onPressed: () => context.go('/events/$eventId/services'),
+                  ),
                 ),
-              ));
+              );
               return;
             }
             onItemTap?.call();
@@ -340,10 +441,10 @@ class _EventSidebar extends ConsumerWidget {
 
 class _NavItemData {
   final String label;
-  final IconData icon;
+  final String iconAsset;
   final String path;
 
-  const _NavItemData(this.label, this.icon, this.path);
+  const _NavItemData(this.label, this.iconAsset, this.path);
 }
 
 // =============================================================================
@@ -393,32 +494,8 @@ class _CompanyHeader extends StatelessWidget {
               ),
             ),
           ),
-          // Cart icon with badge
-          if (cartCount > 0)
-            Padding(
-              padding: const EdgeInsets.only(right: 4),
-              child: InkWell(
-                onTap: () {
-                  onItemTap?.call();
-                  context.go('/events/$eventId/services/cart');
-                },
-                borderRadius: BorderRadius.circular(8),
-                child: Badge(
-                  label: Text(
-                    cartCount.toString(),
-                    style: const TextStyle(fontSize: 10, color: Colors.white),
-                  ),
-                  backgroundColor: AppTheme.successColor,
-                  child: Icon(
-                    Icons.shopping_cart_outlined,
-                    size: 22,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-              ),
-            ),
           // Hamburger menu
-          Icon(Icons.menu, size: 22, color: Colors.grey.shade600),
+          Image.asset('assets/sidebar/burger.png', width: 22, height: 22),
         ],
       ),
     );
@@ -457,19 +534,20 @@ class _QuickActionsSection extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           _QuickActionItem(
-            icon: Icons.task_alt_outlined,
+            iconAsset: 'assets/sidebar/complete-company.png',
             label: 'Complete Company Profile',
             isLocked: !hasPurchased,
-            onTap: () => _handleTap(context, '/events/$eventId/company-profile'),
+            onTap: () =>
+                _handleTap(context, '/events/$eventId/company-profile'),
           ),
           _QuickActionItem(
-            icon: Icons.person_add_outlined,
+            iconAsset: 'assets/sidebar/add_team.png',
             label: 'Add Team Member',
             isLocked: !hasPurchased,
             onTap: () => _handleTap(context, '/events/$eventId/team/add'),
           ),
           _QuickActionItem(
-            icon: Icons.description_outlined,
+            iconAsset: 'assets/sidebar/order_additional.png',
             label: 'Order Additional Services',
             isLocked: !hasPurchased,
             onTap: () => _handleTap(context, '/events/$eventId/services'),
@@ -481,13 +559,17 @@ class _QuickActionsSection extends StatelessWidget {
 
   void _handleTap(BuildContext context, String route) {
     if (!hasPurchased) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: const Text('Purchase a service package to unlock this feature'),
-        action: SnackBarAction(
-          label: 'View Services',
-          onPressed: () => context.go('/events/$eventId/services'),
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Purchase a service package to unlock this feature',
+          ),
+          action: SnackBarAction(
+            label: 'View Services',
+            onPressed: () => context.go('/events/$eventId/services'),
+          ),
         ),
-      ));
+      );
       return;
     }
     onItemTap?.call();
@@ -500,13 +582,13 @@ class _QuickActionsSection extends StatelessWidget {
 // =============================================================================
 
 class _QuickActionItem extends StatelessWidget {
-  final IconData icon;
+  final String iconAsset;
   final String label;
   final bool isLocked;
   final VoidCallback onTap;
 
   const _QuickActionItem({
-    required this.icon,
+    required this.iconAsset,
     required this.label,
     required this.isLocked,
     required this.onTap,
@@ -521,10 +603,9 @@ class _QuickActionItem extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
         child: Row(
           children: [
-            Icon(
-              icon,
-              size: 20,
-              color: isLocked ? Colors.grey.shade500 : Colors.grey.shade700,
+            Opacity(
+              opacity: isLocked ? 0.4 : 1.0,
+              child: Image.asset(iconAsset, width: 20, height: 20),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -538,7 +619,7 @@ class _QuickActionItem extends StatelessWidget {
               ),
             ),
             if (isLocked)
-              Icon(Icons.lock_outline, size: 16, color: Colors.grey.shade400),
+              Image.asset('assets/sidebar/lock.png', width: 16, height: 16),
           ],
         ),
       ),
@@ -552,14 +633,14 @@ class _QuickActionItem extends StatelessWidget {
 
 class _NavItem extends StatelessWidget {
   final String label;
-  final IconData icon;
+  final String iconAsset;
   final bool isActive;
   final bool isLocked;
   final VoidCallback onTap;
 
   const _NavItem({
     required this.label,
-    required this.icon,
+    required this.iconAsset,
     required this.isActive,
     required this.isLocked,
     required this.onTap,
@@ -570,14 +651,10 @@ class _NavItem extends StatelessWidget {
     final Color textColor = isActive
         ? AppTheme.primaryColor
         : isLocked
-            ? Colors.grey.shade500
-            : Colors.black87;
+        ? Colors.grey.shade500
+        : Colors.black87;
 
-    final Color iconColor = isActive
-        ? AppTheme.primaryColor
-        : isLocked
-            ? Colors.grey.shade400
-            : Colors.grey.shade600;
+    final double iconOpacity = isLocked ? 0.4 : 1.0;
 
     return InkWell(
       onTap: onTap,
@@ -596,7 +673,10 @@ class _NavItem extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(
           children: [
-            Icon(icon, size: 20, color: iconColor),
+            Opacity(
+              opacity: iconOpacity,
+              child: Image.asset(iconAsset, width: 20, height: 20),
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
@@ -609,7 +689,7 @@ class _NavItem extends StatelessWidget {
               ),
             ),
             if (isLocked)
-              Icon(Icons.lock_outline, size: 16, color: Colors.grey.shade400),
+              Image.asset('assets/sidebar/lock.png', width: 16, height: 16),
           ],
         ),
       ),

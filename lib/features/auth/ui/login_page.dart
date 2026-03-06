@@ -184,7 +184,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             duration: Duration(seconds: 2),
           ),
         );
-        context.go('/');
+        // GoRouter redirect handles post-login navigation automatically
+        // (event menu if last-viewed event exists, otherwise event calendar)
       } else if (errorMessage == 'EMAIL_NOT_VERIFIED') {
         final email = Uri.encodeComponent(_usernameController.text.trim());
         context.go('/verification-pending?email=$email');

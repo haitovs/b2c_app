@@ -218,7 +218,7 @@ class _VerificationCodePageState extends ConsumerState<VerificationCodePage> {
           if (!mounted) return;
 
           if (loginError == null) {
-            context.go('/');
+            context.go('/post-login');
             return;
           }
         }

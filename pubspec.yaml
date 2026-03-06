@@ -1,6 +1,6 @@
 name: b2c_app
 description: "A new Flutter project."
-publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+publish_to: "none" # Remove this line if you wish to publish to pub.dev
 
 version: 1.0.0+1
 
@@ -39,7 +39,6 @@ dev_dependencies:
   flutter_lints: ^5.0.0
 
 flutter:
-
   uses-material-design: true
   generate: true
 
@@ -47,9 +46,12 @@ flutter:
     - assets/
     - assets/event_calendar/
     - assets/event_menu/
-    - assets/event_detail/
     - assets/contact_us/
     - assets/meeting/
     - assets/visa_application/
     - assets/visa_application/icons/
     - assets/login_signup/
+    - assets/sidebar/
+    - assets/header/
+    - assets/event_services/
+    - assets/event_services/event_detail/

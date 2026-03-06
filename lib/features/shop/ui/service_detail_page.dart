@@ -5,7 +5,6 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/layouts/event_sidebar_layout.dart';
-import '../../../shared/widgets/breadcrumb_nav.dart';
 import '../providers/shop_providers.dart';
 import '../models/event_service.dart';
 
@@ -39,42 +38,10 @@ class ServiceDetailPage extends ConsumerWidget {
           },
         ),
         data: (service) {
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Breadcrumb
-                BreadcrumbNav(
-                  items: [
-                    BreadcrumbItem(
-                      label: 'Services',
-                      path: '/events/$eventIdStr/services',
-                    ),
-                    BreadcrumbItem(label: service.name),
-                  ],
-                ),
-                const SizedBox(height: 24),
-
-                // Content — responsive layout
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    if (constraints.maxWidth >= 800) {
-                      return _DesktopLayout(
-                        service: service,
-                        eventId: eventId,
-                        eventIdStr: eventIdStr,
-                      );
-                    }
-                    return _MobileLayout(
-                      service: service,
-                      eventId: eventId,
-                      eventIdStr: eventIdStr,
-                    );
-                  },
-                ),
-              ],
-            ),
+          return _ServiceDetailContent(
+            service: service,
+            eventId: eventId,
+            eventIdStr: eventIdStr,
           );
         },
       ),
@@ -83,335 +50,129 @@ class ServiceDetailPage extends ConsumerWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Desktop layout — image left, details right
+// Main content — matches Figma layout
 // ---------------------------------------------------------------------------
-class _DesktopLayout extends StatelessWidget {
+class _ServiceDetailContent extends ConsumerStatefulWidget {
   final EventServiceItem service;
   final int eventId;
   final String eventIdStr;
 
-  const _DesktopLayout({
+  const _ServiceDetailContent({
     required this.service,
     required this.eventId,
     required this.eventIdStr,
   });
 
   @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Image
-        Expanded(
-          flex: 5,
-          child: _ServiceImage(imageUrl: service.imageUrl),
-        ),
-        const SizedBox(width: 32),
-
-        // Details
-        Expanded(
-          flex: 5,
-          child: _ServiceDetails(
-            service: service,
-            eventId: eventId,
-            eventIdStr: eventIdStr,
-          ),
-        ),
-      ],
-    );
-  }
+  ConsumerState<_ServiceDetailContent> createState() =>
+      _ServiceDetailContentState();
 }
 
-// ---------------------------------------------------------------------------
-// Mobile layout — stacked
-// ---------------------------------------------------------------------------
-class _MobileLayout extends StatelessWidget {
-  final EventServiceItem service;
-  final int eventId;
-  final String eventIdStr;
-
-  const _MobileLayout({
-    required this.service,
-    required this.eventId,
-    required this.eventIdStr,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _ServiceImage(imageUrl: service.imageUrl),
-        const SizedBox(height: 24),
-        _ServiceDetails(
-          service: service,
-          eventId: eventId,
-          eventIdStr: eventIdStr,
-        ),
-      ],
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Service image with discount badge
-// ---------------------------------------------------------------------------
-class _ServiceImage extends StatelessWidget {
-  final String? imageUrl;
-
-  const _ServiceImage({required this.imageUrl});
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: AspectRatio(
-        aspectRatio: 16 / 10,
-        child: imageUrl != null
-            ? Image.network(
-                imageUrl!,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => _placeholder(),
-              )
-            : _placeholder(),
-      ),
-    );
-  }
-
-  Widget _placeholder() {
-    return Container(
-      color: Colors.grey.shade100,
-      child: Center(
-        child: Icon(
-          Icons.image_outlined,
-          size: 64,
-          color: Colors.grey.shade400,
-        ),
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Service details section (name, price, description, included lists, add to cart)
-// ---------------------------------------------------------------------------
-class _ServiceDetails extends ConsumerStatefulWidget {
-  final EventServiceItem service;
-  final int eventId;
-  final String eventIdStr;
-
-  const _ServiceDetails({
-    required this.service,
-    required this.eventId,
-    required this.eventIdStr,
-  });
-
-  @override
-  ConsumerState<_ServiceDetails> createState() => _ServiceDetailsState();
-}
-
-class _ServiceDetailsState extends ConsumerState<_ServiceDetails> {
-  int _quantity = 1;
+class _ServiceDetailContentState extends ConsumerState<_ServiceDetailContent> {
   bool _isAddingToCart = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _quantity = widget.service.minOrder > 0 ? widget.service.minOrder : 1;
-  }
 
   @override
   Widget build(BuildContext context) {
     final service = widget.service;
-    final hasDiscount = service.discountPercent > 0;
+    final isMobile = MediaQuery.of(context).size.width < 600;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Category badge
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-            color: AppTheme.primaryColor.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Text(
-            service.category.toUpperCase(),
-            style: GoogleFonts.inter(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.primaryColor,
-              letterSpacing: 0.5,
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-
-        // Name
-        Text(
-          service.name,
-          style: GoogleFonts.montserrat(
-            fontSize: 24,
-            fontWeight: FontWeight.w700,
-            color: Colors.black87,
-          ),
+        // Header: "Event Services" > service name + divider
+        _DetailHeader(
+          eventIdStr: widget.eventIdStr,
+          serviceName: service.name,
         ),
 
-        // Subtitle
-        if (service.subtitle != null) ...[
-          const SizedBox(height: 6),
-          Text(
-            service.subtitle!,
-            style: GoogleFonts.inter(
-              fontSize: 15,
-              color: Colors.grey.shade600,
+        // Scrollable content
+        Expanded(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(
+              isMobile ? 16 : 24,
+              16,
+              isMobile ? 16 : 24,
+              24,
             ),
-          ),
-        ],
-
-        const SizedBox(height: 16),
-
-        // Price row with optional discount
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Text(
-              '\$${_formatNumber(service.priceUsd)} / ${_formatNumber(service.priceTmt)} TMT',
-              style: GoogleFonts.inter(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: AppTheme.primaryColor,
-              ),
-            ),
-            if (hasDiscount) ...[
-              const SizedBox(width: 12),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.red.shade600,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  '${service.discountPercent.round()}% OFF',
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Service title (large, centered)
+                Center(
+                  child: Text(
+                    service.name,
+                    style: GoogleFonts.inter(
+                      fontSize: isMobile ? 22 : 30,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.black,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
                 ),
-              ),
-            ],
-          ],
-        ),
 
-        if (service.minOrder > 1) ...[
-          const SizedBox(height: 8),
-          Text(
-            'Minimum order: ${service.minOrder}',
-            style: GoogleFonts.inter(
-              fontSize: 13,
-              color: Colors.grey.shade600,
-            ),
-          ),
-        ],
+                // Subtitle
+                if (service.subtitle != null) ...[
+                  const SizedBox(height: 6),
+                  Center(
+                    child: Text(
+                      service.subtitle!,
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w400,
+                        color: Colors.black,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ],
 
-        const SizedBox(height: 24),
+                const SizedBox(height: 24),
 
-        // Description
-        if (service.description != null && service.description!.isNotEmpty) ...[
-          Text(
-            'Description',
-            style: GoogleFonts.montserrat(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Colors.black87,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            service.description!,
-            style: GoogleFonts.inter(
-              fontSize: 14,
-              height: 1.6,
-              color: Colors.grey.shade700,
-            ),
-          ),
-          const SizedBox(height: 24),
-        ],
+                // Image + Price (left) | Description + Included/NotIncluded (right)
+                if (isMobile)
+                  _MobileBody(service: service)
+                else
+                  _DesktopBody(service: service),
 
-        // Included list
-        if (service.included != null && service.included!.isNotEmpty) ...[
-          _ChecklistSection(
-            title: 'Included',
-            items: service.included!.map((e) => e.toString()).toList(),
-            icon: Icons.check_circle,
-            iconColor: AppTheme.successColor,
-          ),
-          const SizedBox(height: 16),
-        ],
+                const SizedBox(height: 32),
 
-        // Not included list
-        if (service.notIncluded != null &&
-            service.notIncluded!.isNotEmpty) ...[
-          _ChecklistSection(
-            title: 'Not Included',
-            items: service.notIncluded!.map((e) => e.toString()).toList(),
-            icon: Icons.cancel,
-            iconColor: AppTheme.errorColor,
-          ),
-          const SizedBox(height: 24),
-        ],
-
-        // Divider
-        Divider(color: Colors.grey.shade200, height: 1),
-        const SizedBox(height: 24),
-
-        // Quantity selector + Add to Cart
-        Row(
-          children: [
-            // Quantity selector
-            _QuantitySelector(
-              quantity: _quantity,
-              minQuantity: service.minOrder > 0 ? service.minOrder : 1,
-              onChanged: (q) => setState(() => _quantity = q),
-            ),
-            const SizedBox(width: 16),
-
-            // Add to Cart button
-            Expanded(
-              child: ElevatedButton.icon(
-                onPressed: _isAddingToCart ? null : _handleAddToCart,
-                icon: _isAddingToCart
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
+                // Add to Cart button — centered, green, 47px
+                Center(
+                  child: SizedBox(
+                    width: 260,
+                    height: 47,
+                    child: ElevatedButton(
+                      onPressed: _isAddingToCart ? null : _handleAddToCart,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF519672),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(5),
                         ),
-                      )
-                    : const Icon(Icons.add_shopping_cart, size: 20),
-                label: Text(
-                  _isAddingToCart ? 'Adding...' : 'Add to Cart',
-                  style: GoogleFonts.inter(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
+                        elevation: 0,
+                        padding: EdgeInsets.zero,
+                      ),
+                      child: _isAddingToCart
+                          ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Image.asset(
+                              'assets/event_services/event_detail/shopping-cart.png',
+                              width: 30,
+                              height: 30,
+                              color: Colors.white,
+                            ),
+                    ),
                   ),
                 ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primaryColor,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
+              ],
             ),
-          ],
+          ),
         ),
       ],
     );
@@ -421,10 +182,12 @@ class _ServiceDetailsState extends ConsumerState<_ServiceDetails> {
     setState(() => _isAddingToCart = true);
     try {
       final shopService = ref.read(shopServiceProvider);
+      final qty =
+          widget.service.minOrder > 0 ? widget.service.minOrder : 1;
       await shopService.addToCart(
         widget.eventId,
         widget.service.id,
-        quantity: _quantity,
+        quantity: qty,
       );
       ref.invalidate(cartProvider(widget.eventId));
       ref.invalidate(cartBadgeCountProvider(widget.eventId));
@@ -455,145 +218,372 @@ class _ServiceDetailsState extends ConsumerState<_ServiceDetails> {
         );
       }
     } finally {
-      if (mounted) {
-        setState(() => _isAddingToCart = false);
-      }
+      if (mounted) setState(() => _isAddingToCart = false);
     }
-  }
-
-  static String _formatNumber(double value) {
-    return value == value.roundToDouble()
-        ? value.toInt().toString()
-        : value.toStringAsFixed(2);
   }
 }
 
 // ---------------------------------------------------------------------------
-// Quantity selector
+// Header — "Event Services" > chevron > service name + divider
 // ---------------------------------------------------------------------------
-class _QuantitySelector extends StatelessWidget {
-  final int quantity;
-  final int minQuantity;
-  final ValueChanged<int> onChanged;
+class _DetailHeader extends StatelessWidget {
+  final String eventIdStr;
+  final String serviceName;
 
-  const _QuantitySelector({
-    required this.quantity,
-    required this.minQuantity,
-    required this.onChanged,
+  const _DetailHeader({
+    required this.eventIdStr,
+    required this.serviceName,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade300),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _QuantityButton(
-            icon: Icons.remove,
-            enabled: quantity > minQuantity,
-            onPressed: () => onChanged(quantity - 1),
-          ),
-          Container(
-            constraints: const BoxConstraints(minWidth: 48),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            child: Text(
-              quantity.toString(),
-              textAlign: TextAlign.center,
-              style: GoogleFonts.inter(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: Colors.black87,
+          Row(
+            children: [
+              GestureDetector(
+                onTap: () =>
+                    context.go('/events/$eventIdStr/services'),
+                child: Text(
+                  'Event Services',
+                  style: GoogleFonts.montserrat(
+                    fontSize: 30,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.primaryColor,
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(width: 12),
+              const Icon(Icons.chevron_right, size: 24, color: Colors.black54),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  serviceName,
+                  style: GoogleFonts.montserrat(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
           ),
-          _QuantityButton(
-            icon: Icons.add,
-            enabled: true,
-            onPressed: () => onChanged(quantity + 1),
-          ),
+          const SizedBox(height: 12),
+          Container(height: 0.5, color: const Color(0xFFCACACA)),
         ],
       ),
     );
   }
 }
 
-class _QuantityButton extends StatelessWidget {
-  final IconData icon;
-  final bool enabled;
-  final VoidCallback onPressed;
+// ---------------------------------------------------------------------------
+// Desktop body — image+price left, description+lists right
+// ---------------------------------------------------------------------------
+class _DesktopBody extends StatelessWidget {
+  final EventServiceItem service;
 
-  const _QuantityButton({
-    required this.icon,
-    required this.enabled,
-    required this.onPressed,
-  });
+  const _DesktopBody({required this.service});
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: enabled ? onPressed : null,
-      borderRadius: BorderRadius.circular(4),
-      child: Padding(
-        padding: const EdgeInsets.all(10),
-        child: Icon(
-          icon,
-          size: 20,
-          color: enabled ? Colors.black87 : Colors.grey.shade400,
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Left: image + price
+        SizedBox(
+          width: 272,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Image with border
+              Container(
+                width: 272,
+                height: 264,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(5),
+                  border: Border.all(color: const Color(0xFFDDDDDD)),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: service.imageUrl != null
+                    ? Image.network(
+                        service.imageUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => _imagePlaceholder(),
+                      )
+                    : _imagePlaceholder(),
+              ),
+
+              const SizedBox(height: 16),
+
+              // Price — Inter Medium 50px
+              Text(
+                '${_fmt(service.priceUsd)} \$',
+                style: GoogleFonts.inter(
+                  fontSize: 50,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black,
+                ),
+              ),
+
+              // Minimum order
+              if (service.minOrder > 1) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'Minimum order: ${service.minOrder} sq. m.',
+                  style: GoogleFonts.inter(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w400,
+                    color: Colors.black,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+
+        const SizedBox(width: 32),
+
+        // Right: description + included/not included
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Description
+              if (service.description != null &&
+                  service.description!.isNotEmpty) ...[
+                Text(
+                  service.description!,
+                  style: GoogleFonts.inter(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w400,
+                    color: Colors.black,
+                    height: 26 / 16,
+                  ),
+                ),
+                const SizedBox(height: 20),
+              ],
+
+              // Divider
+              Container(height: 0.5, color: const Color(0xFFCACACA)),
+              const SizedBox(height: 20),
+
+              // Included + Not Included side by side
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Included
+                  if (service.included != null &&
+                      service.included!.isNotEmpty)
+                    Expanded(
+                      child: _IncludedList(
+                        title: 'Included',
+                        items: service.included!
+                            .map((e) => e.toString())
+                            .toList(),
+                      ),
+                    ),
+
+                  if (service.included != null &&
+                      service.included!.isNotEmpty &&
+                      service.notIncluded != null &&
+                      service.notIncluded!.isNotEmpty)
+                    const SizedBox(width: 40),
+
+                  // Not Included
+                  if (service.notIncluded != null &&
+                      service.notIncluded!.isNotEmpty)
+                    Expanded(
+                      child: _IncludedList(
+                        title: 'Not Included',
+                        items: service.notIncluded!
+                            .map((e) => e.toString())
+                            .toList(),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  static Widget _imagePlaceholder() {
+    return Container(
+      color: Colors.grey.shade100,
+      child: Center(
+        child: Image.asset(
+          'assets/event_services/event_detail/event_detail.png',
+          fit: BoxFit.cover,
+          width: double.infinity,
+          height: double.infinity,
+          errorBuilder: (_, __, ___) => Icon(
+            Icons.image_outlined,
+            size: 48,
+            color: Colors.grey.shade400,
+          ),
         ),
       ),
     );
   }
+
+  static String _fmt(double v) =>
+      v == v.roundToDouble() ? v.toInt().toString() : v.toStringAsFixed(2);
 }
 
 // ---------------------------------------------------------------------------
-// Checklist section (Included / Not Included)
+// Mobile body — stacked layout
 // ---------------------------------------------------------------------------
-class _ChecklistSection extends StatelessWidget {
-  final String title;
-  final List<String> items;
-  final IconData icon;
-  final Color iconColor;
+class _MobileBody extends StatelessWidget {
+  final EventServiceItem service;
 
-  const _ChecklistSection({
-    required this.title,
-    required this.items,
-    required this.icon,
-    required this.iconColor,
-  });
+  const _MobileBody({required this.service});
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          title,
-          style: GoogleFonts.montserrat(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Colors.black87,
+        // Image
+        Center(
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 272, maxHeight: 264),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(5),
+              border: Border.all(color: const Color(0xFFDDDDDD)),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: AspectRatio(
+              aspectRatio: 272 / 264,
+              child: service.imageUrl != null
+                  ? Image.network(
+                      service.imageUrl!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => _placeholder(),
+                    )
+                  : _placeholder(),
+            ),
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 16),
+
+        // Price
+        Text(
+          '${_fmt(service.priceUsd)} \$',
+          style: GoogleFonts.inter(
+            fontSize: 36,
+            fontWeight: FontWeight.w500,
+            color: Colors.black,
+          ),
+        ),
+        if (service.minOrder > 1) ...[
+          const SizedBox(height: 4),
+          Text(
+            'Minimum order: ${service.minOrder} sq. m.',
+            style: GoogleFonts.inter(fontSize: 16, color: Colors.black),
+          ),
+        ],
+        const SizedBox(height: 20),
+
+        // Description
+        if (service.description != null &&
+            service.description!.isNotEmpty) ...[
+          Text(
+            service.description!,
+            style: GoogleFonts.inter(
+              fontSize: 16,
+              color: Colors.black,
+              height: 26 / 16,
+            ),
+          ),
+          const SizedBox(height: 20),
+        ],
+
+        Container(height: 0.5, color: const Color(0xFFCACACA)),
+        const SizedBox(height: 20),
+
+        // Included
+        if (service.included != null && service.included!.isNotEmpty) ...[
+          _IncludedList(
+            title: 'Included',
+            items: service.included!.map((e) => e.toString()).toList(),
+          ),
+          const SizedBox(height: 20),
+        ],
+
+        // Not Included
+        if (service.notIncluded != null &&
+            service.notIncluded!.isNotEmpty)
+          _IncludedList(
+            title: 'Not Included',
+            items:
+                service.notIncluded!.map((e) => e.toString()).toList(),
+          ),
+      ],
+    );
+  }
+
+  static Widget _placeholder() {
+    return Container(
+      color: Colors.grey.shade100,
+      child: Center(
+        child: Icon(Icons.image_outlined, size: 48, color: Colors.grey.shade400),
+      ),
+    );
+  }
+
+  static String _fmt(double v) =>
+      v == v.roundToDouble() ? v.toInt().toString() : v.toStringAsFixed(2);
+}
+
+// ---------------------------------------------------------------------------
+// Included / Not Included list with plus-circle icons
+// ---------------------------------------------------------------------------
+class _IncludedList extends StatelessWidget {
+  final String title;
+  final List<String> items;
+
+  const _IncludedList({required this.title, required this.items});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Title — Inter SemiBold 20px
+        Text(
+          title,
+          style: GoogleFonts.inter(
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+            color: Colors.black,
+          ),
+        ),
+        const SizedBox(height: 12),
         ...items.map(
           (item) => Padding(
-            padding: const EdgeInsets.only(bottom: 6),
+            padding: const EdgeInsets.only(bottom: 10),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(icon, size: 18, color: iconColor),
+                Icon(
+                  Icons.add_circle_outline,
+                  size: 19,
+                  color: AppTheme.primaryColor,
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     item,
                     style: GoogleFonts.inter(
-                      fontSize: 14,
-                      color: Colors.grey.shade700,
-                      height: 1.4,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w400,
+                      color: Colors.black,
                     ),
                   ),
                 ),

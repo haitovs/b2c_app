@@ -5,10 +5,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
+
 import '../../../core/config/app_config.dart';
 import '../../../core/providers/event_context_provider.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../shared/layouts/event_sidebar_layout.dart';
-import 'widgets/profile_dropdown.dart';
 
 class SpeakerListPage extends ConsumerStatefulWidget {
   final String eventId;
@@ -20,12 +21,10 @@ class SpeakerListPage extends ConsumerStatefulWidget {
 }
 
 class _SpeakerListPageState extends ConsumerState<SpeakerListPage> {
-  bool _isProfileOpen = false;
-
   List<Map<String, dynamic>> _speakers = [];
   List<Map<String, dynamic>> _filteredSpeakers = [];
   bool _isLoading = true;
-  String _searchQuery = '';
+  bool _sortAZ = true;
   final TextEditingController _searchController = TextEditingController();
 
   @override
@@ -35,10 +34,11 @@ class _SpeakerListPageState extends ConsumerState<SpeakerListPage> {
   }
 
   Future<void> _initializeAndFetch() async {
-    // Ensure the event context is loaded for this event
     final eventId = int.tryParse(widget.eventId);
     if (eventId != null) {
-      await ref.read(eventContextProvider.notifier).ensureEventContext(eventId);
+      await ref
+          .read(eventContextProvider.notifier)
+          .ensureEventContext(eventId);
     }
     _fetchSpeakers();
   }
@@ -51,12 +51,10 @@ class _SpeakerListPageState extends ConsumerState<SpeakerListPage> {
 
   Future<void> _fetchSpeakers() async {
     try {
-      // Use EventContextService for site_id
       final siteId = ref.read(eventContextProvider).siteId;
       final uri = siteId != null
           ? Uri.parse(
-              '${AppConfig.tourismApiBaseUrl}/speakers/?site_id=$siteId',
-            )
+              '${AppConfig.tourismApiBaseUrl}/speakers/?site_id=$siteId')
           : Uri.parse('${AppConfig.tourismApiBaseUrl}/speakers/');
 
       final response = await http.get(uri);
@@ -64,7 +62,7 @@ class _SpeakerListPageState extends ConsumerState<SpeakerListPage> {
         final List data = jsonDecode(response.body);
         setState(() {
           _speakers = data.cast<Map<String, dynamic>>();
-          _filteredSpeakers = _speakers;
+          _applyFilters();
           _isLoading = false;
         });
       } else {
@@ -77,27 +75,31 @@ class _SpeakerListPageState extends ConsumerState<SpeakerListPage> {
     }
   }
 
-  void _filterSpeakers(String query) {
-    setState(() {
-      _searchQuery = query;
-      if (query.isEmpty) {
-        _filteredSpeakers = _speakers;
-      } else {
-        _filteredSpeakers = _speakers.where((speaker) {
-          final name = '${speaker['name'] ?? ''} ${speaker['surname'] ?? ''}'
-              .toLowerCase();
-          final position = (speaker['position'] ?? '').toString().toLowerCase();
-          final company = (speaker['company'] ?? '').toString().toLowerCase();
-          return name.contains(query.toLowerCase()) ||
-              position.contains(query.toLowerCase()) ||
-              company.contains(query.toLowerCase());
-        }).toList();
-      }
-    });
-  }
+  void _applyFilters() {
+    final query = _searchController.text.toLowerCase();
+    var result = _speakers.toList();
 
-  void _closeProfile() {
-    if (_isProfileOpen) setState(() => _isProfileOpen = false);
+    if (query.isNotEmpty) {
+      result = result.where((s) {
+        final name =
+            '${s['name'] ?? ''} ${s['surname'] ?? ''}'.toLowerCase();
+        final position = (s['position'] ?? '').toString().toLowerCase();
+        final company = (s['company'] ?? '').toString().toLowerCase();
+        return name.contains(query) ||
+            position.contains(query) ||
+            company.contains(query);
+      }).toList();
+    }
+
+    result.sort((a, b) {
+      final nameA =
+          '${a['name'] ?? ''} ${a['surname'] ?? ''}'.trim().toLowerCase();
+      final nameB =
+          '${b['name'] ?? ''} ${b['surname'] ?? ''}'.trim().toLowerCase();
+      return _sortAZ ? nameA.compareTo(nameB) : nameB.compareTo(nameA);
+    });
+
+    _filteredSpeakers = result;
   }
 
   String _buildImageUrl(String? path) {
@@ -108,268 +110,380 @@ class _SpeakerListPageState extends ConsumerState<SpeakerListPage> {
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 600;
-    final horizontalPadding = isMobile ? 16.0 : 50.0;
-
     return EventSidebarLayout(
       title: 'Speakers',
-      child: GestureDetector(
-        onTap: _closeProfile,
-        behavior: HitTestBehavior.translucent,
-        child: Stack(
-          children: [
-            SafeArea(
-              child: Column(
-                children: [
-                  // Search Bar
-                  Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: horizontalPadding,
-                      vertical: isMobile ? 12 : 20,
-                    ),
-                    child: _buildSearchBar(isMobile),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header: "Speakers" title + divider
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Speakers',
+                  style: GoogleFonts.montserrat(
+                    fontSize: 30,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.primaryColor,
                   ),
+                ),
+                const SizedBox(height: 12),
+                Container(height: 0.5, color: const Color(0xFFCACACA)),
+              ],
+            ),
+          ),
 
-                  // Content Container
-                  Expanded(
-                    child: Container(
-                      margin: EdgeInsets.symmetric(
-                        horizontal: horizontalPadding,
-                      ),
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFF1F1F6),
-                        borderRadius: BorderRadius.vertical(
-                          top: Radius.circular(20),
+          const SizedBox(height: 12),
+
+          // Search bar + Sort button
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              children: [
+                // Search bar
+                Expanded(child: _SearchBar(controller: _searchController, onChanged: (q) {
+                  setState(() => _applyFilters());
+                })),
+                const SizedBox(width: 10),
+                // Sort button
+                _SortButton(
+                  isAZ: _sortAZ,
+                  onTap: () => setState(() {
+                    _sortAZ = !_sortAZ;
+                    _applyFilters();
+                  }),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Grid
+          Expanded(
+            child: _isLoading
+                ? const Center(
+                    child: CircularProgressIndicator(
+                      color: AppTheme.primaryColor,
+                    ),
+                  )
+                : _filteredSpeakers.isEmpty
+                    ? Center(
+                        child: Text(
+                          _searchController.text.isNotEmpty
+                              ? 'No speakers found'
+                              : 'No speakers available',
+                          style: GoogleFonts.roboto(
+                            fontSize: 16,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      )
+                    : _buildGrid(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGrid() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+
+    return GridView.builder(
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+      gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 220,
+        crossAxisSpacing: isMobile ? 10 : 12,
+        mainAxisSpacing: isMobile ? 10 : 12,
+        childAspectRatio: 184 / 246,
+      ),
+      itemCount: _filteredSpeakers.length,
+      itemBuilder: (context, index) {
+        final speaker = _filteredSpeakers[index];
+        return _SpeakerCard(
+          name:
+              '${speaker['name'] ?? ''} ${speaker['surname'] ?? ''}'.trim(),
+          company: speaker['company'] ?? '',
+          position: speaker['position'] ?? '',
+          country: speaker['country'] ?? '',
+          photoUrl: _buildImageUrl(speaker['photo']),
+          flagUrl: _buildImageUrl(speaker['country_flag']),
+          onViewProfile: () => context.push(
+            '/events/${widget.eventId}/speakers/${speaker['id']}',
+            extra: speaker,
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Search bar — #E6E7F2 bg, 5px radius, 1px #CBCBCB border, 38px height
+// ---------------------------------------------------------------------------
+class _SearchBar extends StatelessWidget {
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+
+  const _SearchBar({required this.controller, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 38,
+      decoration: BoxDecoration(
+        color: const Color(0xFFE6E7F2),
+        borderRadius: BorderRadius.circular(5),
+        border: Border.all(color: const Color(0xFFCBCBCB)),
+      ),
+      child: TextField(
+        controller: controller,
+        onChanged: onChanged,
+        style: GoogleFonts.roboto(fontSize: 14, fontWeight: FontWeight.w400),
+        textAlignVertical: TextAlignVertical.center,
+        decoration: InputDecoration(
+          isDense: true,
+          prefixIcon: Icon(
+            Icons.search,
+            size: 20,
+            color: Colors.grey.shade600,
+          ),
+          prefixIconConstraints: const BoxConstraints(minWidth: 40),
+          hintText: 'Search speakers...',
+          hintStyle: GoogleFonts.roboto(
+            fontSize: 14,
+            fontWeight: FontWeight.w400,
+            color: Colors.grey.shade500,
+          ),
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 10),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Sort button — 150px, 38px, border #CBCBCB
+// ---------------------------------------------------------------------------
+class _SortButton extends StatelessWidget {
+  final bool isAZ;
+  final VoidCallback onTap;
+
+  const _SortButton({required this.isAZ, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(5),
+      child: Container(
+        width: 150,
+        height: 38,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.3),
+          borderRadius: BorderRadius.circular(5),
+          border: Border.all(color: const Color(0xFFCBCBCB)),
+        ),
+        child: Row(
+          children: [
+            Text(
+              isAZ ? 'Sort by: A - Z' : 'Sort by: Z - A',
+              style: GoogleFonts.roboto(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: const Color(0xFF757A8A),
+              ),
+            ),
+            const Spacer(),
+            Icon(
+              Icons.chevron_right,
+              size: 16,
+              color: const Color(0xFF757A8A),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Speaker Card — 184x246 proportions, matches Figma
+// ---------------------------------------------------------------------------
+class _SpeakerCard extends StatelessWidget {
+  final String name;
+  final String company;
+  final String position;
+  final String country;
+  final String photoUrl;
+  final String flagUrl;
+  final VoidCallback onViewProfile;
+
+  const _SpeakerCard({
+    required this.name,
+    required this.company,
+    required this.position,
+    required this.country,
+    required this.photoUrl,
+    required this.flagUrl,
+    required this.onViewProfile,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.25),
+            blurRadius: 5,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Photo — top ~50%
+          Expanded(
+            flex: 50,
+            child: ClipRRect(
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(5)),
+              child: SizedBox(
+                width: double.infinity,
+                child: photoUrl.isNotEmpty
+                    ? Image.network(
+                        photoUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => _photoPlaceholder(),
+                      )
+                    : _photoPlaceholder(),
+              ),
+            ),
+          ),
+
+          // Info section — bottom ~50%
+          Expanded(
+            flex: 50,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Name — Roboto Medium 16px
+                  Text(
+                    name.isNotEmpty ? name : 'Unknown',
+                    style: GoogleFonts.roboto(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.black,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+
+                  // Company/Position — Roboto Regular 10px
+                  Text(
+                    position.isNotEmpty && company.isNotEmpty
+                        ? '$position, $company'
+                        : position.isNotEmpty
+                            ? position
+                            : company,
+                    style: GoogleFonts.roboto(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w400,
+                      color: Colors.black,
+                      height: 1.4,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+
+                  // Role + Country — Roboto Regular 14px with flag
+                  Row(
+                    children: [
+                      if (flagUrl.isNotEmpty) ...[
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(1),
+                          child: Image.network(
+                            flagUrl,
+                            width: 20,
+                            height: 14,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) =>
+                                const SizedBox.shrink(),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                      ],
+                      Expanded(
+                        child: Text(
+                          country.isNotEmpty ? country : '',
+                          style: GoogleFonts.roboto(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w400,
+                            color: Colors.black,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      child: _isLoading
-                          ? const Center(
-                              child: CircularProgressIndicator(
-                                color: Color(0xFF3C4494),
-                              ),
-                            )
-                          : _filteredSpeakers.isEmpty
-                          ? Center(
-                              child: Text(
-                                _searchQuery.isNotEmpty
-                                    ? 'No speakers found for "$_searchQuery"'
-                                    : 'No speakers available',
-                                style: GoogleFonts.roboto(
-                                  fontSize: 16,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                            )
-                          : _buildSpeakersGrid(isMobile),
+                    ],
+                  ),
+
+                  const Spacer(),
+
+                  // View Profile button — border #3C4494, 5px radius
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: onViewProfile,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppTheme.primaryColor,
+                        side: const BorderSide(color: AppTheme.primaryColor),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: Text(
+                        'View Profile',
+                        style: GoogleFonts.roboto(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: AppTheme.primaryColor,
+                        ),
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
-
-            // Profile Dropdown
-            if (_isProfileOpen)
-              Positioned(
-                top: isMobile ? 55 : 70,
-                right: horizontalPadding,
-                child: ProfileDropdown(
-                  onClose: _closeProfile,
-                  onLogout: () {
-                    if (context.canPop()) {
-                      context.pop();
-                    } else {
-                      context.go('/');
-                    }
-                  },
-                ),
-              ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildSearchBar(bool isMobile) {
+  static Widget _photoPlaceholder() {
     return Container(
-      height: isMobile ? 46 : 56,
-      decoration: BoxDecoration(
-        color: const Color(0xFFF1F1F6).withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      alignment: Alignment.center,
-      child: TextField(
-        controller: _searchController,
-        onChanged: _filterSpeakers,
-        cursorColor: const Color(0xFFF1F1F6),
-        style: GoogleFonts.roboto(
-          fontSize: isMobile ? 16 : 18,
-          color: const Color(0xFFF1F1F6),
-          fontWeight: FontWeight.w500,
-        ),
-        textAlignVertical: TextAlignVertical.center,
-        decoration: InputDecoration(
-          isDense: true,
-          filled: false,
-          prefixIcon: Icon(
-            Icons.search,
-            color: const Color(0xFFF1F1F6),
-            size: isMobile ? 24 : 28,
-          ),
-          hintText: 'Search speakers...',
-          hintStyle: GoogleFonts.roboto(
-            fontWeight: FontWeight.w500,
-            fontSize: isMobile ? 16 : 18,
-            color: const Color(0xFFF1F1F6),
-          ),
-          border: InputBorder.none,
-          focusedBorder: InputBorder.none,
-          enabledBorder: InputBorder.none,
-          disabledBorder: InputBorder.none,
-          contentPadding: EdgeInsets.zero,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSpeakersGrid(bool isMobile) {
-    // Calculate columns based on screen width
-    final screenWidth = MediaQuery.of(context).size.width;
-    int crossAxisCount = 2; // Default mobile
-    if (screenWidth >= 1200) {
-      crossAxisCount = 5;
-    } else if (screenWidth >= 900) {
-      crossAxisCount = 4;
-    } else if (screenWidth >= 600) {
-      crossAxisCount = 3;
-    }
-
-    return Padding(
-      padding: EdgeInsets.all(isMobile ? 16 : 30),
-      child: GridView.builder(
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: crossAxisCount,
-          childAspectRatio: 0.72,
-          crossAxisSpacing: isMobile ? 12 : 20,
-          mainAxisSpacing: isMobile ? 12 : 20,
-        ),
-        itemCount: _filteredSpeakers.length,
-        itemBuilder: (context, index) {
-          final speaker = _filteredSpeakers[index];
-          return _buildSpeakerCard(speaker, isMobile);
-        },
-      ),
-    );
-  }
-
-  Widget _buildSpeakerCard(Map<String, dynamic> speaker, bool isMobile) {
-    final name = '${speaker['name'] ?? ''} ${speaker['surname'] ?? ''}'.trim();
-    final position = speaker['position'] ?? '';
-    final photoUrl = _buildImageUrl(speaker['photo']);
-
-    return GestureDetector(
-      onTap: () {
-        // Navigate to speaker detail
-        context.push(
-          '/events/${widget.eventId}/speakers/${speaker['id']}',
-          extra: speaker,
-        );
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            // Photo - takes ~75% of card
-            Expanded(
-              flex: 75,
-              child: Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(8),
-                  ),
-                ),
-                child: photoUrl.isNotEmpty
-                    ? ClipRRect(
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(8),
-                        ),
-                        child: Image.network(
-                          photoUrl,
-                          fit: BoxFit.cover,
-                          width: double.infinity,
-                          errorBuilder: (_, __, ___) => const Center(
-                            child: Icon(
-                              Icons.person,
-                              size: 50,
-                              color: Colors.grey,
-                            ),
-                          ),
-                        ),
-                      )
-                    : const Center(
-                        child: Icon(Icons.person, size: 50, color: Colors.grey),
-                      ),
-              ),
-            ),
-
-            // Info section - takes ~25% of card
-            Expanded(
-              flex: 25,
-              child: Container(
-                width: double.infinity,
-                padding: EdgeInsets.symmetric(
-                  horizontal: isMobile ? 6 : 10,
-                  vertical: isMobile ? 4 : 8,
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Flexible(
-                      child: Text(
-                        name.isNotEmpty ? name : 'Unknown Speaker',
-                        textAlign: TextAlign.center,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.roboto(
-                          fontSize: isMobile ? 14 : 16,
-                          fontWeight: FontWeight.w600,
-                          color: const Color(0xFF151938),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Flexible(
-                      child: Text(
-                        position,
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.roboto(
-                          fontSize: isMobile ? 10 : 12,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.black54,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
+      color: Colors.grey.shade200,
+      child: Center(
+        child: Icon(Icons.person, size: 40, color: Colors.grey.shade400),
       ),
     );
   }

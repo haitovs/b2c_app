@@ -42,7 +42,7 @@ class _PostLoginDispatcherPageState
       final lastEventId = ref.read(eventContextProvider).eventId;
       if (lastEventId != null) {
         if (!mounted) return;
-        context.go('/events/$lastEventId/menu');
+        context.go('/events/$lastEventId/services');
         return;
       }
 
@@ -65,7 +65,7 @@ class _PostLoginDispatcherPageState
 
       if (active.length == 1) {
         final eventId = active.first['event_id'];
-        context.go('/events/$eventId/menu');
+        context.go('/events/$eventId/services');
         return;
       }
 
@@ -89,7 +89,7 @@ class _PostLoginDispatcherPageState
       }
 
       if (eventDetails.length == 1) {
-        context.go('/events/${eventDetails.first['id']}/menu');
+        context.go('/events/${eventDetails.first['id']}/services');
         return;
       }
 
@@ -100,7 +100,7 @@ class _PostLoginDispatcherPageState
           events: eventDetails,
           onEventSelected: (eventId) {
             Navigator.of(context).pop();
-            context.go('/events/$eventId/menu');
+            context.go('/events/$eventId/services');
           },
           onViewAll: () {
             Navigator.of(context).pop();

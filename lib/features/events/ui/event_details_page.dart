@@ -54,6 +54,12 @@ class _EventDetailsPageState extends ConsumerState<EventDetailsPage> {
       if (!mounted) return;
 
       if (data != null) {
+        // Store last-viewed event so post-login redirect can find it
+        ref.read(eventContextProvider.notifier).setEventContext(
+          eventId: eventId,
+          tourismSiteId: data['tourism_site_id'] as int?,
+        );
+
         setState(() {
           _event = {
             'id': data['id'],

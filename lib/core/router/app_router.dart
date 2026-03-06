@@ -18,7 +18,6 @@ import '../../features/company/ui/company_profile_page.dart';
 import '../../features/events/ui/agenda_page.dart';
 import '../../features/events/ui/event_calendar_page.dart';
 import '../../features/events/ui/event_details_page.dart';
-import '../../features/events/ui/event_menu_page.dart';
 import '../../features/events/ui/participant_detail_page.dart';
 import '../../features/events/ui/participant_list_page.dart';
 import '../../features/events/ui/speaker_detail_page.dart';
@@ -119,7 +118,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         // 2. Persisted last-visited event
         final eventId = ref.read(eventContextProvider).eventId;
         if (eventId != null) {
-          return '/events/$eventId/menu';
+          return '/events/$eventId/services';
         }
         // 3. Fall back to async dispatcher (checks registrations)
         return '/post-login';
@@ -201,9 +200,9 @@ final routerProvider = Provider<GoRouter>((ref) {
         routes: [
           GoRoute(
             path: 'menu',
-            builder: (context, state) {
-              final idStr = state.pathParameters['id']!;
-              return EventMenuPage(eventId: int.tryParse(idStr) ?? 0);
+            redirect: (context, state) {
+              final id = state.pathParameters['id'] ?? '0';
+              return '/events/$id/services';
             },
           ),
           // --- NEW: Company Profile ---
