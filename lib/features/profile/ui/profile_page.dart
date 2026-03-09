@@ -14,7 +14,6 @@ import 'package:image_picker/image_picker.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/widgets/app_snackbar.dart';
 import '../../../core/widgets/phone_input_field.dart';
-import '../../../shared/widgets/legal_bottom_sheet.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../models/social_network.dart';
 
@@ -62,38 +61,23 @@ const List<String> _nationalities = [
 ];
 
 class ProfilePage extends ConsumerStatefulWidget {
-  final int initialTab;
   final String? returnTo;
-  final bool highlightConfirmButton;
 
   const ProfilePage({
     super.key,
-    this.initialTab = 1,
     this.returnTo,
-    this.highlightConfirmButton = false,
   });
 
   @override
   ConsumerState<ProfilePage> createState() => _ProfilePageState();
 }
 
-class _ProfilePageState extends ConsumerState<ProfilePage>
-    with SingleTickerProviderStateMixin {
-  late int _currentTab;
+class _ProfilePageState extends ConsumerState<ProfilePage> {
   bool _isEditing = false;
-  bool _agreedToTerms = false;
   XFile? _selectedImage;
-  Uint8List? _selectedImageBytes; // Store image bytes for upload
-  String? _profilePhotoUrl; // Profile photo URL from user data
-  String _mobileE164 = ''; // Store mobile in E.164 format (e.g., +99361444555)
-
-  // Button highlight animation
-  late AnimationController _highlightController;
-  late Animation<double> _highlightAnimation;
-  bool _showHighlight = false;
-
-  // Scroll controller for auto-scroll to button
-  final ScrollController _scrollController = ScrollController();
+  Uint8List? _selectedImageBytes;
+  String? _profilePhotoUrl;
+  String _mobileE164 = '';
 
   // Controllers
   late TextEditingController _nameController;
@@ -115,51 +99,6 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
   @override
   void initState() {
     super.initState();
-    _currentTab = widget.initialTab.clamp(0, 2); // Ensure valid tab index
-
-    // Setup highlight animation
-    _highlightController = AnimationController(
-      duration: const Duration(milliseconds: 1500),
-      vsync: this,
-    );
-    _highlightAnimation = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _highlightController, curve: Curves.easeInOut),
-    );
-
-    // Start highlight animation if coming from agreement dialog
-    if (widget.highlightConfirmButton && widget.initialTab == 0) {
-      _showHighlight = true;
-      // Start animation after widget is built
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        int cycles = 0;
-        void listener(AnimationStatus status) {
-          if (status == AnimationStatus.completed ||
-              status == AnimationStatus.dismissed) {
-            cycles++;
-            if (cycles >= 4) {
-              // 2 full cycles (forward+reverse each)
-              _highlightController.removeStatusListener(listener);
-              _highlightController.stop();
-              if (mounted) setState(() => _showHighlight = false);
-            }
-          }
-        }
-
-        _highlightController.addStatusListener(listener);
-        _highlightController.repeat(reverse: true);
-
-        // Auto-scroll to checkbox area
-        Future.delayed(const Duration(milliseconds: 300), () {
-          if (mounted && _scrollController.hasClients) {
-            _scrollController.animateTo(
-              _scrollController.position.maxScrollExtent,
-              duration: const Duration(milliseconds: 600),
-              curve: Curves.easeOut,
-            );
-          }
-        });
-      });
-    }
 
     _nameController = TextEditingController();
     _surnameController = TextEditingController();
@@ -173,8 +112,6 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
 
   @override
   void dispose() {
-    _highlightController.dispose();
-    _scrollController.dispose();
     _nameController.dispose();
     _surnameController.dispose();
     _emailController.dispose();
@@ -213,11 +150,6 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
       _companyNameController.text = user['company_name'] ?? '';
       _websiteController.text = user['website'] ?? '';
       _positionController.text = user['position'] ?? '';
-
-      // Set agreement checkbox from user's saved status
-      if (user['has_agreed_terms'] == true) {
-        _agreedToTerms = true;
-      }
 
       // Load social links
       if (user['social_links'] != null) {
@@ -457,24 +389,6 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
     );
   }
 
-  /// Builds a ripple ring that expands and fades out
-  Widget _buildRippleRing(double progress, Color color, double maxSize) {
-    final size = 24.0 + (maxSize - 24.0) * progress;
-    final opacity = (1.0 - progress).clamp(0.0, 1.0);
-
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        border: Border.all(
-          color: color.withValues(alpha: opacity * 0.6),
-          width: 2,
-        ),
-        borderRadius: BorderRadius.circular(size / 4),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -487,8 +401,6 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
             children: [
               // Header
               _buildHeader(isMobile),
-              // Tabs
-              _buildTabBar(isMobile),
               // Content
               Expanded(
                 child: Container(
@@ -501,9 +413,10 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
                     ),
                   ),
                   child: SingleChildScrollView(
-                    controller: _scrollController,
                     padding: EdgeInsets.all(isMobile ? 20 : 50),
-                    child: _buildCurrentTabContent(isMobile),
+                    child: isMobile
+                        ? _buildMobileLayout()
+                        : _buildDesktopLayout(),
                   ),
                 ),
               ),
@@ -544,31 +457,12 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
             const SizedBox(width: 12),
             // Title
             Text(
-              "My profile",
+              "Profile",
               style: GoogleFonts.montserrat(
                 color: Colors.white,
                 fontSize: isMobile ? 22 : 32,
                 fontWeight: FontWeight.w600,
               ),
-            ),
-            const Spacer(),
-            // Icons
-            IconButton(
-              icon: Icon(
-                Icons.notifications_outlined,
-                color: Colors.white,
-                size: isMobile ? 22 : 24,
-              ),
-              onPressed: () {},
-            ),
-            const SizedBox(width: 6),
-            IconButton(
-              icon: Icon(
-                Icons.person_outline,
-                color: Colors.white,
-                size: isMobile ? 22 : 24,
-              ),
-              onPressed: () {},
             ),
           ],
         ),
@@ -576,378 +470,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
     );
   }
 
-  Widget _buildTabBar(bool isMobile) {
-    final tabs = ["Agreement process", "My profile"];
-
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: isMobile ? 10 : 50),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: List.generate(tabs.length, (index) {
-            final isActive = _currentTab == index;
-            return Padding(
-              padding: EdgeInsets.only(right: isMobile ? 15 : 40),
-              child: GestureDetector(
-                onTap: () => setState(() => _currentTab = index),
-                child: Column(
-                  children: [
-                    Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: isMobile ? 12 : 20,
-                        vertical: isMobile ? 8 : 12,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isActive
-                            ? const Color(0xFFF1F1F6)
-                            : Colors.transparent,
-                        borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(10),
-                          topRight: Radius.circular(10),
-                        ),
-                      ),
-                      child: Text(
-                        tabs[index],
-                        style: GoogleFonts.montserrat(
-                          fontSize: isMobile ? 14 : 25,
-                          fontWeight: FontWeight.w600,
-                          color: isActive
-                              ? const Color(0xFF3C4494)
-                              : const Color.fromRGBO(255, 255, 255, 0.7),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCurrentTabContent(bool isMobile) {
-    switch (_currentTab) {
-      case 0:
-        return _buildAgreementProcess();
-      case 1:
-        return isMobile ? _buildMobileLayout() : _buildDesktopLayout();
-      default:
-        return const SizedBox();
-    }
-  }
-
-  // ============== Agreement Process Tab ==============
-
-  Widget _buildAgreementProcess() {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isMobileAgreement = screenWidth < 600;
-    return Container(
-      constraints: const BoxConstraints(maxWidth: 1240),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      padding: EdgeInsets.all(isMobileAgreement ? 20 : 40),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Title
-          Text(
-            "Participation Agreement Process",
-            style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 20),
-          ),
-          const SizedBox(height: 20),
-          // Description
-          Text(
-            'You are at the final stage of registration. Please carefully review the terms and conditions for participating in the "Future of Tech 2026" Forum and confirm your agreement to gain full access.',
-            style: GoogleFonts.roboto(
-              fontSize: 18,
-              height: 1.39,
-              color: const Color.fromRGBO(21, 25, 56, 0.85),
-            ),
-          ),
-          const SizedBox(height: 50),
-
-          // Step 1: Document Review
-          Text(
-            "Step 1: Document Review",
-            style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 20),
-          ),
-          const SizedBox(height: 20),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final isMobile = constraints.maxWidth < 600;
-              if (isMobile) {
-                // Stack vertically on mobile
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "To proceed, please read the following documents:",
-                      style: GoogleFonts.roboto(
-                        fontSize: 16,
-                        color: const Color.fromRGBO(21, 25, 56, 0.85),
-                      ),
-                    ),
-                    const SizedBox(height: 15),
-                    _buildDocumentLink("Terms and Conditions", "TERMS"),
-                    const SizedBox(height: 10),
-                    _buildDocumentLink("Privacy Policy", "PRIVACY"),
-                    const SizedBox(height: 10),
-                    _buildDocumentLink("Refund Policy", "REFUND"),
-                  ],
-                );
-              } else {
-                // Side by side on desktop
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      flex: 2,
-                      child: Text(
-                        "To proceed, please read the following documents:",
-                        style: GoogleFonts.roboto(
-                          fontSize: 18,
-                          color: const Color.fromRGBO(21, 25, 56, 0.85),
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      flex: 3,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildDocumentLink(
-                            "Terms and Conditions (ToS)",
-                            "TERMS",
-                          ),
-                          const SizedBox(height: 15),
-                          _buildDocumentLink("Privacy Policy", "PRIVACY"),
-                          const SizedBox(height: 15),
-                          _buildDocumentLink("Refund Policy", "REFUND"),
-                        ],
-                      ),
-                    ),
-                  ],
-                );
-              }
-            },
-          ),
-          const SizedBox(height: 50),
-
-          // Divider
-          const Divider(color: Color(0xFFD2D2D2), thickness: 1),
-          const SizedBox(height: 40),
-
-          // Step 2: Final Agreement
-          Text(
-            "Step 2: Final Agreement",
-            style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 20),
-          ),
-          const SizedBox(height: 20),
-          // Checkbox row
-          Row(
-            children: [
-              // Animated checkbox with ripple ring effect - fixed size to prevent layout shift
-              SizedBox(
-                width: 40,
-                height: 40,
-                child: AnimatedBuilder(
-                  animation: _highlightAnimation,
-                  builder: (context, _) {
-                    // Elastic bounce effect
-                    final bounce = _showHighlight
-                        ? 1.0 +
-                              0.1 *
-                                  Curves.elasticOut.transform(
-                                    (_highlightAnimation.value * 2).clamp(
-                                      0.0,
-                                      1.0,
-                                    ),
-                                  )
-                        : 1.0;
-
-                    return Stack(
-                      alignment: Alignment.center,
-                      clipBehavior: Clip.none,
-                      children: [
-                        // Ripple rings (expanding circles that fade)
-                        if (_showHighlight) ...[
-                          // First ring
-                          _buildRippleRing(
-                            _highlightAnimation.value,
-                            const Color(0xFF3C4494),
-                            32,
-                          ),
-                          // Second ring (delayed)
-                          _buildRippleRing(
-                            (_highlightAnimation.value - 0.3).clamp(0.0, 1.0),
-                            const Color(0xFF3C4494),
-                            32,
-                          ),
-                        ],
-                        // The checkbox
-                        Transform.scale(
-                          scale: bounce,
-                          child: GestureDetector(
-                            onTap: () {
-                              // Only allow toggling if user hasn't already confirmed
-                              final hasConfirmed = ref
-                                  .read(authNotifierProvider)
-                                  .hasAgreedTerms;
-                              if (!hasConfirmed) {
-                                setState(
-                                  () => _agreedToTerms = !_agreedToTerms,
-                                );
-                              }
-                            },
-                            child: Container(
-                              width: 24,
-                              height: 24,
-                              decoration: BoxDecoration(
-                                border: Border.all(
-                                  color: _showHighlight || _agreedToTerms
-                                      ? const Color(0xFF3C4494)
-                                      : const Color(0xFFB7B7B7),
-                                  width: 2,
-                                ),
-                                borderRadius: BorderRadius.circular(6),
-                                color: _agreedToTerms
-                                    ? const Color(0xFF3C4494)
-                                    : Colors.white,
-                                boxShadow: _showHighlight
-                                    ? [
-                                        BoxShadow(
-                                          color: const Color(
-                                            0xFF3C4494,
-                                          ).withValues(alpha: 0.3),
-                                          blurRadius: 8,
-                                          spreadRadius: 1,
-                                        ),
-                                      ]
-                                    : null,
-                              ),
-                              child: _agreedToTerms
-                                  ? const Icon(
-                                      Icons.check,
-                                      size: 18,
-                                      color: Colors.white,
-                                    )
-                                  : null,
-                            ),
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(width: 15),
-              Flexible(
-                child: Text(
-                  "I have read and agree to the Terms and Conditions and the Privacy Policy.",
-                  style: GoogleFonts.roboto(
-                    fontSize: 18,
-                    color: const Color.fromRGBO(21, 25, 56, 0.85),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 80),
-
-          // Confirm Button
-          SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton(
-              // Only enable if checkbox is checked AND user hasn't already confirmed
-              onPressed:
-                  (_agreedToTerms &&
-                      !ref.read(authNotifierProvider).hasAgreedTerms)
-                  ? () async {
-                      // Save agreement to API
-                      final error = await ref
-                          .read(authNotifierProvider.notifier)
-                          .updateProfile({'has_agreed_terms': true});
-                      if (!mounted) return;
-                      if (error != null) {
-                        AppSnackBar.showError(context, error);
-                        return;
-                      }
-
-                      // Show success message
-                      AppSnackBar.showSuccess(context, 'Agreement confirmed! You now have full access.');
-
-                      // Redirect to returnTo URL if available, otherwise switch to My Profile tab
-                      if (widget.returnTo != null &&
-                          widget.returnTo!.isNotEmpty) {
-                        context.go(widget.returnTo!);
-                      } else {
-                        // Stay on profile page but switch to My Profile tab
-                        setState(() => _currentTab = 1);
-                      }
-                    }
-                  : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF3C4494),
-                disabledBackgroundColor: const Color(0xFFD9D9D9),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-              ),
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  "Confirm and Complete Registration",
-                  style: GoogleFonts.roboto(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: const Color(0xFFF1F1F6),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDocumentLink(String title, String docType) {
-    return GestureDetector(
-      onTap: () => LegalBottomSheet.show(context, docType),
-      child: Wrap(
-        children: [
-          Text(
-            title,
-            style: GoogleFonts.inter(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              decoration: TextDecoration.underline,
-              color: const Color(0xFF3C4494),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            "(View)",
-            style: GoogleFonts.roboto(
-              fontSize: 16,
-              color: const Color.fromRGBO(21, 25, 56, 0.85),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ============== Company Profile Tab ==============
+  // ============== Profile Content Layouts ==============
 
   Widget _buildDesktopLayout() {
     return Row(

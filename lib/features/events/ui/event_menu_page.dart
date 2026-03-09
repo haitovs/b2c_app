@@ -166,7 +166,7 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
                         onPressed: () {
                           Navigator.pop(ctx);
                           context.go(
-                            '/profile?tab=0&returnTo=/events/${widget.eventId}/menu',
+                            '/profile?returnTo=/events/${widget.eventId}/menu',
                           );
                         },
                         child: const Text('Go to Profile'),

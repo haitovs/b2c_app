@@ -2,16 +2,40 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/config/app_config.dart';
-import '../../../core/providers/event_context_provider.dart';
-import '../../../core/widgets/custom_app_bar.dart';
-import '../../notifications/ui/notification_drawer.dart';
-import 'widgets/profile_dropdown.dart';
+import '../../../core/theme/app_theme.dart';
 
+/// Social platform icons — consistent with company preview page.
+const _socialIcons = <String, IconData>{
+  'facebook': Icons.facebook,
+  'instagram': Icons.photo_camera,
+  'linkedin': Icons.groups,
+  'twitter': Icons.tag,
+  'twitter / x': Icons.tag,
+  'youtube': Icons.smart_display,
+  'tiktok': Icons.music_video,
+  'telegram': Icons.telegram,
+  'whatsapp': Icons.chat_bubble,
+  'wechat': Icons.forum,
+  'website': Icons.language,
+};
+
+/// Company preview page for a participant — matches the CompanyPreviewPage
+/// design. Rendered inside EventShellLayout (no Scaffold needed).
+///
+/// Layout:
+/// - Company name + brand logo
+/// - Divider
+/// - About / bio text (first half)
+/// - Gallery
+/// - About / bio text (second half)
+/// - Social media icons
+/// - Contacts (phone)
+/// - Email
 class ParticipantDetailPage extends ConsumerStatefulWidget {
   final String eventId;
   final String participantId;
@@ -29,10 +53,8 @@ class ParticipantDetailPage extends ConsumerStatefulWidget {
       _ParticipantDetailPageState();
 }
 
-class _ParticipantDetailPageState extends ConsumerState<ParticipantDetailPage> {
-  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  bool _isProfileOpen = false;
-
+class _ParticipantDetailPageState
+    extends ConsumerState<ParticipantDetailPage> {
   Map<String, dynamic>? _participant;
   bool _isLoading = true;
 
@@ -49,16 +71,10 @@ class _ParticipantDetailPageState extends ConsumerState<ParticipantDetailPage> {
 
   Future<void> _fetchParticipant() async {
     try {
-      final siteId = ref.read(eventContextProvider).siteId;
-      final uri = siteId != null
-          ? Uri.parse(
-              '${AppConfig.tourismApiBaseUrl}/participants/${widget.participantId}?site_id=$siteId',
-            )
-          : Uri.parse(
-              '${AppConfig.tourismApiBaseUrl}/participants/${widget.participantId}',
-            );
+      final uri =
+          '${AppConfig.b2cApiBaseUrl}/api/v1/companies/public/${widget.participantId}';
 
-      final response = await http.get(uri);
+      final response = await http.get(Uri.parse(uri));
       if (!mounted) return;
       if (response.statusCode == 200) {
         setState(() {
@@ -76,630 +92,416 @@ class _ParticipantDetailPageState extends ConsumerState<ParticipantDetailPage> {
     }
   }
 
-  void _toggleProfile() {
-    setState(() => _isProfileOpen = !_isProfileOpen);
-  }
-
-  void _closeProfile() {
-    if (_isProfileOpen) setState(() => _isProfileOpen = false);
-  }
-
-  String _buildImageUrl(String? path) {
+  String _imageUrl(String? path) {
     if (path == null || path.isEmpty) return '';
     if (path.startsWith('http')) return path;
-    return '${AppConfig.tourismApiBaseUrl}$path';
+    return '${AppConfig.b2cApiBaseUrl}$path';
   }
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 600;
-    final horizontalPadding = isMobile ? 16.0 : 50.0;
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: AppTheme.primaryColor),
+      );
+    }
 
-    return Scaffold(
-      key: _scaffoldKey,
-      backgroundColor: const Color(0xFF3C4494),
-      endDrawer: const NotificationDrawer(),
-      body: GestureDetector(
-        onTap: _closeProfile,
-        behavior: HitTestBehavior.translucent,
-        child: Stack(
+    if (_participant == null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            SafeArea(
-              child: Column(
-                children: [
-                  // Header
-                  Padding(
-                    padding: EdgeInsets.only(
-                      left: horizontalPadding,
-                      right: horizontalPadding,
-                      top: isMobile ? 12 : 20,
-                    ),
-                    child: _buildHeader(isMobile),
-                  ),
-
-                  // Content Container
-                  Expanded(
-                    child: Container(
-                      margin: EdgeInsets.symmetric(
-                        horizontal: horizontalPadding,
-                      ),
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.vertical(
-                          top: Radius.circular(10),
-                        ),
-                      ),
-                      child: _isLoading
-                          ? const Center(
-                              child: CircularProgressIndicator(
-                                color: Color(0xFF3C4494),
-                              ),
-                            )
-                          : _participant == null
-                          ? Center(
-                              child: Text(
-                                'Participant not found',
-                                style: GoogleFonts.roboto(
-                                  fontSize: 16,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                            )
-                          : _buildContent(isMobile),
-                    ),
-                  ),
-                ],
-              ),
+            Icon(Icons.error_outline, size: 48, color: Colors.grey.shade400),
+            const SizedBox(height: 12),
+            Text(
+              'Participant not found',
+              style: GoogleFonts.inter(color: Colors.grey.shade600),
             ),
+          ],
+        ),
+      );
+    }
 
-            // Profile Dropdown
-            if (_isProfileOpen)
-              Positioned(
-                top: isMobile ? 55 : 70,
-                right: horizontalPadding,
-                child: ProfileDropdown(
-                  onClose: _closeProfile,
-                  onLogout: () {
-                    if (context.canPop()) {
-                      context.pop();
-                    } else {
-                      context.go('/');
-                    }
-                  },
+    return _ParticipantPreview(
+      participant: _participant!,
+      imageUrl: _imageUrl,
+    );
+  }
+}
+
+// =============================================================================
+// Preview Content — matches CompanyPreviewPage layout
+// =============================================================================
+
+class _ParticipantPreview extends StatelessWidget {
+  final Map<String, dynamic> participant;
+  final String Function(String?) imageUrl;
+
+  const _ParticipantPreview({
+    required this.participant,
+    required this.imageUrl,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final name = (participant['name'] ?? '').toString();
+    final bio = (participant['bio'] ?? '').toString();
+    final logoUrl = imageUrl(participant['logo']);
+
+    // Gather gallery images
+    final List<String> gallery = [];
+    final imagesData = participant['images'];
+    if (imagesData is List) {
+      for (var img in imagesData) {
+        if (img is Map) {
+          final path = imageUrl(img['path']?.toString());
+          if (path.isNotEmpty) gallery.add(path);
+        }
+      }
+    }
+
+    // Gather social links
+    final socialLinks = participant['social_links'];
+    final List<MapEntry<String, String>> activeSocials = [];
+    if (socialLinks is Map) {
+      for (final entry in socialLinks.entries) {
+        final value = entry.value?.toString() ?? '';
+        if (value.isNotEmpty) {
+          activeSocials.add(MapEntry(entry.key.toString(), value));
+        }
+      }
+    } else if (socialLinks is List) {
+      for (var link in socialLinks) {
+        if (link is Map) {
+          final key = link['platform']?.toString() ?? '';
+          final val = link['url']?.toString() ?? '';
+          if (key.isNotEmpty && val.isNotEmpty) {
+            activeSocials.add(MapEntry(key, val));
+          }
+        }
+      }
+    }
+
+    final phone = (participant['phone'] ?? participant['mobile'] ?? '').toString();
+    final email = (participant['email'] ?? '').toString();
+
+    // Split bio around gallery
+    final bioMidpoint =
+        bio.length > 200 ? _findSplitPoint(bio) : bio.length;
+    final bioFirst = bio.substring(0, bioMidpoint).trim();
+    final bioSecond =
+        bioMidpoint < bio.length ? bio.substring(bioMidpoint).trim() : '';
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header: name + logo
+            _buildHeader(name, logoUrl),
+            const SizedBox(height: 16),
+            Divider(color: Colors.grey.shade300, height: 1),
+            const SizedBox(height: 20),
+
+            // About text — first part
+            if (bioFirst.isNotEmpty) ...[
+              Text(
+                bioFirst,
+                style: GoogleFonts.inter(
+                  fontSize: 16,
+                  height: 1.6,
+                  color: const Color(0xFF1E1E1E),
                 ),
               ),
+              const SizedBox(height: 24),
+            ],
+
+            // Gallery
+            if (gallery.isNotEmpty) ...[
+              _GalleryLayout(urls: gallery),
+              const SizedBox(height: 24),
+            ],
+
+            // About text — second part
+            if (bioSecond.isNotEmpty) ...[
+              Text(
+                bioSecond,
+                style: GoogleFonts.inter(
+                  fontSize: 16,
+                  height: 1.6,
+                  color: const Color(0xFF1E1E1E),
+                ),
+              ),
+              const SizedBox(height: 32),
+            ],
+
+            // Social Media
+            if (activeSocials.isNotEmpty) ...[
+              _buildSocialSection(activeSocials),
+              const SizedBox(height: 20),
+            ],
+
+            // Contacts (phone)
+            if (phone.isNotEmpty) ...[
+              _buildContactRow('Contacts', phone, 'tel:$phone'),
+              const SizedBox(height: 16),
+            ],
+
+            // Email
+            if (email.isNotEmpty) ...[
+              _buildContactRow('Email', email, 'mailto:$email'),
+              const SizedBox(height: 24),
+            ],
           ],
         ),
       ),
     );
   }
 
-  Widget _buildHeader(bool isMobile) {
-    return Row(
+  // ---------------------------------------------------------------------------
+  // Header — name left, logo right
+  // ---------------------------------------------------------------------------
+
+  Widget _buildHeader(String name, String logoUrl) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = constraints.maxWidth < 500;
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: Text(
+                name.isNotEmpty ? name : 'Unknown Company',
+                style: GoogleFonts.montserrat(
+                  fontSize: isMobile ? 20 : 30,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.primaryColor,
+                ),
+              ),
+            ),
+            if (logoUrl.isNotEmpty) ...[
+              const SizedBox(width: 12),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: Image.network(
+                  logoUrl,
+                  width: isMobile ? 100 : 190,
+                  height: isMobile ? 44 : 80,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                ),
+              ),
+            ],
+          ],
+        );
+      },
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Social Media
+  // ---------------------------------------------------------------------------
+
+  Widget _buildSocialSection(List<MapEntry<String, String>> socials) {
+    return Wrap(
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 12,
+      runSpacing: 8,
       children: [
-        // Back button
-        IconButton(
-          icon: Icon(
-            Icons.arrow_back,
-            color: Colors.white,
-            size: isMobile ? 24 : 28,
-          ),
-          onPressed: () => context.go('/events/${widget.eventId}/participants'),
-        ),
-        const SizedBox(width: 8),
-        // Title
         Text(
-          'Participant',
-          style: GoogleFonts.montserrat(
-            fontSize: isMobile ? 24 : 28,
-            fontWeight: FontWeight.w600,
-            color: Colors.white,
+          'Social Media',
+          style: GoogleFonts.roboto(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            color: Colors.black,
           ),
         ),
-        const Spacer(),
-        // Custom App Bar with notifications and profile
-        CustomAppBar(
-          onProfileTap: _toggleProfile,
-          onNotificationTap: () {
-            _closeProfile();
-            _scaffoldKey.currentState?.openEndDrawer();
-          },
-          isMobile: isMobile,
+        ...socials.map((entry) {
+          final key = entry.key.toLowerCase();
+          final url = entry.value;
+          final icon = _socialIcons[key] ?? Icons.link;
+
+          return InkWell(
+            onTap: () => _launchUrl(url),
+            borderRadius: BorderRadius.circular(17),
+            child: Container(
+              width: 34,
+              height: 34,
+              decoration: const BoxDecoration(
+                color: AppTheme.primaryColor,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, size: 20, color: Colors.white),
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Contacts / Email
+  // ---------------------------------------------------------------------------
+
+  Widget _buildContactRow(String label, String value, String uri) {
+    return Wrap(
+      spacing: 12,
+      runSpacing: 4,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.roboto(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            color: Colors.black,
+          ),
+        ),
+        InkWell(
+          onTap: () => _launchUrl(uri),
+          child: Text(
+            value,
+            style: GoogleFonts.roboto(
+              fontSize: 16,
+              fontWeight: FontWeight.w400,
+              color: Colors.black,
+            ),
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildContent(bool isMobile) {
-    final name = _participant!['name'] ?? '';
-    final bio = _participant!['bio'] ?? '';
-    final logoUrl = _buildImageUrl(_participant!['logo']);
+  // ---------------------------------------------------------------------------
+  // Helpers
+  // ---------------------------------------------------------------------------
 
-    // Get images list
-    List<Map<String, dynamic>> images = [];
-    final imagesData = _participant!['images'];
-    if (imagesData != null && imagesData is List) {
-      for (var img in imagesData) {
-        if (img is Map) {
-          images.add({'id': img['id'], 'path': _buildImageUrl(img['path'])});
-        }
-      }
+  int _findSplitPoint(String text) {
+    final mid = text.length ~/ 2;
+    final paragraphBreak = text.indexOf('\n', mid);
+    if (paragraphBreak != -1 && paragraphBreak < mid + 200) {
+      return paragraphBreak;
+    }
+    final sentenceEnd = text.indexOf('. ', mid);
+    if (sentenceEnd != -1 && sentenceEnd < mid + 200) {
+      return sentenceEnd + 2;
+    }
+    return mid;
+  }
+
+  Future<void> _launchUrl(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri != null && await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+}
+
+// =============================================================================
+// Gallery Layout — Figma style (matches company preview)
+// 1 tall image left, 2 small top-right, 1 wide bottom-right
+// =============================================================================
+
+class _GalleryLayout extends StatelessWidget {
+  final List<String> urls;
+  const _GalleryLayout({required this.urls});
+
+  @override
+  Widget build(BuildContext context) {
+    if (urls.length == 1) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: Image.network(
+          urls[0],
+          width: double.infinity,
+          height: 300,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _imagePlaceholder(300),
+        ),
+      );
     }
 
-    return SingleChildScrollView(
-      padding: EdgeInsets.all(isMobile ? 16 : 50),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Breadcrumb
-          Row(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final totalWidth = constraints.maxWidth;
+        final leftWidth = (totalWidth * 0.34).roundToDouble();
+        final rightWidth = totalWidth - leftWidth - 12;
+        final tallHeight = 571.0 * (totalWidth / 1011).clamp(0.4, 1.0);
+        final smallHeight = (tallHeight - 12) * 0.46;
+        final wideHeight = tallHeight - smallHeight - 12;
+
+        return SizedBox(
+          height: tallHeight,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              GestureDetector(
-                onTap: () =>
-                    context.go('/events/${widget.eventId}/participants'),
-                child: Text(
-                  'Participants',
-                  style: GoogleFonts.roboto(
-                    fontSize: isMobile ? 18 : 24,
-                    fontWeight: FontWeight.w500,
-                    color: const Color(0xFF6B6B6B),
-                  ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Icon(
-                  Icons.chevron_right,
-                  size: isMobile ? 18 : 20,
-                  color: const Color(0xFF6B6B6B),
-                ),
-              ),
-              Text(
-                'Details',
-                style: GoogleFonts.roboto(
-                  fontSize: isMobile ? 18 : 24,
-                  fontWeight: FontWeight.w500,
-                  color: const Color(0xFF6B6B6B),
+              // Left tall image
+              _galleryImage(urls[0], leftWidth, tallHeight),
+              const SizedBox(width: 12),
+              // Right side
+              Expanded(
+                child: Column(
+                  children: [
+                    // Top row: 2 small images
+                    Row(
+                      children: [
+                        if (urls.length > 1)
+                          _galleryImage(
+                            urls[1],
+                            (rightWidth - 12) / 2,
+                            smallHeight,
+                          ),
+                        if (urls.length > 1) const SizedBox(width: 12),
+                        if (urls.length > 2)
+                          _galleryImage(
+                            urls[2],
+                            (rightWidth - 12) / 2,
+                            smallHeight,
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    // Bottom wide image
+                    if (urls.length > 3)
+                      _galleryImage(urls[3], rightWidth, wideHeight),
+                  ],
                 ),
               ),
             ],
-          ),
-
-          SizedBox(height: isMobile ? 16 : 24),
-
-          // Name and Logo row
-          isMobile
-              ? Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Name - wraps to multiple lines
-                    Text(
-                      name.isNotEmpty ? name : 'Unknown Participant',
-                      style: GoogleFonts.poppins(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w400,
-                        color: const Color(0xFF1E1E1E),
-                        height: 1.4,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    // Logo with shadow
-                    if (logoUrl.isNotEmpty)
-                      Container(
-                        height: 100,
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(8),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.1),
-                              blurRadius: 8,
-                              spreadRadius: 1,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: Image.network(
-                          logoUrl,
-                          fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                        ),
-                      ),
-                  ],
-                )
-              : Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Name - takes up to half the screen, wraps
-                    Expanded(
-                      flex: 1,
-                      child: Text(
-                        name.isNotEmpty ? name : 'Unknown Participant',
-                        style: GoogleFonts.poppins(
-                          fontSize: 30,
-                          fontWeight: FontWeight.w400,
-                          color: const Color(0xFF1E1E1E),
-                          height: 1.4,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 40),
-                    // Logo with shadow - bigger size
-                    if (logoUrl.isNotEmpty)
-                      Container(
-                        width: 320,
-                        height: 140,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(10),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.1),
-                              blurRadius: 12,
-                              spreadRadius: 2,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Image.network(
-                          logoUrl,
-                          fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                        ),
-                      ),
-                  ],
-                ),
-
-          SizedBox(height: isMobile ? 16 : 24),
-
-          // Divider
-          Container(height: 2, color: const Color(0xFFB59C83)),
-
-          SizedBox(height: isMobile ? 16 : 24),
-
-          // Bio (first part)
-          if (bio.isNotEmpty)
-            Text(
-              bio,
-              style: GoogleFonts.lato(
-                fontSize: isMobile ? 16 : 25,
-                fontWeight: FontWeight.w500,
-                color: const Color(0xFF1E1E1E),
-                height: 1.6,
-              ),
-            ),
-
-          SizedBox(height: isMobile ? 24 : 40),
-
-          // Gallery
-          if (images.isNotEmpty) ...[
-            _buildGallery(images, isMobile),
-            SizedBox(height: isMobile ? 24 : 40),
-          ],
-
-          // Social Links and Contacts placeholders
-          _buildSocialAndContacts(isMobile),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildGallery(List<Map<String, dynamic>> images, bool isMobile) {
-    if (images.isEmpty) return const SizedBox.shrink();
-
-    final imageCount = images.length;
-
-    // For mobile, show images in a responsive grid
-    if (isMobile) {
-      return _buildDynamicMobileGallery(images);
-    }
-
-    // For desktop, create dynamic layouts based on image count
-    return SizedBox(
-      height: 450,
-      child: _buildDynamicDesktopGallery(images, imageCount),
-    );
-  }
-
-  Widget _buildDynamicMobileGallery(List<Map<String, dynamic>> images) {
-    // Show all images in a 2-column grid on mobile
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-        childAspectRatio: 1.0,
-      ),
-      itemCount: images.length,
-      itemBuilder: (context, index) {
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: Image.network(
-            images[index]['path'] ?? '',
-            fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => Container(
-              color: Colors.grey[300],
-              child: const Center(
-                child: Icon(Icons.image, size: 40, color: Colors.grey),
-              ),
-            ),
           ),
         );
       },
     );
   }
 
-  Widget _buildDynamicDesktopGallery(
-    List<Map<String, dynamic>> images,
-    int count,
-  ) {
-    // Dynamic layout based on number of images
-    if (count == 1) {
-      // Single image - full width
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(10),
+  Widget _galleryImage(String url, double width, double height) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: SizedBox(
+        width: width,
+        height: height,
         child: Image.network(
-          images[0]['path'] ?? '',
+          url,
           fit: BoxFit.cover,
-          width: double.infinity,
-          height: 450,
-          errorBuilder: (_, __, ___) => _buildImagePlaceholder(450),
+          errorBuilder: (_, __, ___) => _imagePlaceholder(height),
         ),
-      );
-    } else if (count == 2) {
-      // Two images side by side
-      return Row(
-        children: [
-          Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: Image.network(
-                images[0]['path'] ?? '',
-                fit: BoxFit.cover,
-                height: 450,
-                errorBuilder: (_, __, ___) => _buildImagePlaceholder(450),
-              ),
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: Image.network(
-                images[1]['path'] ?? '',
-                fit: BoxFit.cover,
-                height: 450,
-                errorBuilder: (_, __, ___) => _buildImagePlaceholder(450),
-              ),
-            ),
-          ),
-        ],
-      );
-    } else if (count == 3) {
-      // One large left, two stacked right
-      return Row(
-        children: [
-          Expanded(
-            flex: 1,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: Image.network(
-                images[0]['path'] ?? '',
-                fit: BoxFit.cover,
-                height: 450,
-                errorBuilder: (_, __, ___) => _buildImagePlaceholder(450),
-              ),
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            flex: 1,
-            child: Column(
-              children: [
-                Expanded(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: Image.network(
-                      images[1]['path'] ?? '',
-                      fit: BoxFit.cover,
-                      width: double.infinity,
-                      errorBuilder: (_, __, ___) =>
-                          _buildImagePlaceholder(null),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Expanded(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: Image.network(
-                      images[2]['path'] ?? '',
-                      fit: BoxFit.cover,
-                      width: double.infinity,
-                      errorBuilder: (_, __, ___) =>
-                          _buildImagePlaceholder(null),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      );
-    } else {
-      // 4+ images: large left, 2 top-right, 1 bottom-right (or grid for more)
-      return Row(
-        children: [
-          Expanded(
-            flex: 1,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: Image.network(
-                images[0]['path'] ?? '',
-                fit: BoxFit.cover,
-                height: 450,
-                errorBuilder: (_, __, ___) => _buildImagePlaceholder(450),
-              ),
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            flex: 2,
-            child: Column(
-              children: [
-                // Top row - 2 images
-                Expanded(
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: Image.network(
-                            images[1]['path'] ?? '',
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) =>
-                                _buildImagePlaceholder(null),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: Image.network(
-                            images[2]['path'] ?? '',
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) =>
-                                _buildImagePlaceholder(null),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                // Bottom row - remaining images or single large
-                Expanded(
-                  child: count == 4
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: Image.network(
-                            images[3]['path'] ?? '',
-                            fit: BoxFit.cover,
-                            width: double.infinity,
-                            errorBuilder: (_, __, ___) =>
-                                _buildImagePlaceholder(null),
-                          ),
-                        )
-                      : Row(
-                          children: images.skip(3).take(3).map((img) {
-                            return Expanded(
-                              child: Padding(
-                                padding: const EdgeInsets.only(right: 16),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(10),
-                                  child: Image.network(
-                                    img['path'] ?? '',
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) =>
-                                        _buildImagePlaceholder(null),
-                                  ),
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      );
-    }
-  }
-
-  Widget _buildImagePlaceholder(double? height) {
-    return Container(
-      height: height,
-      color: Colors.grey[300],
-      child: const Center(
-        child: Icon(Icons.image, size: 60, color: Colors.grey),
       ),
     );
   }
 
-  Widget _buildSocialAndContacts(bool isMobile) {
-    // Placeholder for social links and contacts
-    // These would typically come from the API if available
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Social links
-        Row(
-          children: [
-            Text(
-              'Follow me:',
-              style: GoogleFonts.roboto(
-                fontSize: isMobile ? 18 : 25,
-                fontWeight: FontWeight.w700,
-                color: Colors.black,
-              ),
-            ),
-            const SizedBox(width: 16),
-            _buildSocialIcon(Icons.facebook, () {}),
-            const SizedBox(width: 12),
-            _buildSocialIcon(Icons.camera_alt, () {}),
-            const SizedBox(width: 12),
-            _buildSocialIcon(Icons.business, () {}),
-          ],
-        ),
-
-        SizedBox(height: isMobile ? 16 : 24),
-
-        // Contacts placeholder
-        Row(
-          children: [
-            Text(
-              'Contacts:',
-              style: GoogleFonts.roboto(
-                fontSize: isMobile ? 18 : 25,
-                fontWeight: FontWeight.w700,
-                color: Colors.black,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Text(
-              '+993-xx-xx-xx-xx',
-              style: GoogleFonts.roboto(
-                fontSize: isMobile ? 16 : 25,
-                fontWeight: FontWeight.w400,
-                color: Colors.black,
-              ),
-            ),
-          ],
-        ),
-
-        const SizedBox(height: 40),
-      ],
-    );
-  }
-
-  Widget _buildSocialIcon(IconData icon, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 34,
-        height: 34,
-        decoration: const BoxDecoration(
-          color: Color(0xFF3C4494),
-          shape: BoxShape.circle,
-        ),
-        child: Icon(icon, size: 20, color: const Color(0xFFF1F1F6)),
+  Widget _imagePlaceholder(double height) {
+    return Container(
+      height: height,
+      color: Colors.grey.shade200,
+      child: const Center(
+        child: Icon(Icons.broken_image, color: Colors.grey),
       ),
     );
   }

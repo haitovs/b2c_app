@@ -8,8 +8,11 @@ import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/config/app_config.dart';
-import 'widgets/profile_dropdown.dart';
+import '../../../core/theme/app_theme.dart';
 
+/// Speaker detail / profile page — rendered inside EventShellLayout.
+/// Matches Figma: breadcrumb top, photo left + info card right (desktop),
+/// stacked on mobile. Single white container, no double background.
 class SpeakerDetailPage extends ConsumerStatefulWidget {
   final String eventId;
   final String speakerId;
@@ -27,8 +30,6 @@ class SpeakerDetailPage extends ConsumerStatefulWidget {
 }
 
 class _SpeakerDetailPageState extends ConsumerState<SpeakerDetailPage> {
-  bool _isProfileOpen = false;
-
   Map<String, dynamic>? _speaker;
   bool _isLoading = true;
 
@@ -48,7 +49,6 @@ class _SpeakerDetailPageState extends ConsumerState<SpeakerDetailPage> {
       final uri = Uri.parse(
         '${AppConfig.b2cApiBaseUrl}/api/v1/speakers/${widget.speakerId}',
       );
-
       final response = await http.get(uri);
       if (!mounted) return;
       if (response.statusCode == 200) {
@@ -57,7 +57,6 @@ class _SpeakerDetailPageState extends ConsumerState<SpeakerDetailPage> {
           _isLoading = false;
         });
       } else {
-        debugPrint('Failed to fetch speaker: ${response.statusCode}');
         setState(() => _isLoading = false);
       }
     } catch (e) {
@@ -67,18 +66,7 @@ class _SpeakerDetailPageState extends ConsumerState<SpeakerDetailPage> {
     }
   }
 
-  void _closeProfile() {
-    if (_isProfileOpen) setState(() => _isProfileOpen = false);
-  }
-
-  void _requestMeeting() {
-    context.push(
-      '/events/${widget.eventId}/meetings/speaker/${widget.speakerId}',
-      extra: _speaker,
-    );
-  }
-
-  String _buildImageUrl(String? path) {
+  String _imageUrl(String? path) {
     if (path == null || path.isEmpty) return '';
     if (path.startsWith('http')) return path;
     return '${AppConfig.b2cApiBaseUrl}$path';
@@ -99,75 +87,35 @@ class _SpeakerDetailPageState extends ConsumerState<SpeakerDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 600;
-    final horizontalPadding = isMobile ? 16.0 : 50.0;
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: AppTheme.primaryColor),
+      );
+    }
 
-    return GestureDetector(
-        onTap: _closeProfile,
-        behavior: HitTestBehavior.translucent,
-        child: Stack(
+    if (_speaker == null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            SafeArea(
-              child: Column(
-                children: [
-                  // Content Container
-                  Expanded(
-                    child: Container(
-                      margin: EdgeInsets.symmetric(
-                        horizontal: horizontalPadding,
-                      ),
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFF1F1F6),
-                        borderRadius: BorderRadius.vertical(
-                          top: Radius.circular(20),
-                        ),
-                      ),
-                      child: _isLoading
-                          ? const Center(
-                              child: CircularProgressIndicator(
-                                color: Color(0xFF3C4494),
-                              ),
-                            )
-                          : _speaker == null
-                          ? Center(
-                              child: Text(
-                                'Speaker not found',
-                                style: GoogleFonts.roboto(
-                                  fontSize: 16,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                            )
-                          : _buildContent(isMobile),
-                    ),
-                  ),
-                ],
-              ),
+            Icon(Icons.error_outline, size: 48, color: Colors.grey.shade400),
+            const SizedBox(height: 12),
+            Text(
+              'Speaker not found',
+              style: GoogleFonts.inter(color: Colors.grey.shade600),
             ),
-
-            // Profile Dropdown
-            if (_isProfileOpen)
-              Positioned(
-                top: isMobile ? 55 : 70,
-                right: horizontalPadding,
-                child: ProfileDropdown(
-                  onClose: _closeProfile,
-                  onLogout: () {
-                    if (context.canPop()) {
-                      context.pop();
-                    } else {
-                      context.go('/');
-                    }
-                  },
-                ),
-              ),
           ],
         ),
       );
+    }
+
+    return _buildPage();
   }
 
-  Widget _buildContent(bool isMobile) {
+  Widget _buildPage() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+
     final name = _speaker!['name'] ?? '';
     final surname = _speaker!['surname'] ?? '';
     final fullName = '$name $surname'.trim();
@@ -176,202 +124,241 @@ class _SpeakerDetailPageState extends ConsumerState<SpeakerDetailPage> {
     final description = _speaker!['description'] ?? '';
     final phone = _speaker!['phone'] ?? '';
     final email = _speaker!['email'] ?? '';
-    final photoUrl = _buildImageUrl(_speaker!['photo']);
-    final companyPhotoUrl = _buildImageUrl(_speaker!['company_photo']);
+    final photoUrl = _imageUrl(_speaker!['photo']);
+    final companyPhotoUrl = _imageUrl(_speaker!['company_photo']);
 
-    // Parse social links
-    List<Map<String, String>> socialLinks = [];
+    // Parse social links (supports both Map and List formats)
+    final List<Map<String, String>> socialLinks = [];
     final socialLinksData = _speaker!['social_links'];
-    if (socialLinksData != null) {
-      if (socialLinksData is List) {
-        for (var link in socialLinksData) {
-          if (link is Map) {
-            socialLinks.add({
-              'platform': link['platform']?.toString() ?? '',
-              'url': link['url']?.toString() ?? '',
-            });
-          }
+    if (socialLinksData is Map) {
+      // New format: {"linkedin": "url", "twitter": "url"}
+      for (final entry in socialLinksData.entries) {
+        final url = entry.value?.toString() ?? '';
+        if (url.isNotEmpty) {
+          socialLinks.add({'platform': entry.key.toString(), 'url': url});
+        }
+      }
+    } else if (socialLinksData is List) {
+      // Legacy format: [{platform, url}, ...]
+      for (var link in socialLinksData) {
+        if (link is Map) {
+          socialLinks.add({
+            'platform': link['platform']?.toString() ?? '',
+            'url': link['url']?.toString() ?? '',
+          });
         }
       }
     }
 
     return SingleChildScrollView(
-      padding: EdgeInsets.all(isMobile ? 16 : 30),
+      padding: EdgeInsets.all(isMobile ? 16 : 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Breadcrumb + Meeting request button (desktop only)
-          Row(
-            children: [
-              GestureDetector(
-                onTap: () => context.go('/events/${widget.eventId}/speakers'),
-                child: Text(
-                  'Speakers',
-                  style: GoogleFonts.montserrat(
-                    fontSize: isMobile ? 18 : 24,
-                    fontWeight: FontWeight.w600,
-                    color: const Color(0xFF3C4494),
-                  ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Icon(
-                  Icons.chevron_right,
-                  size: isMobile ? 18 : 22,
-                  color: const Color(0xFF616161),
-                ),
-              ),
-              Expanded(
-                child: Text(
-                  fullName.isNotEmpty ? fullName : 'Speaker',
-                  style: GoogleFonts.inter(
-                    fontSize: isMobile ? 14 : 16,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              if (!isMobile)
-                OutlinedButton.icon(
-                  onPressed: () => _requestMeeting(),
-                  icon: const Icon(Icons.calendar_today, size: 16),
-                  label: const Text('Meeting request'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    backgroundColor: const Color(0xFF3C4494),
-                    side: BorderSide.none,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                  ),
-                ),
-            ],
-          ),
+          // Breadcrumb + Meeting request button
+          _buildBreadcrumb(fullName, isMobile),
 
           SizedBox(height: isMobile ? 16 : 24),
 
-          // Main content - Photo and Info
-          isMobile
-              ? _buildMobileLayout(
-                  fullName,
-                  position,
-                  company,
-                  description,
-                  phone,
-                  email,
-                  photoUrl,
-                  companyPhotoUrl,
-                  socialLinks,
-                )
-              : _buildDesktopLayout(
-                  fullName,
-                  position,
-                  company,
-                  description,
-                  phone,
-                  email,
-                  photoUrl,
-                  companyPhotoUrl,
-                  socialLinks,
-                ),
+          // Main content — white card
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.all(isMobile ? 16 : 30),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: isMobile
+                ? _buildMobileContent(
+                    fullName, position, company, description,
+                    phone, email, photoUrl, companyPhotoUrl, socialLinks,
+                  )
+                : _buildDesktopContent(
+                    fullName, position, company, description,
+                    phone, email, photoUrl, companyPhotoUrl, socialLinks,
+                  ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildMobileLayout(
-    String fullName,
-    String position,
-    String company,
-    String description,
-    String phone,
-    String email,
-    String photoUrl,
-    String companyPhotoUrl,
+  // ---------------------------------------------------------------------------
+  // Breadcrumb
+  // ---------------------------------------------------------------------------
+
+  Widget _buildBreadcrumb(String fullName, bool isMobile) {
+    return Row(
+      children: [
+        GestureDetector(
+          onTap: () => context.go('/events/${widget.eventId}/speakers'),
+          child: Text(
+            'Speakers',
+            style: GoogleFonts.montserrat(
+              fontSize: isMobile ? 20 : 30,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.primaryColor,
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Icon(
+            Icons.chevron_right,
+            size: isMobile ? 20 : 24,
+            color: const Color(0xFF616161),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            fullName.isNotEmpty ? fullName : 'Speaker',
+            style: GoogleFonts.montserrat(
+              fontSize: isMobile ? 10 : 20,
+              fontWeight: FontWeight.w600,
+              color: Colors.black,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        if (!isMobile) ...[
+          const SizedBox(width: 12),
+          _buildMeetingButton(isMobile: false),
+        ],
+      ],
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Desktop: photo left, info card right
+  // ---------------------------------------------------------------------------
+
+  Widget _buildDesktopContent(
+    String fullName, String position, String company,
+    String description, String phone, String email,
+    String photoUrl, String companyPhotoUrl,
+    List<Map<String, String>> socialLinks,
+  ) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Photo
+        _buildPhoto(photoUrl, width: 300, height: 351),
+        const SizedBox(width: 40),
+        // Info
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Personal Information',
+                style: GoogleFonts.roboto(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w400,
+                  color: const Color(0xFF151938).withValues(alpha: 0.85),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Name
+              Text(
+                fullName.isNotEmpty ? fullName : 'Unknown Speaker',
+                style: GoogleFonts.roboto(
+                  fontSize: 48,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF151938),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Company logo + position
+              _buildCompanyRow(company, position, companyPhotoUrl),
+              const SizedBox(height: 24),
+
+              // Description
+              if (description.isNotEmpty)
+                Text(
+                  description,
+                  style: GoogleFonts.roboto(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w400,
+                    height: 1.6,
+                    color: Colors.black,
+                  ),
+                ),
+
+              if (description.isNotEmpty) const SizedBox(height: 32),
+
+              // Social links
+              if (socialLinks.isNotEmpty)
+                _buildSocialLinks(socialLinks),
+
+              if (socialLinks.isNotEmpty) const SizedBox(height: 16),
+
+              // Contacts
+              if (phone.isNotEmpty || email.isNotEmpty)
+                _buildContacts(phone, email),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Mobile: stacked layout
+  // ---------------------------------------------------------------------------
+
+  Widget _buildMobileContent(
+    String fullName, String position, String company,
+    String description, String phone, String email,
+    String photoUrl, String companyPhotoUrl,
     List<Map<String, String>> socialLinks,
   ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Photo + basic info side by side
+        // Meeting button on mobile
+        _buildMeetingButton(isMobile: true),
+        const SizedBox(height: 16),
+
+        // Photo + Name side by side
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Photo
-            Container(
-              width: 140,
-              height: 180,
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: photoUrl.isNotEmpty
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: Image.network(
-                        photoUrl,
-                        fit: BoxFit.cover,
-                        width: double.infinity,
-                        height: double.infinity,
-                        errorBuilder: (_, __, ___) => const Center(
-                          child:
-                              Icon(Icons.person, size: 60, color: Colors.grey),
-                        ),
-                      ),
-                    )
-                  : const Center(
-                      child: Icon(Icons.person, size: 60, color: Colors.grey),
-                    ),
-            ),
+            _buildPhoto(photoUrl, width: 120, height: 160),
             const SizedBox(width: 16),
-            // Name + company + meeting button
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Meeting request button
-                  OutlinedButton.icon(
-                    onPressed: () => _requestMeeting(),
-                    icon: const Icon(Icons.calendar_today, size: 14),
-                    label: const Text('Meting request'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      backgroundColor: const Color(0xFF3C4494),
-                      side: BorderSide.none,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  // Name
                   Text(
                     fullName.isNotEmpty ? fullName : 'Unknown Speaker',
                     style: GoogleFonts.roboto(
-                      fontSize: 22,
+                      fontSize: 20,
                       fontWeight: FontWeight.w600,
                       color: const Color(0xFF151938),
                     ),
                   ),
                   const SizedBox(height: 8),
-                  // Company logo + position
                   if (companyPhotoUrl.isNotEmpty)
                     Image.network(
                       companyPhotoUrl,
-                      height: 40,
+                      height: 36,
                       fit: BoxFit.contain,
                       alignment: Alignment.centerLeft,
                       errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                    ),
+                  const SizedBox(height: 8),
+                  if (position.isNotEmpty || company.isNotEmpty)
+                    Text(
+                      [position, company]
+                          .where((s) => s.isNotEmpty)
+                          .join(', '),
+                      style: GoogleFonts.roboto(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w400,
+                        color: const Color(0xFF151938),
+                      ),
                     ),
                 ],
               ),
@@ -381,204 +368,94 @@ class _SpeakerDetailPageState extends ConsumerState<SpeakerDetailPage> {
 
         const SizedBox(height: 20),
 
-        // Position text
-        if (position.isNotEmpty)
-          Text(
-            position.isNotEmpty && company.isNotEmpty
-                ? '$position, $company'
-                : position,
-            style: GoogleFonts.roboto(
-              fontSize: 16,
-              fontWeight: FontWeight.w400,
-              color: const Color(0xFF151938),
-            ),
-          ),
-
-        if (position.isNotEmpty) const SizedBox(height: 16),
-
         // Description
         if (description.isNotEmpty)
           Text(
             description,
             style: GoogleFonts.roboto(
-              fontSize: 16,
+              fontSize: 15,
               fontWeight: FontWeight.w400,
               height: 1.6,
               color: Colors.black,
             ),
           ),
 
-        const SizedBox(height: 24),
+        if (description.isNotEmpty) const SizedBox(height: 24),
 
-        // Social Links
-        if (socialLinks.isNotEmpty) _buildSocialLinks(socialLinks, true),
+        // Social links
+        if (socialLinks.isNotEmpty) _buildSocialLinks(socialLinks),
 
-        const SizedBox(height: 16),
+        if (socialLinks.isNotEmpty) const SizedBox(height: 16),
 
         // Contacts
         if (phone.isNotEmpty || email.isNotEmpty)
-          _buildContacts(phone, email, true),
+          _buildContacts(phone, email),
       ],
     );
   }
 
-  Widget _buildDesktopLayout(
-    String fullName,
-    String position,
-    String company,
-    String description,
-    String phone,
-    String email,
-    String photoUrl,
-    String companyPhotoUrl,
-    List<Map<String, String>> socialLinks,
-  ) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Photo
-        Container(
-          width: 300,
-          height: 351,
-          decoration: BoxDecoration(
-            color: Colors.grey[300],
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: photoUrl.isNotEmpty
-              ? ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: Image.network(
-                    photoUrl,
-                    fit: BoxFit.cover,
-                    width: double.infinity,
-                    height: double.infinity,
-                    errorBuilder: (_, __, ___) => const Center(
-                      child: Icon(Icons.person, size: 100, color: Colors.grey),
-                    ),
-                  ),
-                )
-              : const Center(
-                  child: Icon(Icons.person, size: 100, color: Colors.grey),
-                ),
-        ),
+  // ---------------------------------------------------------------------------
+  // Shared widgets
+  // ---------------------------------------------------------------------------
 
-        const SizedBox(width: 50),
-
-        // Info Card
-        Expanded(
-          child: Container(
-            padding: const EdgeInsets.all(30),
-            decoration: BoxDecoration(
-              color: Colors.white,
+  Widget _buildPhoto(String photoUrl, {required double width, required double height}) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: Colors.grey.shade200,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: photoUrl.isNotEmpty
+          ? ClipRRect(
               borderRadius: BorderRadius.circular(10),
+              child: Image.network(
+                photoUrl,
+                fit: BoxFit.cover,
+                width: width,
+                height: height,
+                errorBuilder: (_, __, ___) => Center(
+                  child: Icon(Icons.person, size: width * 0.3, color: Colors.grey.shade400),
+                ),
+              ),
+            )
+          : Center(
+              child: Icon(Icons.person, size: width * 0.3, color: Colors.grey.shade400),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Personal Information',
-                  style: GoogleFonts.roboto(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w400,
-                    color: const Color(0xFF151938).withValues(alpha: 0.85),
-                  ),
-                ),
-
-                const SizedBox(height: 16),
-
-                // Name
-                Text(
-                  fullName.isNotEmpty ? fullName : 'Unknown Speaker',
-                  style: GoogleFonts.roboto(
-                    fontSize: 65,
-                    fontWeight: FontWeight.w600,
-                    color: const Color(0xFF151938),
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                // Company and Position
-                _buildCompanyPositionRow(
-                  company,
-                  position,
-                  companyPhotoUrl,
-                  false,
-                ),
-
-                const SizedBox(height: 30),
-
-                // Description
-                if (description.isNotEmpty)
-                  Text(
-                    description,
-                    style: GoogleFonts.roboto(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w400,
-                      height: 1.6,
-                      color: Colors.black,
-                    ),
-                  ),
-
-                const SizedBox(height: 40),
-
-                // Social Links
-                if (socialLinks.isNotEmpty)
-                  _buildSocialLinks(socialLinks, false),
-
-                const SizedBox(height: 20),
-
-                // Contacts
-                if (phone.isNotEmpty || email.isNotEmpty)
-                  _buildContacts(phone, email, false),
-              ],
-            ),
-          ),
-        ),
-      ],
     );
   }
 
-  Widget _buildCompanyPositionRow(
-    String company,
-    String position,
-    String companyPhotoUrl,
-    bool isMobile,
-  ) {
+  Widget _buildCompanyRow(String company, String position, String companyPhotoUrl) {
+    final hasLogo = companyPhotoUrl.isNotEmpty;
+    final hasText = position.isNotEmpty || company.isNotEmpty;
+    if (!hasLogo && !hasText) return const SizedBox.shrink();
+
     return Row(
       children: [
-        // Company logo if available
-        if (companyPhotoUrl.isNotEmpty)
-          Container(
-            width: isMobile ? 60 : 100,
-            height: isMobile ? 40 : 66,
-            margin: EdgeInsets.only(right: isMobile ? 12 : 20),
+        if (hasLogo) ...[
+          SizedBox(
+            width: 100,
+            height: 66,
             child: Image.network(
               companyPhotoUrl,
               fit: BoxFit.contain,
               errorBuilder: (_, __, ___) => const SizedBox.shrink(),
             ),
           ),
-
-        // Divider
-        if (companyPhotoUrl.isNotEmpty || company.isNotEmpty)
+          const SizedBox(width: 20),
+        ],
+        if (hasLogo || hasText)
           Container(
             width: 2,
-            height: isMobile ? 40 : 60,
-            margin: EdgeInsets.only(right: isMobile ? 12 : 20),
+            height: 60,
+            margin: const EdgeInsets.only(right: 20),
             color: const Color(0xFF20306C),
           ),
-
-        // Position and Company
         Expanded(
           child: Text(
-            position.isNotEmpty && company.isNotEmpty
-                ? '$position, $company'
-                : position.isNotEmpty
-                ? position
-                : company,
+            [position, company].where((s) => s.isNotEmpty).join(', '),
             style: GoogleFonts.roboto(
-              fontSize: isMobile ? 16 : 25,
+              fontSize: 20,
               fontWeight: FontWeight.w400,
               color: const Color(0xFF151938),
             ),
@@ -588,47 +465,75 @@ class _SpeakerDetailPageState extends ConsumerState<SpeakerDetailPage> {
     );
   }
 
-  Widget _buildSocialLinks(
-    List<Map<String, String>> socialLinks,
-    bool isMobile,
-  ) {
-    return Row(
+  Widget _buildMeetingButton({required bool isMobile}) {
+    return SizedBox(
+      width: isMobile ? double.infinity : null,
+      child: ElevatedButton.icon(
+        onPressed: () => context.push(
+          '/events/${widget.eventId}/meetings/speaker/${widget.speakerId}',
+          extra: _speaker,
+        ),
+        icon: const Icon(Icons.calendar_today, size: 16),
+        label: const Text('Meeting request'),
+        style: ElevatedButton.styleFrom(
+          foregroundColor: Colors.white,
+          backgroundColor: AppTheme.primaryColor,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(4),
+          ),
+          padding: EdgeInsets.symmetric(
+            horizontal: isMobile ? 16 : 16,
+            vertical: isMobile ? 12 : 12,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSocialLinks(List<Map<String, String>> socialLinks) {
+    return Wrap(
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 12,
+      runSpacing: 8,
       children: [
         Text(
           'Follow me:',
           style: GoogleFonts.roboto(
-            fontSize: isMobile ? 18 : 25,
+            fontSize: 20,
             fontWeight: FontWeight.w700,
             color: Colors.black,
           ),
         ),
-        SizedBox(width: isMobile ? 12 : 20),
         ...socialLinks.map((link) {
-          IconData icon = Icons.link;
           final platform = link['platform']?.toLowerCase() ?? '';
+          IconData icon;
           if (platform.contains('facebook')) {
             icon = Icons.facebook;
           } else if (platform.contains('instagram')) {
-            icon = Icons.camera_alt;
+            icon = Icons.photo_camera;
           } else if (platform.contains('linkedin')) {
-            icon = Icons.business;
+            icon = Icons.groups;
           } else if (platform.contains('twitter') || platform.contains('x')) {
-            icon = Icons.alternate_email;
+            icon = Icons.tag;
+          } else if (platform.contains('telegram')) {
+            icon = Icons.telegram;
+          } else if (platform.contains('youtube')) {
+            icon = Icons.smart_display;
+          } else {
+            icon = Icons.link;
           }
 
-          return Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: GestureDetector(
-              onTap: () => _launchUrl(link['url'] ?? ''),
-              child: Container(
-                width: 34,
-                height: 34,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF3C4494),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, size: 20, color: const Color(0xFFF1F1F6)),
+          return InkWell(
+            onTap: () => _launchUrl(link['url'] ?? ''),
+            borderRadius: BorderRadius.circular(17),
+            child: Container(
+              width: 34,
+              height: 34,
+              decoration: const BoxDecoration(
+                color: AppTheme.primaryColor,
+                shape: BoxShape.circle,
               ),
+              child: Icon(icon, size: 20, color: Colors.white),
             ),
           );
         }),
@@ -636,48 +541,41 @@ class _SpeakerDetailPageState extends ConsumerState<SpeakerDetailPage> {
     );
   }
 
-  Widget _buildContacts(String phone, String email, bool isMobile) {
-    return Row(
+  Widget _buildContacts(String phone, String email) {
+    return Wrap(
+      spacing: 12,
+      runSpacing: 8,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         Text(
           'Contacts:',
           style: GoogleFonts.roboto(
-            fontSize: isMobile ? 18 : 25,
+            fontSize: 20,
             fontWeight: FontWeight.w700,
             color: Colors.black,
           ),
         ),
-        SizedBox(width: isMobile ? 12 : 20),
         if (phone.isNotEmpty)
-          GestureDetector(
+          InkWell(
             onTap: () => _launchUrl('tel:$phone'),
             child: Text(
               phone,
               style: GoogleFonts.roboto(
-                fontSize: isMobile ? 16 : 25,
+                fontSize: 16,
                 fontWeight: FontWeight.w400,
                 color: Colors.black,
               ),
             ),
           ),
         if (phone.isNotEmpty && email.isNotEmpty)
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: isMobile ? 8 : 16),
-            child: Text(
-              '|',
-              style: GoogleFonts.roboto(
-                fontSize: isMobile ? 16 : 25,
-                color: Colors.grey,
-              ),
-            ),
-          ),
+          Text('|', style: GoogleFonts.roboto(fontSize: 16, color: Colors.grey)),
         if (email.isNotEmpty)
-          GestureDetector(
+          InkWell(
             onTap: () => _launchUrl('mailto:$email'),
             child: Text(
               email,
               style: GoogleFonts.roboto(
-                fontSize: isMobile ? 16 : 25,
+                fontSize: 16,
                 fontWeight: FontWeight.w400,
                 color: Colors.black,
               ),

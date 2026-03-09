@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 import '../../../core/config/app_config.dart';
 import '../../../core/providers/event_context_provider.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/country_flags.dart';
 
 class SpeakerListPage extends ConsumerStatefulWidget {
   final String eventId;
@@ -23,7 +24,7 @@ class _SpeakerListPageState extends ConsumerState<SpeakerListPage> {
   List<Map<String, dynamic>> _speakers = [];
   List<Map<String, dynamic>> _filteredSpeakers = [];
   bool _isLoading = true;
-  bool _sortAZ = true;
+  String _sortMode = 'az'; // 'az', 'za', 'country'
   final TextEditingController _searchController = TextEditingController();
 
   @override
@@ -87,11 +88,16 @@ class _SpeakerListPageState extends ConsumerState<SpeakerListPage> {
     }
 
     result.sort((a, b) {
+      if (_sortMode == 'country') {
+        final countryA = (a['country'] ?? '').toString().toLowerCase();
+        final countryB = (b['country'] ?? '').toString().toLowerCase();
+        if (countryA != countryB) return countryA.compareTo(countryB);
+      }
       final nameA =
           '${a['name'] ?? ''} ${a['surname'] ?? ''}'.trim().toLowerCase();
       final nameB =
           '${b['name'] ?? ''} ${b['surname'] ?? ''}'.trim().toLowerCase();
-      return _sortAZ ? nameA.compareTo(nameB) : nameB.compareTo(nameA);
+      return _sortMode == 'za' ? nameB.compareTo(nameA) : nameA.compareTo(nameB);
     });
 
     _filteredSpeakers = result;
@@ -145,9 +151,9 @@ class _SpeakerListPageState extends ConsumerState<SpeakerListPage> {
                 const SizedBox(width: 10),
                 // Sort button
                 _SortButton(
-                  isAZ: _sortAZ,
-                  onTap: () => setState(() {
-                    _sortAZ = !_sortAZ;
+                  sortMode: _sortMode,
+                  onChanged: (mode) => setState(() {
+                    _sortMode = mode;
                     _applyFilters();
                   }),
                 ),
@@ -193,13 +199,15 @@ class _SpeakerListPageState extends ConsumerState<SpeakerListPage> {
         itemCount: _filteredSpeakers.length,
         itemBuilder: (context, index) {
           final speaker = _filteredSpeakers[index];
+          final country = speaker['country'] ?? '';
           return _SpeakerHorizontalCard(
             name: '${speaker['name'] ?? ''} ${speaker['surname'] ?? ''}'.trim(),
             company: speaker['company'] ?? '',
             position: speaker['position'] ?? '',
-            country: speaker['country'] ?? '',
+            country: country,
             photoUrl: _buildImageUrl(speaker['photo']),
             flagUrl: _buildImageUrl(speaker['country_flag']),
+            flagEmoji: countryNameToFlag(country),
             onViewProfile: () => context.push(
               '/events/${widget.eventId}/speakers/${speaker['id']}',
               extra: speaker,
@@ -220,14 +228,16 @@ class _SpeakerListPageState extends ConsumerState<SpeakerListPage> {
       itemCount: _filteredSpeakers.length,
       itemBuilder: (context, index) {
         final speaker = _filteredSpeakers[index];
+        final country = speaker['country'] ?? '';
         return _SpeakerCard(
           name:
               '${speaker['name'] ?? ''} ${speaker['surname'] ?? ''}'.trim(),
           company: speaker['company'] ?? '',
           position: speaker['position'] ?? '',
-          country: speaker['country'] ?? '',
+          country: country,
           photoUrl: _buildImageUrl(speaker['photo']),
           flagUrl: _buildImageUrl(speaker['country_flag']),
+          flagEmoji: countryNameToFlag(country),
           onViewProfile: () => context.push(
             '/events/${widget.eventId}/speakers/${speaker['id']}',
             extra: speaker,
@@ -289,20 +299,39 @@ class _SearchBar extends StatelessWidget {
 // Sort button — 150px, 38px, border #CBCBCB
 // ---------------------------------------------------------------------------
 class _SortButton extends StatelessWidget {
-  final bool isAZ;
-  final VoidCallback onTap;
+  final String sortMode;
+  final ValueChanged<String> onChanged;
 
-  const _SortButton({required this.isAZ, required this.onTap});
+  const _SortButton({required this.sortMode, required this.onChanged});
+
+  static const _modes = ['az', 'za', 'country'];
+  static const _labels = {
+    'az': 'Sort by: A - Z',
+    'za': 'Sort by: Z - A',
+    'country': 'Sort by: Country',
+  };
 
   @override
   Widget build(BuildContext context) {
     final isMobile = MediaQuery.of(context).size.width < 600;
 
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(5),
+    return PopupMenuButton<String>(
+      onSelected: onChanged,
+      itemBuilder: (_) => _modes.map((mode) {
+        return PopupMenuItem(
+          value: mode,
+          child: Text(
+            _labels[mode]!,
+            style: GoogleFonts.roboto(
+              fontSize: 14,
+              fontWeight: sortMode == mode ? FontWeight.w600 : FontWeight.w400,
+              color: sortMode == mode ? AppTheme.primaryColor : Colors.black87,
+            ),
+          ),
+        );
+      }).toList(),
       child: Container(
-        width: isMobile ? 40 : 150,
+        width: isMobile ? 40 : 170,
         height: 38,
         padding: EdgeInsets.symmetric(horizontal: isMobile ? 0 : 10),
         decoration: BoxDecoration(
@@ -312,25 +341,23 @@ class _SortButton extends StatelessWidget {
         ),
         child: isMobile
             ? const Center(
-                child: Icon(
-                  Icons.sort,
-                  size: 20,
-                  color: Color(0xFF757A8A),
-                ),
+                child: Icon(Icons.sort, size: 20, color: Color(0xFF757A8A)),
               )
             : Row(
                 children: [
-                  Text(
-                    isAZ ? 'Sort by: A - Z' : 'Sort by: Z - A',
-                    style: GoogleFonts.roboto(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: const Color(0xFF757A8A),
+                  Expanded(
+                    child: Text(
+                      _labels[sortMode]!,
+                      style: GoogleFonts.roboto(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: const Color(0xFF757A8A),
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  const Spacer(),
                   const Icon(
-                    Icons.chevron_right,
+                    Icons.unfold_more,
                     size: 16,
                     color: Color(0xFF757A8A),
                   ),
@@ -351,6 +378,7 @@ class _SpeakerCard extends StatelessWidget {
   final String country;
   final String photoUrl;
   final String flagUrl;
+  final String flagEmoji;
   final VoidCallback onViewProfile;
 
   const _SpeakerCard({
@@ -360,6 +388,7 @@ class _SpeakerCard extends StatelessWidget {
     required this.country,
     required this.photoUrl,
     required this.flagUrl,
+    this.flagEmoji = '',
     required this.onViewProfile,
   });
 
@@ -450,9 +479,14 @@ class _SpeakerCard extends StatelessWidget {
                             height: 14,
                             fit: BoxFit.cover,
                             errorBuilder: (_, __, ___) =>
-                                const SizedBox.shrink(),
+                                flagEmoji.isNotEmpty
+                                    ? Text(flagEmoji, style: const TextStyle(fontSize: 14))
+                                    : const SizedBox.shrink(),
                           ),
                         ),
+                        const SizedBox(width: 6),
+                      ] else if (flagEmoji.isNotEmpty) ...[
+                        Text(flagEmoji, style: const TextStyle(fontSize: 14)),
                         const SizedBox(width: 6),
                       ],
                       Expanded(
@@ -526,6 +560,7 @@ class _SpeakerHorizontalCard extends StatelessWidget {
   final String country;
   final String photoUrl;
   final String flagUrl;
+  final String flagEmoji;
   final VoidCallback onViewProfile;
 
   const _SpeakerHorizontalCard({
@@ -535,6 +570,7 @@ class _SpeakerHorizontalCard extends StatelessWidget {
     required this.country,
     required this.photoUrl,
     required this.flagUrl,
+    this.flagEmoji = '',
     required this.onViewProfile,
   });
 
@@ -632,9 +668,14 @@ class _SpeakerHorizontalCard extends StatelessWidget {
                               height: 14,
                               fit: BoxFit.cover,
                               errorBuilder: (_, __, ___) =>
-                                  const SizedBox.shrink(),
+                                  flagEmoji.isNotEmpty
+                                      ? Text(flagEmoji, style: const TextStyle(fontSize: 14))
+                                      : const SizedBox.shrink(),
                             ),
                           ),
+                          const SizedBox(width: 6),
+                        ] else if (flagEmoji.isNotEmpty) ...[
+                          Text(flagEmoji, style: const TextStyle(fontSize: 14)),
                           const SizedBox(width: 6),
                         ],
                         Expanded(

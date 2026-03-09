@@ -619,15 +619,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/profile',
         builder: (context, state) {
-          final tab =
-              int.tryParse(state.uri.queryParameters['tab'] ?? '1') ?? 1;
           final returnTo = state.uri.queryParameters['returnTo'];
-          final highlight = tab == 0;
-          return ProfilePage(
-            initialTab: tab,
-            returnTo: returnTo,
-            highlightConfirmButton: highlight,
-          );
+          return ProfilePage(returnTo: returnTo);
         },
       ),
     ],
