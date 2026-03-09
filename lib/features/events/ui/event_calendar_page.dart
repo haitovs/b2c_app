@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../core/widgets/app_snackbar.dart';
 import '../../../../core/widgets/custom_app_bar.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../events/providers/event_providers.dart';
@@ -282,11 +283,7 @@ class _EventCalendarPageState extends ConsumerState<EventCalendarPage> {
                       if (id != null) {
                         context.go('/events/$id');
                       } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text("Event ID missing"),
-                          ),
-                        );
+                        AppSnackBar.showInfo(context, 'Event ID missing');
                       }
                     },
                   ),

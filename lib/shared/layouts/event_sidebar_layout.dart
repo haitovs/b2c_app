@@ -1,28 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/providers/event_context_provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/app_snackbar.dart';
 import '../../features/notifications/providers/notification_providers.dart';
 import '../../features/shop/providers/shop_providers.dart';
 
 // =============================================================================
-// EventSidebarLayout — shared scaffold for all event sub-pages
+// EventShellLayout — persistent shell for all event sub-pages.
+// Used as the builder for a ShellRoute so the sidebar stays mounted
+// and only the content area (navigatorBuilder's child) swaps on navigation.
 // =============================================================================
 
-class EventSidebarLayout extends ConsumerWidget {
-  final String title;
+class EventShellLayout extends ConsumerWidget {
   final Widget child;
-  final List<Widget>? actions;
 
-  const EventSidebarLayout({
-    super.key,
-    required this.title,
-    required this.child,
-    this.actions,
-  });
+  const EventShellLayout({super.key, required this.child});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -61,7 +58,6 @@ class EventSidebarLayout extends ConsumerWidget {
         body: Column(
           children: [
             _EventTopBar(
-              title: eventName,
               eventName: eventName,
               eventId: eventId,
               logoUrl: logoUrl,
@@ -121,33 +117,74 @@ class EventSidebarLayout extends ConsumerWidget {
       );
     }
 
-    // Mobile layout
+    // Mobile layout — sidebar in drawer
+    return _MobileShell(
+      eventName: eventName,
+      eventId: eventId,
+      eventIdInt: eventIdInt,
+      logoUrl: logoUrl,
+      unreadCount: unreadCount,
+      currentPath: currentPath,
+      child: child,
+    );
+  }
+}
+
+// Mobile shell — StatefulWidget so we can open the drawer via GlobalKey.
+class _MobileShell extends StatefulWidget {
+  final String eventName;
+  final String eventId;
+  final int eventIdInt;
+  final String? logoUrl;
+  final int unreadCount;
+  final String currentPath;
+  final Widget child;
+
+  const _MobileShell({
+    required this.eventName,
+    required this.eventId,
+    required this.eventIdInt,
+    required this.logoUrl,
+    required this.unreadCount,
+    required this.currentPath,
+    required this.child,
+  });
+
+  @override
+  State<_MobileShell> createState() => _MobileShellState();
+}
+
+class _MobileShellState extends State<_MobileShell> {
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor: AppTheme.backgroundColor,
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(64),
         child: _EventTopBar(
-          title: title,
-          eventName: eventName,
-          eventId: eventId,
-          logoUrl: logoUrl,
-          unreadCount: unreadCount,
+          eventName: widget.eventName,
+          eventId: widget.eventId,
+          logoUrl: widget.logoUrl,
+          unreadCount: widget.unreadCount,
           showMenuButton: true,
-          onMenuPressed: () => Scaffold.of(context).openDrawer(),
+          onMenuPressed: () => _scaffoldKey.currentState?.openDrawer(),
         ),
       ),
       drawer: Drawer(
         backgroundColor: Colors.white,
         child: SafeArea(
           child: _EventSidebar(
-            eventId: eventId,
-            eventIdInt: eventIdInt,
-            currentPath: currentPath,
+            eventId: widget.eventId,
+            eventIdInt: widget.eventIdInt,
+            currentPath: widget.currentPath,
             onItemTap: () => Navigator.of(context).pop(),
           ),
         ),
       ),
-      body: child,
+      body: widget.child,
     );
   }
 }
@@ -157,7 +194,6 @@ class EventSidebarLayout extends ConsumerWidget {
 // =============================================================================
 
 class _EventTopBar extends StatelessWidget {
-  final String title;
   final String eventName;
   final String eventId;
   final String? logoUrl;
@@ -166,7 +202,6 @@ class _EventTopBar extends StatelessWidget {
   final VoidCallback? onMenuPressed;
 
   const _EventTopBar({
-    required this.title,
     required this.eventName,
     required this.eventId,
     this.logoUrl,
@@ -278,7 +313,7 @@ class _EventTopBar extends StatelessWidget {
 // Sidebar — company header, quick actions, navigation
 // =============================================================================
 
-class _EventSidebar extends ConsumerWidget {
+class _EventSidebar extends ConsumerStatefulWidget {
   final String eventId;
   final int eventIdInt;
   final String currentPath;
@@ -292,9 +327,33 @@ class _EventSidebar extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final hasPurchased = ref.watch(hasPurchasedProvider(eventIdInt));
-    final cartCount = ref.watch(cartBadgeCountProvider(eventIdInt));
+  ConsumerState<_EventSidebar> createState() => _EventSidebarState();
+}
+
+class _EventSidebarState extends ConsumerState<_EventSidebar> {
+  bool _visaExpanded = false;
+  bool _agendaMeetingsExpanded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Auto-expand groups if the current path is inside them
+    final path = widget.currentPath;
+    final base = '/events/${widget.eventId}';
+    if (path.startsWith('$base/visa') || path.startsWith('$base/transfer') ||
+        path.startsWith('$base/hotels') || path.startsWith('$base/travel')) {
+      _visaExpanded = true;
+    }
+    if (path.startsWith('$base/agenda') || path.startsWith('$base/schedule') ||
+        path.startsWith('$base/meetings')) {
+      _agendaMeetingsExpanded = true;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasPurchased = ref.watch(hasPurchasedProvider(widget.eventIdInt));
+    final cartCount = ref.watch(cartBadgeCountProvider(widget.eventIdInt));
 
     return Container(
       decoration: BoxDecoration(
@@ -309,29 +368,23 @@ class _EventSidebar extends ConsumerWidget {
       ),
       child: Column(
         children: [
-          // Company header
           _CompanyHeader(
-            eventId: eventId,
+            eventId: widget.eventId,
             cartCount: cartCount,
-            onItemTap: onItemTap,
+            onItemTap: widget.onItemTap,
           ),
           const Divider(height: 1, color: Color(0xFFEEEEEE)),
-
-          // Scrollable content
           Expanded(
             child: SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Quick Actions
                   _QuickActionsSection(
-                    eventId: eventId,
+                    eventId: widget.eventId,
                     hasPurchased: hasPurchased,
-                    onItemTap: onItemTap,
+                    onItemTap: widget.onItemTap,
                   ),
                   const Divider(height: 1, color: Color(0xFFEEEEEE)),
-
-                  // Navigation items
                   const SizedBox(height: 8),
                   _buildNavSection(context, hasPurchased),
                   const SizedBox(height: 8),
@@ -339,97 +392,387 @@ class _EventSidebar extends ConsumerWidget {
               ),
             ),
           ),
-
-          // Back to events
           const Divider(height: 1, color: Color(0xFFEEEEEE)),
-          _BackToEventsLink(onTap: onItemTap),
+          _BackToEventsLink(onTap: widget.onItemTap),
         ],
       ),
     );
   }
 
-  Widget _buildNavSection(BuildContext context, bool hasPurchased) {
-    const lockedUntilPurchase = {
-      'Visa & Travel Center',
-      'Schedule & Meetings',
-      'Financial Section',
-      'Analytics',
-    };
+  // ---------------------------------------------------------------------------
+  // Navigation section
+  // ---------------------------------------------------------------------------
 
-    final basePath = '/events/$eventId';
-    final items = <_NavItemData>[
-      _NavItemData(
-        'Services & Add-Ons',
-        'assets/sidebar/services.png',
-        '$basePath/services',
-      ),
-      _NavItemData(
-        'Visa & Travel Center',
-        'assets/sidebar/visa.png',
-        '$basePath/visa-travel',
-      ),
-      _NavItemData(
-        'Schedule & Meetings',
-        'assets/sidebar/meetings.png',
-        '$basePath/schedule',
-      ),
-      _NavItemData(
-        'Financial Section',
-        'assets/sidebar/financial.png',
-        '$basePath/financial',
-      ),
-      _NavItemData('Analytics', 'assets/sidebar/analytics.png', '$basePath/analytics'),
-      _NavItemData(
-        'Speakers',
-        'assets/sidebar/speakers.png',
-        '$basePath/speakers',
-      ),
-      _NavItemData(
-        'Participants of event',
-        'assets/sidebar/participants.png',
-        '$basePath/participants',
-      ),
-      _NavItemData('News', 'assets/sidebar/news.png', '$basePath/news'),
-      _NavItemData(
-        'Hotline',
-        'assets/sidebar/hotline.png',
-        '$basePath/hotline',
-      ),
-      _NavItemData('Feedback', 'assets/sidebar/feedback.png', '$basePath/feedback'),
-      _NavItemData('FAQ', 'assets/sidebar/faq.png', '$basePath/faq'),
-    ];
+  Widget _buildNavSection(BuildContext context, bool hasPurchased) {
+    final basePath = '/events/${widget.eventId}';
+    final path = widget.currentPath;
 
     return Column(
-      children: items.map((item) {
-        final isActive = _isPathActive(currentPath, item.path);
-        final isLocked =
-            lockedUntilPurchase.contains(item.label) && !hasPurchased;
-        return _NavItem(
-          label: item.label,
-          iconAsset: item.iconAsset,
-          isActive: isActive,
-          isLocked: isLocked,
+      children: [
+        // Dashboard
+        _buildNavItem(
+          context,
+          label: 'Dashboard',
+          iconAsset: 'assets/sidebar/analytics.svg',
+          path: '$basePath/dashboard',
+          hasPurchased: true,
+        ),
+
+        // Services & Add-Ons
+        _buildNavItem(
+          context,
+          label: 'Services & Add-Ons',
+          iconAsset: 'assets/sidebar/services.svg',
+          path: '$basePath/services',
+          hasPurchased: true,
+        ),
+
+        // ── Visa & Travel Center (expandable) ──
+        _buildExpandableGroup(
+          context,
+          label: 'Visa & Travel Center',
+          iconAsset: 'assets/sidebar/visa.svg',
+          isExpanded: _visaExpanded,
+          isLocked: !hasPurchased,
+          isGroupActive: path.startsWith('$basePath/visa') ||
+              path.startsWith('$basePath/transfer') ||
+              path.startsWith('$basePath/hotels') ||
+              path.startsWith('$basePath/travel'),
+          onToggle: () => setState(() => _visaExpanded = !_visaExpanded),
+          children: [
+            _buildSubItem(
+              context,
+              label: 'Visa Application',
+              path: '$basePath/visa-travel',
+              isActive: path.startsWith('$basePath/visa'),
+            ),
+            _buildSubItem(
+              context,
+              label: 'Travel Information',
+              path: '$basePath/travel',
+              isActive: path.startsWith('$basePath/travel'),
+              comingSoon: true,
+            ),
+            _buildSubItem(
+              context,
+              label: 'Transfer Information',
+              path: '$basePath/transfer',
+              isActive: path.startsWith('$basePath/transfer'),
+              comingSoon: true,
+            ),
+            _buildSubItem(
+              context,
+              label: 'Hotel Information',
+              path: '$basePath/hotels',
+              isActive: path.startsWith('$basePath/hotels'),
+              comingSoon: true,
+            ),
+          ],
+        ),
+
+        // ── Agenda & Meetings (expandable) ──
+        _buildExpandableGroup(
+          context,
+          label: 'Agenda & Meetings',
+          iconAsset: 'assets/sidebar/meetings.svg',
+          isExpanded: _agendaMeetingsExpanded,
+          isLocked: !hasPurchased,
+          isGroupActive: path.startsWith('$basePath/agenda') ||
+              path.startsWith('$basePath/schedule') ||
+              path.startsWith('$basePath/meetings'),
+          onToggle: () => setState(() => _agendaMeetingsExpanded = !_agendaMeetingsExpanded),
+          children: [
+            _buildSubItem(
+              context,
+              label: 'Agenda',
+              path: '$basePath/agenda',
+              isActive: path.startsWith('$basePath/agenda'),
+            ),
+            _buildSubItem(
+              context,
+              label: 'Meetings',
+              path: '$basePath/schedule',
+              isActive: path.startsWith('$basePath/schedule') ||
+                  path.startsWith('$basePath/meetings'),
+            ),
+          ],
+        ),
+
+        // Financial Section (coming soon)
+        _buildNavItem(
+          context,
+          label: 'Financial Section',
+          iconAsset: 'assets/sidebar/financial.svg',
+          path: '$basePath/financial',
+          hasPurchased: hasPurchased,
+        ),
+
+        // Analytics (coming soon)
+        _buildNavItem(
+          context,
+          label: 'Analytics',
+          iconAsset: 'assets/sidebar/analytics.svg',
+          path: '$basePath/analytics',
+          hasPurchased: hasPurchased,
+        ),
+
+        // Speakers
+        _buildNavItem(
+          context,
+          label: 'Speakers',
+          iconAsset: 'assets/sidebar/speakers.svg',
+          path: '$basePath/speakers',
+          hasPurchased: true,
+        ),
+
+        // Participants of event
+        _buildNavItem(
+          context,
+          label: 'Participants of event',
+          iconAsset: 'assets/sidebar/participants.svg',
+          path: '$basePath/participants',
+          hasPurchased: true,
+        ),
+
+        // News
+        _buildNavItem(
+          context,
+          label: 'News',
+          iconAsset: 'assets/sidebar/news.svg',
+          path: '$basePath/news',
+          hasPurchased: true,
+        ),
+
+        // Hotline
+        _buildNavItem(
+          context,
+          label: 'Hotline',
+          iconAsset: 'assets/sidebar/hotline.svg',
+          path: '$basePath/hotline',
+          hasPurchased: true,
+        ),
+
+        // Feedback
+        _buildNavItem(
+          context,
+          label: 'Feedback',
+          iconAsset: 'assets/sidebar/feedback.svg',
+          path: '$basePath/feedback',
+          hasPurchased: true,
+        ),
+
+        // FAQ
+        _buildNavItem(
+          context,
+          label: 'FAQ',
+          iconAsset: 'assets/sidebar/faq.svg',
+          path: '$basePath/faq',
+          hasPurchased: true,
+        ),
+      ],
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Regular nav item
+  // ---------------------------------------------------------------------------
+
+  Widget _buildNavItem(
+    BuildContext context, {
+    required String label,
+    required String iconAsset,
+    required String path,
+    required bool hasPurchased,
+  }) {
+    final isActive = _isPathActive(widget.currentPath, path);
+    final isLocked = !hasPurchased;
+    return _NavItem(
+      label: label,
+      iconAsset: iconAsset,
+      isActive: isActive,
+      isLocked: isLocked,
+      onTap: () {
+        if (isLocked) {
+          _showLockedSnackbar(context);
+          return;
+        }
+        widget.onItemTap?.call();
+        context.go(path);
+      },
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Expandable group header + children
+  // ---------------------------------------------------------------------------
+
+  Widget _buildExpandableGroup(
+    BuildContext context, {
+    required String label,
+    required String iconAsset,
+    required bool isExpanded,
+    required bool isLocked,
+    required bool isGroupActive,
+    required VoidCallback onToggle,
+    required List<Widget> children,
+  }) {
+    return Column(
+      children: [
+        // Group header
+        InkWell(
           onTap: () {
             if (isLocked) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: const Text(
-                    'Purchase a service package to unlock this feature',
-                  ),
-                  action: SnackBarAction(
-                    label: 'View Services',
-                    onPressed: () => context.go('/events/$eventId/services'),
-                  ),
-                ),
-              );
+              _showLockedSnackbar(context);
               return;
             }
-            onItemTap?.call();
-            context.go(item.path);
+            onToggle();
           },
-        );
-      }).toList(),
+          child: Container(
+            decoration: BoxDecoration(
+              border: Border(
+                left: BorderSide(
+                  color: isGroupActive && !isExpanded
+                      ? AppTheme.primaryColor
+                      : Colors.transparent,
+                  width: 3,
+                ),
+              ),
+              color: isGroupActive && !isExpanded
+                  ? AppTheme.primaryColor.withValues(alpha: 0.10)
+                  : Colors.transparent,
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                SvgPicture.asset(
+                  iconAsset,
+                  width: 20,
+                  height: 20,
+                  colorFilter: isLocked
+                      ? const ColorFilter.mode(Color(0xFFBBBBBB), BlendMode.srcIn)
+                      : null,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: isGroupActive ? FontWeight.w600 : FontWeight.w400,
+                      color: isLocked
+                          ? const Color(0xFFBBBBBB)
+                          : isGroupActive
+                              ? AppTheme.primaryColor
+                              : Colors.black87,
+                    ),
+                  ),
+                ),
+                if (isLocked)
+                  SvgPicture.asset('assets/sidebar/lock.svg', width: 16, height: 16)
+                else
+                  AnimatedRotation(
+                    turns: isExpanded ? 0.5 : 0.0,
+                    duration: const Duration(milliseconds: 200),
+                    child: Icon(
+                      Icons.expand_more,
+                      size: 20,
+                      color: isGroupActive ? AppTheme.primaryColor : Colors.grey.shade500,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        // Animated children
+        AnimatedCrossFade(
+          firstChild: const SizedBox.shrink(),
+          secondChild: Column(children: children),
+          crossFadeState: isExpanded && !isLocked
+              ? CrossFadeState.showSecond
+              : CrossFadeState.showFirst,
+          duration: const Duration(milliseconds: 200),
+        ),
+      ],
     );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Sub-item (indented, inside expandable group)
+  // ---------------------------------------------------------------------------
+
+  Widget _buildSubItem(
+    BuildContext context, {
+    required String label,
+    required String path,
+    required bool isActive,
+    bool comingSoon = false,
+  }) {
+    final Color textColor = comingSoon
+        ? Colors.grey.shade400
+        : isActive
+            ? AppTheme.primaryColor
+            : Colors.black87;
+
+    return InkWell(
+      onTap: comingSoon
+          ? null
+          : () {
+              widget.onItemTap?.call();
+              context.go(path);
+            },
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border(
+            left: BorderSide(
+              color: isActive && !comingSoon ? AppTheme.primaryColor : Colors.transparent,
+              width: 3,
+            ),
+          ),
+          color: isActive && !comingSoon
+              ? AppTheme.primaryColor.withValues(alpha: 0.10)
+              : Colors.transparent,
+        ),
+        padding: const EdgeInsets.only(left: 48, right: 16, top: 10, bottom: 10),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: isActive && !comingSoon ? FontWeight.w600 : FontWeight.w400,
+                  color: textColor,
+                ),
+              ),
+            ),
+            if (comingSoon)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade200,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  'Soon',
+                  style: GoogleFonts.inter(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey.shade500,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Helpers
+  // ---------------------------------------------------------------------------
+
+  void _showLockedSnackbar(BuildContext context) {
+    AppSnackBar.showInfo(context, 'Purchase a service package to unlock this feature');
   }
 
   bool _isPathActive(String currentPath, String navPath) {
@@ -437,14 +780,6 @@ class _EventSidebar extends ConsumerWidget {
     if (currentPath.startsWith('$navPath/')) return true;
     return false;
   }
-}
-
-class _NavItemData {
-  final String label;
-  final String iconAsset;
-  final String path;
-
-  const _NavItemData(this.label, this.iconAsset, this.path);
 }
 
 // =============================================================================
@@ -495,7 +830,7 @@ class _CompanyHeader extends StatelessWidget {
             ),
           ),
           // Hamburger menu
-          Image.asset('assets/sidebar/burger.png', width: 22, height: 22),
+          SvgPicture.asset('assets/sidebar/burger.svg', width: 22, height: 22),
         ],
       ),
     );
@@ -534,20 +869,20 @@ class _QuickActionsSection extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           _QuickActionItem(
-            iconAsset: 'assets/sidebar/complete-company.png',
+            iconAsset: 'assets/sidebar/complete-company.svg',
             label: 'Complete Company Profile',
             isLocked: !hasPurchased,
             onTap: () =>
                 _handleTap(context, '/events/$eventId/company-profile'),
           ),
           _QuickActionItem(
-            iconAsset: 'assets/sidebar/add_team.png',
-            label: 'Add Team Member',
+            iconAsset: 'assets/sidebar/add_team.svg',
+            label: 'Team Members',
             isLocked: !hasPurchased,
-            onTap: () => _handleTap(context, '/events/$eventId/team/add'),
+            onTap: () => _handleTap(context, '/events/$eventId/team'),
           ),
           _QuickActionItem(
-            iconAsset: 'assets/sidebar/order_additional.png',
+            iconAsset: 'assets/sidebar/order_additional.svg',
             label: 'Order Additional Services',
             isLocked: !hasPurchased,
             onTap: () => _handleTap(context, '/events/$eventId/services'),
@@ -559,17 +894,7 @@ class _QuickActionsSection extends StatelessWidget {
 
   void _handleTap(BuildContext context, String route) {
     if (!hasPurchased) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text(
-            'Purchase a service package to unlock this feature',
-          ),
-          action: SnackBarAction(
-            label: 'View Services',
-            onPressed: () => context.go('/events/$eventId/services'),
-          ),
-        ),
-      );
+      AppSnackBar.showInfo(context, 'Purchase a service package to unlock this feature');
       return;
     }
     onItemTap?.call();
@@ -603,9 +928,13 @@ class _QuickActionItem extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
         child: Row(
           children: [
-            Opacity(
-              opacity: isLocked ? 0.4 : 1.0,
-              child: Image.asset(iconAsset, width: 20, height: 20),
+            SvgPicture.asset(
+              iconAsset,
+              width: 20,
+              height: 20,
+              colorFilter: isLocked
+                  ? const ColorFilter.mode(Color(0xFFBBBBBB), BlendMode.srcIn)
+                  : null,
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -614,12 +943,12 @@ class _QuickActionItem extends StatelessWidget {
                 style: GoogleFonts.inter(
                   fontSize: 14,
                   fontWeight: FontWeight.w400,
-                  color: isLocked ? Colors.grey.shade500 : Colors.black87,
+                  color: isLocked ? const Color(0xFFBBBBBB) : Colors.black87,
                 ),
               ),
             ),
             if (isLocked)
-              Image.asset('assets/sidebar/lock.png', width: 16, height: 16),
+              SvgPicture.asset('assets/sidebar/lock.svg', width: 16, height: 16),
           ],
         ),
       ),
@@ -651,10 +980,8 @@ class _NavItem extends StatelessWidget {
     final Color textColor = isActive
         ? AppTheme.primaryColor
         : isLocked
-        ? Colors.grey.shade500
-        : Colors.black87;
-
-    final double iconOpacity = isLocked ? 0.4 : 1.0;
+            ? const Color(0xFFBBBBBB)
+            : Colors.black87;
 
     return InkWell(
       onTap: onTap,
@@ -667,15 +994,19 @@ class _NavItem extends StatelessWidget {
             ),
           ),
           color: isActive
-              ? AppTheme.primaryColor.withValues(alpha: 0.04)
+              ? AppTheme.primaryColor.withValues(alpha: 0.10)
               : Colors.transparent,
         ),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(
           children: [
-            Opacity(
-              opacity: iconOpacity,
-              child: Image.asset(iconAsset, width: 20, height: 20),
+            SvgPicture.asset(
+              iconAsset,
+              width: 20,
+              height: 20,
+              colorFilter: isLocked
+                  ? const ColorFilter.mode(Color(0xFFBBBBBB), BlendMode.srcIn)
+                  : null,
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -689,7 +1020,7 @@ class _NavItem extends StatelessWidget {
               ),
             ),
             if (isLocked)
-              Image.asset('assets/sidebar/lock.png', width: 16, height: 16),
+              SvgPicture.asset('assets/sidebar/lock.svg', width: 16, height: 16),
           ],
         ),
       ),

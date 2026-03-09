@@ -38,10 +38,10 @@ final eventDetailProvider =
   return ref.watch(eventServiceProvider).fetchEvent(eventId);
 });
 
-/// Fetch agenda days for a site.
+/// Fetch agenda days for an event.
 final agendaDaysProvider =
-    FutureProvider.family<List<dynamic>, int?>((ref, siteId) {
-  return ref.watch(agendaServiceProvider).fetchAgendaDays(siteId: siteId);
+    FutureProvider.family<List<dynamic>, int>((ref, eventId) {
+  return ref.watch(agendaServiceProvider).fetchAgendaDays(eventId: eventId);
 });
 
 /// Fetch speakers.

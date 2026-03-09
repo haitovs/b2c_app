@@ -59,6 +59,7 @@ class _ParticipantDetailPageState extends ConsumerState<ParticipantDetailPage> {
             );
 
       final response = await http.get(uri);
+      if (!mounted) return;
       if (response.statusCode == 200) {
         setState(() {
           _participant = jsonDecode(response.body);
@@ -70,6 +71,7 @@ class _ParticipantDetailPageState extends ConsumerState<ParticipantDetailPage> {
       }
     } catch (e) {
       debugPrint('Error fetching participant: $e');
+      if (!mounted) return;
       setState(() => _isLoading = false);
     }
   }

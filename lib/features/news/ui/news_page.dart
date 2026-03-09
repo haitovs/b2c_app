@@ -8,7 +8,6 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/providers/event_context_provider.dart';
-import '../../../shared/layouts/event_sidebar_layout.dart';
 import '../../events/ui/widgets/profile_dropdown.dart';
 
 /// News Page - displays news from Tourism backend with search and infinite scroll
@@ -72,6 +71,7 @@ class _NewsPageState extends ConsumerState<NewsPage> {
             );
 
       final response = await http.get(uri);
+      if (!mounted) return;
       if (response.statusCode == 200) {
         final List data = jsonDecode(response.body);
         setState(() {
@@ -87,6 +87,7 @@ class _NewsPageState extends ConsumerState<NewsPage> {
       }
     } catch (e) {
       debugPrint('Error fetching news: $e');
+      if (!mounted) return;
       setState(() => _isLoading = false);
     }
   }
@@ -107,6 +108,7 @@ class _NewsPageState extends ConsumerState<NewsPage> {
             );
 
       final response = await http.get(uri);
+      if (!mounted) return;
       if (response.statusCode == 200) {
         final List data = jsonDecode(response.body);
         setState(() {
@@ -121,6 +123,7 @@ class _NewsPageState extends ConsumerState<NewsPage> {
       }
     } catch (e) {
       debugPrint('Error loading more news: $e');
+      if (!mounted) return;
       setState(() => _isLoadingMore = false);
     }
   }
@@ -170,9 +173,7 @@ class _NewsPageState extends ConsumerState<NewsPage> {
     final isMobile = screenWidth < 600;
     final horizontalPadding = isMobile ? 16.0 : 50.0;
 
-    return EventSidebarLayout(
-      title: 'News',
-      child: GestureDetector(
+    return GestureDetector(
         onTap: _closeProfile,
         behavior: HitTestBehavior.translucent,
         child: Stack(
@@ -218,8 +219,7 @@ class _NewsPageState extends ConsumerState<NewsPage> {
               ),
           ],
         ),
-      ),
-    );
+      );
   }
 
   Widget _buildSearchBar(bool isMobile) {

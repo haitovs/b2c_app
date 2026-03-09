@@ -1,19 +1,17 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import '../../../core/config/app_config.dart';
-import '../../../core/models/api_exception.dart';
 import '../../../core/providers/event_context_provider.dart';
+import '../../../core/widgets/app_snackbar.dart';
 import '../../../core/widgets/custom_app_bar.dart';
-import '../../auth/providers/auth_provider.dart';
 import '../../events/ui/widgets/profile_dropdown.dart';
 import '../../notifications/ui/notification_drawer.dart';
+import '../providers/meeting_providers.dart';
 
 /// Meeting Edit Page - for editing an existing meeting (only if PENDING)
 /// Layout matches the MeetingRequestPage (image card + form card)
@@ -63,10 +61,6 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
   List<Map<String, dynamic>> _agendaDays = [];
   Map<String, dynamic>? _selectedDay;
 
-  // Attachment
-  Uint8List? _attachmentImage;
-  String? _attachmentImageName;
-
   // Data
   Map<String, dynamic>? _meeting;
   bool _isLoading = true;
@@ -91,25 +85,12 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
     setState(() => _isLoading = true);
 
     try {
-      final token = await ref.read(authNotifierProvider.notifier).getToken();
-
       // Get meeting data - either from extra or fetch from API
       if (widget.meetingData != null) {
         _meeting = widget.meetingData;
       } else {
-        // Fetch meeting from API
-        final response = await http.get(
-          Uri.parse(
-            '${AppConfig.b2cApiBaseUrl}/api/v1/meetings/${widget.meetingId}',
-          ),
-          headers: {
-            'Authorization': 'Bearer $token',
-            'Content-Type': 'application/json',
-          },
-        );
-        if (response.statusCode == 200) {
-          _meeting = jsonDecode(response.body);
-        }
+        final meetingService = ref.read(meetingServiceProvider);
+        _meeting = await meetingService.fetchMeeting(widget.meetingId);
       }
 
       if (_meeting != null) {
@@ -119,6 +100,7 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
 
         // Pre-fill form fields
         _subjectController.text = _meeting!['subject'] ?? '';
+        _commentsController.text = _meeting!['message'] ?? '';
 
         // Pre-fill attendees from attendees_text
         final attendeesText = _meeting!['attendees_text'] as String? ?? '';
@@ -138,8 +120,14 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
         // Initialize meeting with
         _meetingWithControllers = [TextEditingController()];
 
+        // Pre-fill language
+        final lang = _meeting!['language'] as String?;
+        if (lang != null && _languages.contains(lang)) {
+          _selectedLanguage = lang;
+        }
+
         // Fetch agenda days
-        await _fetchAgendaDays(token);
+        await _fetchAgendaDays();
 
         // Try to match the selected day from meeting start_time
         final startTime = _meeting!['start_time'];
@@ -160,14 +148,16 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
         }
       }
 
+      if (!mounted) return;
       setState(() => _isLoading = false);
     } catch (e) {
       debugPrint('Error fetching meeting: $e');
+      if (!mounted) return;
       setState(() => _isLoading = false);
     }
   }
 
-  Future<void> _fetchAgendaDays(String? token) async {
+  Future<void> _fetchAgendaDays() async {
     try {
       final siteId = ref.read(eventContextProvider).siteId;
 
@@ -270,43 +260,17 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
     }
   }
 
-  Future<void> _pickImage() async {
-    try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.image,
-        withData: true,
-      );
-      if (result != null && result.files.isNotEmpty) {
-        setState(() {
-          _attachmentImage = result.files.first.bytes;
-          _attachmentImageName = result.files.first.name;
-        });
-      }
-    } catch (e) {
-      debugPrint('Error picking image: $e');
-    }
-  }
-
-  void _removeImage() {
-    setState(() {
-      _attachmentImage = null;
-      _attachmentImageName = null;
-    });
-  }
-
   Future<void> _saveMeeting() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedDay == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Please select a day')));
+      AppSnackBar.showInfo(context, 'Please select a day');
       return;
     }
 
     setState(() => _isSaving = true);
 
     try {
-      final token = await ref.read(authNotifierProvider.notifier).getToken();
+      final meetingService = ref.read(meetingServiceProvider);
 
       // Collect attendees as comma-separated text
       final attendeesText = _attendeeControllers
@@ -319,45 +283,24 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
       final startTime = DateTime.parse('${dayDate}T09:00:00');
       final endTime = DateTime.parse('${dayDate}T10:00:00');
 
-      final body = {
-        'subject': _subjectController.text.trim(),
-        'start_time': startTime.toIso8601String(),
-        'end_time': endTime.toIso8601String(),
-        'attendees_text': attendeesText.isEmpty ? null : attendeesText,
-      };
-
-      final response = await http.put(
-        Uri.parse(
-          '${AppConfig.b2cApiBaseUrl}/api/v1/meetings/${widget.meetingId}',
-        ),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode(body),
+      await meetingService.updateMeeting(
+        meetingId: widget.meetingId,
+        subject: _subjectController.text.trim(),
+        startTime: startTime,
+        endTime: endTime,
+        attendeesText: attendeesText.isEmpty ? null : attendeesText,
+        message: _commentsController.text.trim().isEmpty
+            ? null
+            : _commentsController.text.trim(),
       );
 
-      if (response.statusCode == 200) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Meeting updated successfully!'),
-              backgroundColor: Colors.green,
-            ),
-          );
-          context.pop(true); // Return true to indicate success
-        }
-      } else {
-        throw Exception(ApiException.extractErrorMessage(response.statusCode, response.body));
+      if (mounted) {
+        AppSnackBar.showSuccess(context, 'Meeting updated successfully!');
+        context.pop(true); // Return true to indicate success
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to update meeting: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppSnackBar.showError(context, 'Failed to update meeting: $e');
       }
     } finally {
       if (mounted) {
@@ -547,9 +490,12 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
   }
 
   Widget _buildImageCard(String imageUrl, String name, String company) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
     return Container(
-      width: 300,
-      height: 351,
+      constraints: isMobile
+          ? const BoxConstraints(maxHeight: 280)
+          : const BoxConstraints(maxWidth: 300, maxHeight: 351),
+      width: isMobile ? double.infinity : 300,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(15),
@@ -614,8 +560,9 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
   }
 
   Widget _buildFormCard() {
+    final isMobile = MediaQuery.of(context).size.width < 600;
     return Container(
-      padding: const EdgeInsets.all(40),
+      padding: EdgeInsets.all(isMobile ? 20 : 40),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(10),
@@ -655,9 +602,7 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
                           const SizedBox(height: 20),
                           _buildSubjectsField(),
                           const SizedBox(height: 20),
-                          _buildCommentsField(),
-                          const SizedBox(height: 20),
-                          _buildAttachmentSection(),
+                          _buildMessageField(),
                         ],
                       ),
                     ),
@@ -692,9 +637,7 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
                     const SizedBox(height: 20),
                     _buildLanguageDropdown(),
                     const SizedBox(height: 20),
-                    _buildCommentsField(),
-                    const SizedBox(height: 20),
-                    _buildAttachmentSection(),
+                    _buildMessageField(),
                   ],
                 );
               }
@@ -990,12 +933,12 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
     );
   }
 
-  Widget _buildCommentsField() {
+  Widget _buildMessageField() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Comments:',
+          'Message:',
           style: GoogleFonts.inter(
             fontSize: 18,
             fontWeight: FontWeight.w500,
@@ -1014,7 +957,7 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
             maxLines: 5,
             style: GoogleFonts.roboto(fontSize: 18),
             decoration: InputDecoration(
-              hintText: 'Enter comments...',
+              hintText: 'Enter message...',
               hintStyle: GoogleFonts.roboto(
                 fontSize: 18,
                 color: Colors.black.withValues(alpha: 0.7),
@@ -1023,114 +966,6 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
               contentPadding: const EdgeInsets.all(15),
             ),
           ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildAttachmentSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Attachment:',
-          style: GoogleFonts.inter(
-            fontSize: 18,
-            fontWeight: FontWeight.w500,
-            color: Colors.black,
-          ),
-        ),
-        const SizedBox(height: 15),
-        Container(
-          height: 120,
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: const Color(0xFFB7B7B7),
-              style: BorderStyle.solid,
-            ),
-            borderRadius: BorderRadius.circular(5),
-          ),
-          child: _attachmentImage != null
-              ? Stack(
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: Image.memory(
-                        _attachmentImage!,
-                        width: double.infinity,
-                        height: double.infinity,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                    Positioned(
-                      top: 8,
-                      right: 8,
-                      child: GestureDetector(
-                        onTap: _removeImage,
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: const BoxDecoration(
-                            color: Colors.red,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.close,
-                            color: Colors.white,
-                            size: 16,
-                          ),
-                        ),
-                      ),
-                    ),
-                    if (_attachmentImageName != null)
-                      Positioned(
-                        bottom: 8,
-                        left: 8,
-                        right: 8,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.black54,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            _attachmentImageName!,
-                            style: GoogleFonts.roboto(
-                              color: Colors.white,
-                              fontSize: 12,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ),
-                  ],
-                )
-              : InkWell(
-                  onTap: _pickImage,
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.cloud_upload_outlined,
-                          size: 40,
-                          color: Colors.grey[400],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Click to upload image',
-                          style: GoogleFonts.roboto(
-                            color: Colors.grey[500],
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
         ),
       ],
     );

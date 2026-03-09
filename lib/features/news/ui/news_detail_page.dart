@@ -57,6 +57,7 @@ class _NewsDetailPageState extends ConsumerState<NewsDetailPage> {
           : Uri.parse('${AppConfig.tourismApiBaseUrl}/news/${widget.newsId}');
 
       final response = await http.get(uri);
+      if (!mounted) return;
       if (response.statusCode == 200) {
         setState(() {
           _news = jsonDecode(response.body);
@@ -68,6 +69,7 @@ class _NewsDetailPageState extends ConsumerState<NewsDetailPage> {
       }
     } catch (e) {
       debugPrint('Error fetching news: $e');
+      if (!mounted) return;
       setState(() => _isLoading = false);
     }
   }

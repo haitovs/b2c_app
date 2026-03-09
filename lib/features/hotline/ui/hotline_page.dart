@@ -1,12 +1,17 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../../../core/app_theme.dart';
+import '../../../core/config/app_config.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../providers/hotline_providers.dart';
 import '../services/hotline_service.dart';
 
@@ -29,6 +34,8 @@ class _HotlinePageState extends ConsumerState<HotlinePage> {
   bool _isConnected = false;
   String? _error;
   bool _initialized = false;
+  bool _showEmojiPicker = false;
+  bool _isSendingFile = false;
 
   @override
   void didChangeDependencies() {
@@ -111,7 +118,6 @@ class _HotlinePageState extends ConsumerState<HotlinePage> {
     final type = message['type'];
 
     if (type == 'message') {
-      // Admin sent a message
       setState(() {
         _messages.add(
           ChatMessage(
@@ -121,13 +127,13 @@ class _HotlinePageState extends ConsumerState<HotlinePage> {
             createdAt: message['timestamp'] != null
                 ? DateTime.parse(message['timestamp'])
                 : DateTime.now(),
+            mediaUrl: message['media_url'],
           ),
         );
       });
       _scrollToBottom();
     } else if (type == 'message_sent') {
-      // Our message was confirmed
-      // Already added optimistically, just update ID if needed
+      // Our message was confirmed — already added optimistically
     }
   }
 
@@ -152,6 +158,115 @@ class _HotlinePageState extends ConsumerState<HotlinePage> {
     }
   }
 
+  void _toggleEmojiPicker() {
+    setState(() => _showEmojiPicker = !_showEmojiPicker);
+  }
+
+  void _insertEmoji(String emoji) {
+    final text = _messageController.text;
+    final selection = _messageController.selection;
+    final newText = text.replaceRange(
+      selection.start < 0 ? text.length : selection.start,
+      selection.end < 0 ? text.length : selection.end,
+      emoji,
+    );
+    _messageController.value = TextEditingValue(
+      text: newText,
+      selection: TextSelection.collapsed(
+        offset: (selection.start < 0 ? text.length : selection.start) +
+            emoji.length,
+      ),
+    );
+    setState(() {});
+  }
+
+  Future<void> _pickAndSendFile() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf', 'doc', 'docx', 'xls', 'xlsx'],
+      withData: true,
+    );
+
+    if (result == null || result.files.isEmpty) return;
+    final file = result.files.first;
+    if (file.bytes == null) return;
+
+    setState(() => _isSendingFile = true);
+
+    try {
+      final token = await ref.read(authNotifierProvider.notifier).getToken();
+      if (token == null) return;
+
+      final uri = Uri.parse('${AppConfig.b2cApiBaseUrl}/api/v1/chat/upload');
+      final request = http.MultipartRequest('POST', uri)
+        ..headers['Authorization'] = 'Bearer $token'
+        ..files.add(http.MultipartFile.fromBytes(
+          'file',
+          file.bytes!,
+          filename: file.name,
+          contentType: MediaType.parse(_getMimeType(file.name)),
+        ));
+
+      final response = await request.send();
+      if (response.statusCode == 200) {
+        final respBody = await response.stream.bytesToString();
+        final data = json.decode(respBody);
+        final url = data['url'] as String;
+
+        // Send message with media URL
+        _sendMediaMessage(url, file.name);
+      }
+    } catch (e) {
+      debugPrint('File upload error: $e');
+    } finally {
+      if (mounted) setState(() => _isSendingFile = false);
+    }
+  }
+
+  String _getMimeType(String filename) {
+    final ext = filename.split('.').last.toLowerCase();
+    switch (ext) {
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'gif':
+        return 'image/gif';
+      case 'webp':
+        return 'image/webp';
+      case 'pdf':
+        return 'application/pdf';
+      default:
+        return 'application/octet-stream';
+    }
+  }
+
+  void _sendMediaMessage(String mediaUrl, String fileName) {
+    final isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp']
+        .any((ext) => fileName.toLowerCase().endsWith(ext));
+    final content = isImage ? '[Image]' : '[File: $fileName]';
+
+    setState(() {
+      _messages.add(ChatMessage(
+        content: content,
+        role: 'USER',
+        createdAt: DateTime.now(),
+        mediaUrl: mediaUrl,
+      ));
+    });
+    _scrollToBottom();
+
+    if (_channel != null && _isConnected) {
+      _channel!.sink.add(json.encode({
+        'content': content,
+        'media_url': mediaUrl,
+      }));
+    } else {
+      _service.sendMessageWithMedia(content, mediaUrl);
+    }
+  }
+
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
@@ -171,6 +286,15 @@ class _HotlinePageState extends ConsumerState<HotlinePage> {
     return '$hour:$minute';
   }
 
+  bool _isImageUrl(String url) {
+    final lower = url.toLowerCase();
+    return lower.endsWith('.jpg') ||
+        lower.endsWith('.jpeg') ||
+        lower.endsWith('.png') ||
+        lower.endsWith('.gif') ||
+        lower.endsWith('.webp');
+  }
+
   String _formatDate(DateTime? time) {
     if (time == null) return '';
     final now = DateTime.now();
@@ -184,7 +308,9 @@ class _HotlinePageState extends ConsumerState<HotlinePage> {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
     return Scaffold(
+      backgroundColor: AppColors.gradientEnd,
       body: Container(
         width: double.infinity,
         height: double.infinity,
@@ -204,7 +330,7 @@ class _HotlinePageState extends ConsumerState<HotlinePage> {
               // Chat Container
               Expanded(
                 child: Container(
-                  margin: const EdgeInsets.all(20),
+                  margin: EdgeInsets.all(isMobile ? 12 : 20),
                   decoration: BoxDecoration(
                     color: AppColors.cardBackground,
                     borderRadius: BorderRadius.circular(20),
@@ -228,6 +354,28 @@ class _HotlinePageState extends ConsumerState<HotlinePage> {
                             : _buildMessagesList(),
                       ),
 
+                      // Emoji Picker
+                      if (_showEmojiPicker) _buildEmojiPicker(),
+
+                      // File sending indicator
+                      if (_isSendingFile)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 8),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              SizedBox(
+                                width: 16,
+                                height: 16,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                              SizedBox(width: 8),
+                              Text('Sending file...'),
+                            ],
+                          ),
+                        ),
+
                       // Input Area
                       _buildInputArea(),
                     ],
@@ -242,17 +390,16 @@ class _HotlinePageState extends ConsumerState<HotlinePage> {
   }
 
   Widget _buildHeader() {
+    final isMobile = MediaQuery.of(context).size.width < 600;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+      padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 20, vertical: 15),
       child: Row(
         children: [
           // Menu/Back Button
           IconButton(
             onPressed: () {
-              // Extract eventId from current URL and go back to menu
               final uri = GoRouterState.of(context).uri;
               final pathSegments = uri.pathSegments;
-              // URL is /events/{id}/hotline, so id is at index 1
               if (pathSegments.length >= 2 && pathSegments[0] == 'events') {
                 final eventId = pathSegments[1];
                 context.go('/events/$eventId/menu');
@@ -265,12 +412,12 @@ class _HotlinePageState extends ConsumerState<HotlinePage> {
           const SizedBox(width: 10),
 
           // Title
-          const Text(
+          Text(
             'Hotline',
             style: TextStyle(
               fontFamily: 'Montserrat',
               fontWeight: FontWeight.w600,
-              fontSize: 32,
+              fontSize: isMobile ? 24 : 32,
               color: Colors.white,
             ),
           ),
@@ -309,33 +456,34 @@ class _HotlinePageState extends ConsumerState<HotlinePage> {
             ),
           ),
 
-          const SizedBox(width: 10),
-
-          // Profile/Notifications
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(
-              Icons.notifications_outlined,
-              color: Colors.white,
-              size: 28,
+          if (!isMobile) ...[
+            const SizedBox(width: 10),
+            IconButton(
+              onPressed: () {},
+              icon: const Icon(
+                Icons.notifications_outlined,
+                color: Colors.white,
+                size: 28,
+              ),
             ),
-          ),
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(
-              Icons.person_outline,
-              color: Colors.white,
-              size: 28,
+            IconButton(
+              onPressed: () {},
+              icon: const Icon(
+                Icons.person_outline,
+                color: Colors.white,
+                size: 28,
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );
   }
 
   Widget _buildChatHeader() {
+    final isMobile = MediaQuery.of(context).size.width < 600;
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(isMobile ? 12 : 20),
       decoration: const BoxDecoration(
         color: Color(0xFFCDD1E5),
         borderRadius: BorderRadius.only(
@@ -345,13 +493,15 @@ class _HotlinePageState extends ConsumerState<HotlinePage> {
       ),
       child: Row(
         children: [
-          const Text(
-            'Chat with Organizers',
-            style: TextStyle(
-              fontFamily: 'Inter',
-              fontWeight: FontWeight.w600,
-              fontSize: 24,
-              color: Colors.black,
+          Flexible(
+            child: Text(
+              'Chat with Organizers',
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontWeight: FontWeight.w600,
+                fontSize: isMobile ? 18 : 24,
+                color: Colors.black,
+              ),
             ),
           ),
           const Spacer(),
@@ -428,16 +578,22 @@ class _HotlinePageState extends ConsumerState<HotlinePage> {
   Widget _buildMessageBubble(ChatMessage message) {
     final isUser = message.isFromUser;
 
+    final bubbleBg = isUser
+        ? AppColors.gradientStart
+        : const Color(0xFFE8E8F0);
+    final textColor = isUser ? Colors.white : AppColors.textPrimary;
+    final timeColor = isUser
+        ? Colors.white.withValues(alpha: 0.6)
+        : AppColors.textSecondary;
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
-        mainAxisAlignment: isUser
-            ? MainAxisAlignment.end
-            : MainAxisAlignment.start,
+        mainAxisAlignment:
+            isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           if (!isUser) ...[
-            // Admin avatar
             CircleAvatar(
               radius: 24,
               backgroundColor: AppColors.gradientStart,
@@ -449,45 +605,82 @@ class _HotlinePageState extends ConsumerState<HotlinePage> {
             ),
             const SizedBox(width: 12),
           ],
-
           Flexible(
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
               decoration: BoxDecoration(
-                color: const Color(0xFF312F2F),
+                color: bubbleBg,
                 borderRadius: BorderRadius.circular(25),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    message.content,
-                    style: const TextStyle(
-                      fontFamily: 'Inter',
-                      fontWeight: FontWeight.w600,
-                      fontSize: 16,
-                      color: Colors.white,
+                  if (message.mediaUrl != null &&
+                      message.mediaUrl!.isNotEmpty) ...[
+                    if (_isImageUrl(message.mediaUrl!))
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.network(
+                          message.mediaUrl!,
+                          width: 200,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            width: 200,
+                            height: 100,
+                            color: Colors.grey[300],
+                            child: const Icon(Icons.broken_image),
+                          ),
+                        ),
+                      )
+                    else
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.insert_drive_file,
+                              color: textColor, size: 20),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              message.content,
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontWeight: FontWeight.w500,
+                                fontSize: 14,
+                                color: textColor,
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    const SizedBox(height: 4),
+                  ],
+                  if (message.mediaUrl == null ||
+                      !_isImageUrl(message.mediaUrl ?? ''))
+                    Text(
+                      message.content,
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontWeight: FontWeight.w500,
+                        fontSize: 16,
+                        color: textColor,
+                      ),
                     ),
-                  ),
                   const SizedBox(height: 4),
                   Text(
                     _formatTime(message.createdAt),
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.white.withValues(alpha: 0.6),
-                    ),
+                    style: TextStyle(fontSize: 11, color: timeColor),
                   ),
                 ],
               ),
             ),
           ),
-
           if (isUser) ...[
             const SizedBox(width: 12),
-            // User avatar placeholder
             CircleAvatar(
               radius: 24,
-              backgroundColor: Colors.grey[400],
+              backgroundColor: AppColors.gradientEnd,
               child: const Icon(Icons.person, color: Colors.white, size: 24),
             ),
           ],
@@ -496,78 +689,106 @@ class _HotlinePageState extends ConsumerState<HotlinePage> {
     );
   }
 
+  Widget _buildEmojiPicker() {
+    const emojis = [
+      '😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂',
+      '🙂', '😊', '😇', '🥰', '😍', '🤩', '😘', '😗',
+      '😋', '😛', '😜', '🤪', '😝', '🤑', '🤗', '🤭',
+      '🤫', '🤔', '🤐', '🤨', '😐', '😑', '😶', '😏',
+      '😒', '🙄', '😬', '😮', '😯', '😲', '😳', '🥺',
+      '😦', '😧', '😨', '😰', '😥', '😢', '😭', '😱',
+      '👍', '👎', '👌', '✌️', '🤞', '🤝', '🙏', '💪',
+      '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍',
+      '🎉', '🎊', '🏆', '🥇', '⭐', '🌟', '💯', '✅',
+      '🔥', '💡', '📎', '📁', '📅', '🕐', '📍', '🏢',
+    ];
+
+    final isMobile = MediaQuery.of(context).size.width < 600;
+    return Container(
+      height: isMobile ? 160 : 200,
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: AppColors.cardBackground,
+        border: Border(top: BorderSide(color: AppColors.inputBorder, width: 0.5)),
+      ),
+      child: GridView.builder(
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: isMobile ? 6 : 8,
+          mainAxisSpacing: 4,
+          crossAxisSpacing: 4,
+        ),
+        itemCount: emojis.length,
+        itemBuilder: (context, index) {
+          return GestureDetector(
+            onTap: () => _insertEmoji(emojis[index]),
+            child: Center(
+              child: Text(emojis[index], style: const TextStyle(fontSize: 24)),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   Widget _buildInputArea() {
     return Container(
       padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.cardBackground,
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(20),
+          bottomRight: Radius.circular(20),
+        ),
+      ),
       child: Row(
         children: [
-          // Message Input
           Expanded(
             child: Container(
               decoration: BoxDecoration(
-                color: const Color(0xFF312F2F),
+                color: const Color(0xFFE0E0EA),
                 borderRadius: BorderRadius.circular(30),
+                border: Border.all(color: AppColors.inputBorder, width: 0.5),
               ),
               child: Row(
                 children: [
-                  // Emoji button
                   IconButton(
-                    onPressed: () {},
-                    icon: const Icon(
-                      Icons.emoji_emotions_outlined,
-                      color: Colors.white54,
-                      size: 28,
+                    onPressed: _toggleEmojiPicker,
+                    icon: Icon(
+                      _showEmojiPicker
+                          ? Icons.keyboard
+                          : Icons.emoji_emotions_outlined,
+                      color: AppColors.textSecondary,
+                      size: 24,
                     ),
                   ),
-
-                  // Text field
                   Expanded(
                     child: TextField(
                       controller: _messageController,
-                      style: const TextStyle(color: Colors.white, fontSize: 16),
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 16,
+                        fontFamily: 'Inter',
+                      ),
                       decoration: InputDecoration(
                         hintText: 'Message...',
                         hintStyle: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.4),
+                          color: AppColors.textSecondary,
                           fontFamily: 'Inter',
-                          fontWeight: FontWeight.w600,
                           fontSize: 16,
                         ),
                         border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(
-                          vertical: 12,
-                        ),
+                        contentPadding:
+                            const EdgeInsets.symmetric(vertical: 12),
                       ),
                       onSubmitted: (_) => _sendMessage(),
+                      onChanged: (_) => setState(() {}),
                     ),
                   ),
-
-                  // Attachment button
                   IconButton(
-                    onPressed: () {},
-                    icon: const Icon(
+                    onPressed: _pickAndSendFile,
+                    icon: Icon(
                       Icons.attach_file,
-                      color: Colors.white54,
-                      size: 24,
-                    ),
-                  ),
-
-                  // Payment button (from Figma)
-                  IconButton(
-                    onPressed: () {},
-                    icon: const Icon(
-                      Icons.payment,
-                      color: Colors.white54,
-                      size: 24,
-                    ),
-                  ),
-
-                  // Camera button
-                  IconButton(
-                    onPressed: () {},
-                    icon: const Icon(
-                      Icons.camera_alt_outlined,
-                      color: Colors.white54,
+                      color: AppColors.textSecondary,
                       size: 24,
                     ),
                   ),
@@ -575,23 +796,22 @@ class _HotlinePageState extends ConsumerState<HotlinePage> {
               ),
             ),
           ),
-
           const SizedBox(width: 12),
-
-          // Voice/Send button
           GestureDetector(
             onTap: _sendMessage,
             child: Container(
-              width: 56,
-              height: 56,
-              decoration: const BoxDecoration(
-                color: Color(0xFF312F2F),
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: AppColors.gradientStart,
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                _messageController.text.isEmpty ? Icons.mic : Icons.send,
+                _messageController.text.trim().isEmpty
+                    ? Icons.mic
+                    : Icons.send,
                 color: Colors.white,
-                size: 28,
+                size: 24,
               ),
             ),
           ),

@@ -64,16 +64,20 @@ class ShuttleDetailPage extends StatelessWidget {
                 color: Colors.white,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
-              child: Padding(
-                padding: const EdgeInsets.all(24),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                final isMobile = constraints.maxWidth < 600;
+                final contentPadding = isMobile ? 16.0 : 24.0;
+                return Padding(
+                padding: EdgeInsets.all(contentPadding),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Name
                     Text(
                       shuttle.name,
-                      style: const TextStyle(
-                        fontSize: 24,
+                      style: TextStyle(
+                        fontSize: isMobile ? 20 : 24,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -201,6 +205,8 @@ class ShuttleDetailPage extends StatelessWidget {
                     const SizedBox(height: 24),
                   ],
                 ),
+              );
+                },
               ),
             ),
           ),

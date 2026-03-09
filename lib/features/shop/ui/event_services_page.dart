@@ -4,8 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/theme/app_theme.dart';
-import '../../../shared/layouts/event_sidebar_layout.dart';
-import '../../../shared/widgets/category_filter.dart';
+import '../../../core/widgets/app_snackbar.dart';
 import '../../../shared/widgets/product_card.dart';
 import '../models/event_service.dart';
 import '../providers/shop_providers.dart';
@@ -18,7 +17,7 @@ class EventServicesPage extends ConsumerStatefulWidget {
 }
 
 class _EventServicesPageState extends ConsumerState<EventServicesPage> {
-  String? _selectedCategory;
+  final Set<String> _selectedCategories = {};
 
   static const _categories = [
     'Expo',
@@ -48,23 +47,59 @@ class _EventServicesPageState extends ConsumerState<EventServicesPage> {
       cartMap[item.serviceId] = item;
     }
 
-    return EventSidebarLayout(
-      title: 'Event Services',
-      child: Column(
+    return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Header: title + cart totals (always visible)
           _ServicesHeader(eventId: eventId),
 
-          // Mobile: horizontal category chips
+          // Mobile: Category button + Filter icon
           if (isMobile) ...[
-            const SizedBox(height: 16),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: CategoryFilter(
-                categories: _categories,
-                selected: _selectedCategory,
-                onSelected: (cat) => setState(() => _selectedCategory = cat),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: Row(
+                children: [
+                  // Category button
+                  GestureDetector(
+                    onTap: () => _showCategoryDrawer(context),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryColor,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.grid_view_rounded,
+                              size: 16, color: Colors.white),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Category',
+                            style: GoogleFonts.inter(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  // Filter icon
+                  GestureDetector(
+                    onTap: () => _showFilterDrawer(context),
+                    child: Icon(
+                      Icons.tune,
+                      size: 24,
+                      color: Colors.black54,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -87,9 +122,9 @@ class _EventServicesPageState extends ConsumerState<EventServicesPage> {
                 if (isMobile) {
                   if (filtered.isEmpty) {
                     return _EmptyGridMessage(
-                      category: _selectedCategory,
+                      categories: _selectedCategories,
                       onClearFilter: () =>
-                          setState(() => _selectedCategory = null),
+                          setState(() => _selectedCategories.clear()),
                     );
                   }
                   return _ServicesGrid(
@@ -112,9 +147,16 @@ class _EventServicesPageState extends ConsumerState<EventServicesPage> {
                       // Category sidebar (always visible)
                       _CategorySidebar(
                         categories: _categories,
-                        selected: _selectedCategory,
-                        onChanged: (cat) =>
-                            setState(() => _selectedCategory = cat),
+                        selected: _selectedCategories,
+                        onToggle: (cat) => setState(() {
+                          if (_selectedCategories.contains(cat)) {
+                            _selectedCategories.remove(cat);
+                          } else {
+                            _selectedCategories.add(cat);
+                          }
+                        }),
+                        onClearAll: () =>
+                            setState(() => _selectedCategories.clear()),
                       ),
 
                       const SizedBox(width: 16),
@@ -129,9 +171,9 @@ class _EventServicesPageState extends ConsumerState<EventServicesPage> {
                             Expanded(
                               child: filtered.isEmpty
                                   ? _EmptyGridMessage(
-                                      category: _selectedCategory,
+                                      categories: _selectedCategories,
                                       onClearFilter: () => setState(
-                                        () => _selectedCategory = null,
+                                        () => _selectedCategories.clear(),
                                       ),
                                     )
                                   : _ServicesGrid(
@@ -155,16 +197,49 @@ class _EventServicesPageState extends ConsumerState<EventServicesPage> {
             ),
           ),
         ],
+      );
+  }
+
+  void _showCategoryDrawer(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _MobileCategoryDrawer(
+        categories: _categories,
+        selected: _selectedCategories,
+        onToggle: (cat) {
+          setState(() {
+            if (_selectedCategories.contains(cat)) {
+              _selectedCategories.remove(cat);
+            } else {
+              _selectedCategories.add(cat);
+            }
+          });
+        },
+        onClearAll: () {
+          setState(() => _selectedCategories.clear());
+          Navigator.of(context).pop();
+        },
       ),
     );
   }
 
+  void _showFilterDrawer(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const _MobileFilterDrawer(),
+    );
+  }
+
   List<EventServiceItem> _filterServices(List<EventServiceItem> services) {
-    if (_selectedCategory == null) return services;
+    if (_selectedCategories.isEmpty) return services;
+    final lowerSelected =
+        _selectedCategories.map((c) => c.toLowerCase()).toSet();
     return services
-        .where(
-          (s) => s.category.toLowerCase() == _selectedCategory!.toLowerCase(),
-        )
+        .where((s) => lowerSelected.contains(s.category.toLowerCase()))
         .toList();
   }
 
@@ -175,30 +250,11 @@ class _EventServicesPageState extends ConsumerState<EventServicesPage> {
       ref.invalidate(cartProvider(eventId));
       ref.invalidate(cartBadgeCountProvider(eventId));
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '${service.name} added to cart',
-              style: GoogleFonts.inter(fontSize: 14),
-            ),
-            backgroundColor: AppTheme.successColor,
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 2),
-          ),
-        );
+        AppSnackBar.showSuccess(context, '${service.name} added to cart');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Failed to add to cart: $e',
-              style: GoogleFonts.inter(fontSize: 14),
-            ),
-            backgroundColor: AppTheme.errorColor,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        AppSnackBar.showError(context, 'Failed to add to cart: $e');
       }
     }
   }
@@ -220,13 +276,7 @@ class _EventServicesPageState extends ConsumerState<EventServicesPage> {
       ref.invalidate(cartBadgeCountProvider(eventId));
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to update cart: $e'),
-            backgroundColor: AppTheme.errorColor,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        AppSnackBar.showError(context, 'Failed to update cart: $e');
       }
     }
   }
@@ -249,13 +299,7 @@ class _EventServicesPageState extends ConsumerState<EventServicesPage> {
       ref.invalidate(cartBadgeCountProvider(eventId));
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to update cart: $e'),
-            backgroundColor: AppTheme.errorColor,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        AppSnackBar.showError(context, 'Failed to update cart: $e');
       }
     }
   }
@@ -275,9 +319,10 @@ class _ServicesHeader extends ConsumerWidget {
     final totalTmt = cartAsync.whenOrNull(data: (c) => c.totalTmt) ?? 0;
     final totalUsd = cartAsync.whenOrNull(data: (c) => c.totalUsd) ?? 0;
     final itemCount = cartAsync.whenOrNull(data: (c) => c.itemCount) ?? 0;
+    final isMobile = MediaQuery.of(context).size.width < 600;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+      padding: EdgeInsets.fromLTRB(isMobile ? 16 : 24, 16, isMobile ? 16 : 24, 0),
       child: Column(
         children: [
           Row(
@@ -286,7 +331,7 @@ class _ServicesHeader extends ConsumerWidget {
               Text(
                 'Event Services',
                 style: GoogleFonts.montserrat(
-                  fontSize: 30,
+                  fontSize: isMobile ? 22 : 30,
                   fontWeight: FontWeight.w600,
                   color: AppTheme.primaryColor,
                 ),
@@ -329,6 +374,8 @@ class _CartSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -367,36 +414,38 @@ class _CartSummary extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(width: 16),
-        // Totals
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              '${_fmt(totalTmt)} TMT',
-              style: GoogleFonts.montserrat(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: Colors.black,
+        if (!isMobile) ...[
+          const SizedBox(width: 16),
+          // Totals (desktop only)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '${_fmt(totalTmt)} TMT',
+                style: GoogleFonts.montserrat(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.black,
+                ),
               ),
-            ),
-            Container(
-              margin: const EdgeInsets.symmetric(vertical: 2),
-              width: 80,
-              height: 0.5,
-              color: AppTheme.primaryColor,
-            ),
-            Text(
-              '${_fmt(totalUsd)} \$',
-              style: GoogleFonts.montserrat(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: Colors.black,
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 2),
+                width: 80,
+                height: 0.5,
+                color: AppTheme.primaryColor,
               ),
-            ),
-          ],
-        ),
+              Text(
+                '${_fmt(totalUsd)} \$',
+                style: GoogleFonts.montserrat(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.black,
+                ),
+              ),
+            ],
+          ),
+        ],
       ],
     );
   }
@@ -410,13 +459,15 @@ class _CartSummary extends StatelessWidget {
 // ---------------------------------------------------------------------------
 class _CategorySidebar extends StatelessWidget {
   final List<String> categories;
-  final String? selected;
-  final ValueChanged<String?> onChanged;
+  final Set<String> selected;
+  final ValueChanged<String> onToggle;
+  final VoidCallback onClearAll;
 
   const _CategorySidebar({
     required this.categories,
     required this.selected,
-    required this.onChanged,
+    required this.onToggle,
+    required this.onClearAll,
   });
 
   @override
@@ -450,17 +501,17 @@ class _CategorySidebar extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          // Category list — clean, no shadow
+          // "All" clears selection
           _CategoryRow(
             label: 'All',
-            isSelected: selected == null,
-            onTap: () => onChanged(null),
+            isSelected: selected.isEmpty,
+            onTap: onClearAll,
           ),
           for (final cat in categories)
             _CategoryRow(
               label: cat,
-              isSelected: selected == cat,
-              onTap: () => onChanged(cat),
+              isSelected: selected.contains(cat),
+              onTap: () => onToggle(cat),
             ),
         ],
       ),
@@ -621,8 +672,8 @@ class _ServicesGrid extends StatelessWidget {
         return ProductCard(
           name: service.name,
           imageUrl: service.imageUrl,
-          priceUsd: service.priceUsd,
-          priceTmt: service.priceTmt,
+          price: service.price,
+          currency: service.currency,
           discountPercent: service.discountPercent,
           subtitle: service.subtitle,
           cartQuantity: qty,
@@ -640,11 +691,11 @@ class _ServicesGrid extends StatelessWidget {
 // Empty grid message (shown inside the grid area, not replacing layout)
 // ---------------------------------------------------------------------------
 class _EmptyGridMessage extends StatelessWidget {
-  final String? category;
+  final Set<String> categories;
   final VoidCallback onClearFilter;
 
   const _EmptyGridMessage({
-    required this.category,
+    required this.categories,
     required this.onClearFilter,
   });
 
@@ -668,8 +719,8 @@ class _EmptyGridMessage extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              category != null
-                  ? 'No services in the "$category" category.'
+              categories.isNotEmpty
+                  ? 'No services in the selected categories.'
                   : 'No services are available for this event.',
               style: GoogleFonts.inter(
                 fontSize: 14,
@@ -677,7 +728,7 @@ class _EmptyGridMessage extends StatelessWidget {
               ),
               textAlign: TextAlign.center,
             ),
-            if (category != null) ...[
+            if (categories.isNotEmpty) ...[
               const SizedBox(height: 16),
               OutlinedButton(
                 onPressed: onClearFilter,
@@ -685,6 +736,274 @@ class _EmptyGridMessage extends StatelessWidget {
                 child: const Text('Show All Services'),
               ),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Mobile Category Drawer
+// ---------------------------------------------------------------------------
+class _MobileCategoryDrawer extends StatelessWidget {
+  final List<String> categories;
+  final Set<String> selected;
+  final ValueChanged<String> onToggle;
+  final VoidCallback onClearAll;
+
+  const _MobileCategoryDrawer({
+    required this.categories,
+    required this.selected,
+    required this.onToggle,
+    required this.onClearAll,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.7,
+      minChildSize: 0.4,
+      maxChildSize: 0.9,
+      builder: (context, scrollController) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+          ),
+          child: Column(
+            children: [
+              // Header
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(16),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.grid_view_rounded,
+                        size: 18, color: Colors.white),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Category',
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const Spacer(),
+                    GestureDetector(
+                      onTap: () => Navigator.of(context).pop(),
+                      child: const Icon(Icons.close,
+                          size: 22, color: Colors.white),
+                    ),
+                  ],
+                ),
+              ),
+              // Category list
+              Expanded(
+                child: ListView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  children: [
+                    _DrawerCheckboxRow(
+                      label: 'All',
+                      isSelected: selected.isEmpty,
+                      onTap: onClearAll,
+                    ),
+                    for (final cat in categories)
+                      _DrawerCheckboxRow(
+                        label: cat,
+                        isSelected: selected.contains(cat),
+                        onTap: () => onToggle(cat),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Mobile Filter Drawer
+// ---------------------------------------------------------------------------
+class _MobileFilterDrawer extends StatelessWidget {
+  const _MobileFilterDrawer();
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.85,
+      minChildSize: 0.4,
+      maxChildSize: 0.95,
+      builder: (context, scrollController) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+          ),
+          child: Column(
+            children: [
+              // Header
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(16),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.tune, size: 18, color: Colors.white),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Filter',
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const Spacer(),
+                    GestureDetector(
+                      onTap: () => Navigator.of(context).pop(),
+                      child: const Icon(Icons.close,
+                          size: 22, color: Colors.white),
+                    ),
+                  ],
+                ),
+              ),
+              // Filter sections
+              Expanded(
+                child: ListView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  children: [
+                    _FilterSection(
+                      title: 'Price',
+                      options: ['Low to High', 'High to Low', 'Premium'],
+                    ),
+                    _FilterSection(
+                      title: 'Service Type',
+                      options: [
+                        'One-time service',
+                        'Per person',
+                        'Per booth',
+                        'Daily rental',
+                      ],
+                    ),
+                    _FilterSection(
+                      title: 'Discount',
+                      options: [
+                        'On Sale',
+                        'Early Bird',
+                        'Per booth',
+                        'Package Included',
+                      ],
+                    ),
+                    _FilterSection(
+                      title: 'Currency',
+                      options: ['All', 'USD', 'TMT'],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _FilterSection extends StatelessWidget {
+  final String title;
+  final List<String> options;
+
+  const _FilterSection({required this.title, required this.options});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Text(
+              title,
+              style: GoogleFonts.inter(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Colors.black,
+              ),
+            ),
+            const Spacer(),
+            const Icon(Icons.keyboard_arrow_down, size: 22, color: Colors.black54),
+          ],
+        ),
+        const Divider(color: Color(0xFFCACACA)),
+        ...options.map(
+          (opt) => _DrawerCheckboxRow(
+            label: opt,
+            isSelected: false,
+            onTap: () {},
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DrawerCheckboxRow extends StatelessWidget {
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _DrawerCheckboxRow({
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: GoogleFonts.inter(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w400,
+                  color: Colors.black,
+                ),
+              ),
+            ),
+            Icon(
+              isSelected ? Icons.check_box : Icons.check_box_outline_blank,
+              size: 20,
+              color: isSelected ? AppTheme.primaryColor : Colors.grey.shade400,
+            ),
           ],
         ),
       ),

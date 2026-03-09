@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/theme/app_theme.dart';
 import '../../registration/providers/registration_providers.dart';
 import 'meeting_not_registered_page.dart';
 import 'meetings_page.dart';
@@ -67,12 +68,9 @@ class _MeetingGatePageState extends ConsumerState<MeetingGatePage> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return Scaffold(
-        backgroundColor: const Color(0xFF3C4494),
-        body: const Center(
-          child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-          ),
+      return Center(
+        child: CircularProgressIndicator(
+          color: AppTheme.primaryColor,
         ),
       );
     }

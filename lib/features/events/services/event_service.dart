@@ -14,7 +14,7 @@ class EventService {
     }
 
     final result = await _api.get<List<dynamic>>(
-      '/api/v1/events/',
+      '/api/v1/events',
       auth: false,
       queryParams: queryParams.isNotEmpty ? queryParams : null,
     );

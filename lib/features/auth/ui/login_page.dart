@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/app_theme.dart';
+import '../../../core/widgets/app_snackbar.dart';
 import '../../../core/widgets/app_text_field.dart';
 import '../providers/auth_provider.dart';
 import 'widgets/auth_page_layout.dart';
@@ -177,13 +178,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       if (!mounted) return;
 
       if (errorMessage == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Login successful!"),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
-          ),
-        );
+        AppSnackBar.showSuccess(context, "Login successful!");
         // GoRouter redirect handles post-login navigation automatically
         // (event menu if last-viewed event exists, otherwise event calendar)
       } else if (errorMessage == 'EMAIL_NOT_VERIFIED') {
@@ -204,13 +199,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-        duration: const Duration(seconds: 4),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    AppSnackBar.showError(context, message);
   }
 }

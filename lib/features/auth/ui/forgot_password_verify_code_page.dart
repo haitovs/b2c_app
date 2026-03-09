@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/app_theme.dart';
+import '../../../core/widgets/app_snackbar.dart';
 import '../providers/auth_provider.dart';
 import 'widgets/auth_info_box.dart';
 import 'widgets/auth_page_layout.dart';
@@ -152,13 +153,6 @@ class _ForgotPasswordVerifyCodePageState
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-        duration: const Duration(seconds: 4),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    AppSnackBar.showError(context, message);
   }
 }

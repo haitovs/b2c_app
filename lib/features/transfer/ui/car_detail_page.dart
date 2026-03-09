@@ -78,8 +78,12 @@ class CarDetailPage extends StatelessWidget {
                 color: Colors.white,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
-              child: Padding(
-                padding: const EdgeInsets.all(24),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                final isMobile = constraints.maxWidth < 600;
+                final contentPadding = isMobile ? 16.0 : 24.0;
+                return Padding(
+                padding: EdgeInsets.all(contentPadding),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -90,8 +94,8 @@ class CarDetailPage extends StatelessWidget {
                         Expanded(
                           child: Text(
                             car.name,
-                            style: const TextStyle(
-                              fontSize: 24,
+                            style: TextStyle(
+                              fontSize: isMobile ? 20 : 24,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -101,10 +105,10 @@ class CarDetailPage extends StatelessWidget {
                           children: [
                             Text(
                               car.priceDisplay,
-                              style: const TextStyle(
-                                fontSize: 22,
+                              style: TextStyle(
+                                fontSize: isMobile ? 18 : 22,
                                 fontWeight: FontWeight.bold,
-                                color: Color(0xFF3C4494),
+                                color: const Color(0xFF3C4494),
                               ),
                             ),
                             if (car.pricePerHour != null)
@@ -253,6 +257,8 @@ class CarDetailPage extends StatelessWidget {
                     const SizedBox(height: 24),
                   ],
                 ),
+              );
+                },
               ),
             ),
           ),

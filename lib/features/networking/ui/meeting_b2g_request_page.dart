@@ -7,9 +7,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import '../../../core/config/app_config.dart';
 import '../../../core/providers/event_context_provider.dart';
+import '../../../core/widgets/app_snackbar.dart';
 import '../../../core/widgets/custom_app_bar.dart';
 import '../../events/ui/widgets/profile_dropdown.dart';
-import '../../auth/providers/auth_provider.dart';
 import '../../notifications/ui/notification_drawer.dart';
 import '../providers/meeting_providers.dart';
 import '../services/meeting_service.dart';
@@ -135,31 +135,16 @@ class _MeetingB2GRequestPageState extends ConsumerState<MeetingB2GRequestPage> {
 
   Future<void> _fetchGovEntity() async {
     try {
-      final token = await ref.read(authNotifierProvider.notifier).getToken();
-
-      // Fetch from B2C backend
-      final response = await http.get(
-        Uri.parse('${AppConfig.b2cApiBaseUrl}/api/v1/meetings/gov-entities'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
+      final meetingService = ref.read(meetingServiceProvider);
+      final entities = await meetingService.fetchGovEntities();
+      final entity = entities.firstWhere(
+        (e) => e['id'].toString() == widget.govEntityId,
+        orElse: () => <String, dynamic>{},
       );
-
-      if (response.statusCode == 200) {
-        final List data = jsonDecode(response.body);
-        // Find the specific gov entity
-        final entity = data.firstWhere(
-          (e) => e['id'].toString() == widget.govEntityId,
-          orElse: () => null,
-        );
-        setState(() {
-          _govEntity = entity;
-          _isLoading = false;
-        });
-      } else {
-        setState(() => _isLoading = false);
-      }
+      setState(() {
+        _govEntity = entity.isNotEmpty ? entity : null;
+        _isLoading = false;
+      });
     } catch (e) {
       debugPrint('Error fetching gov entity: $e');
       setState(() => _isLoading = false);
@@ -201,12 +186,7 @@ class _MeetingB2GRequestPageState extends ConsumerState<MeetingB2GRequestPage> {
 
     // Validate day selection
     if (_selectedDay == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select a day for the meeting'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      AppSnackBar.showWarning(context, 'Please select a day for the meeting');
       return;
     }
 
@@ -239,22 +219,12 @@ class _MeetingB2GRequestPageState extends ConsumerState<MeetingB2GRequestPage> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Meeting request sent successfully!'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        AppSnackBar.showSuccess(context, 'Meeting request sent successfully!');
         context.pop(true); // Return true to signal refresh needed
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to send request: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppSnackBar.showError(context, 'Failed to send request: $e');
       }
     } finally {
       if (mounted) {
@@ -325,31 +295,39 @@ class _MeetingB2GRequestPageState extends ConsumerState<MeetingB2GRequestPage> {
 
   Widget _buildHeader(bool isMobile, double horizontalPadding) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+      padding: EdgeInsets.only(
+        left: horizontalPadding,
+        right: horizontalPadding,
+        top: isMobile ? 12 : 20,
+      ),
       child: Row(
         children: [
-          // Back button
           IconButton(
             icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
             onPressed: () => context.pop(),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
           ),
-          const SizedBox(width: 8),
-          // Title
-          Text(
-            'Meeting Request',
-            style: GoogleFonts.montserrat(
-              fontSize: 28,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
+          SizedBox(width: isMobile ? 4 : 8),
+          Flexible(
+            child: Text(
+              'Meeting Request',
+              style: GoogleFonts.montserrat(
+                fontSize: isMobile ? 20 : 28,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
           const Spacer(),
-          // Notification & Profile icons
           CustomAppBar(
             onNotificationTap: () {
               _scaffoldKey.currentState?.openEndDrawer();
             },
             onProfileTap: _toggleProfile,
+            isMobile: isMobile,
+            showLogo: false,
           ),
         ],
       ),
@@ -397,9 +375,12 @@ class _MeetingB2GRequestPageState extends ConsumerState<MeetingB2GRequestPage> {
   }
 
   Widget _buildImageCard(String logoUrl, String name) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
     return Container(
-      width: 300,
-      height: 351,
+      constraints: isMobile
+          ? const BoxConstraints(maxHeight: 280)
+          : const BoxConstraints(maxWidth: 300, maxHeight: 351),
+      width: isMobile ? double.infinity : 300,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(15),
@@ -421,8 +402,9 @@ class _MeetingB2GRequestPageState extends ConsumerState<MeetingB2GRequestPage> {
   }
 
   Widget _buildFormCard() {
+    final isMobile = MediaQuery.of(context).size.width < 600;
     return Container(
-      padding: const EdgeInsets.all(40),
+      padding: EdgeInsets.all(isMobile ? 20 : 40),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(10),
@@ -789,7 +771,7 @@ class _MeetingB2GRequestPageState extends ConsumerState<MeetingB2GRequestPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Comments:',
+          'Message:',
           style: GoogleFonts.inter(
             fontSize: 18,
             fontWeight: FontWeight.w500,
@@ -808,7 +790,7 @@ class _MeetingB2GRequestPageState extends ConsumerState<MeetingB2GRequestPage> {
             maxLines: 5,
             style: GoogleFonts.roboto(fontSize: 18),
             decoration: InputDecoration(
-              hintText: 'Enter comments...',
+              hintText: 'Enter message...',
               hintStyle: GoogleFonts.roboto(
                 fontSize: 18,
                 color: Colors.black.withValues(alpha: 0.7),

@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -14,6 +15,7 @@ import '../../features/auth/ui/verification_code_page.dart';
 import '../../features/auth/ui/verification_pending_page.dart';
 import '../../features/auth/ui/verify_email_page.dart';
 import '../../features/company/ui/company_preview_page.dart';
+import '../../features/company/ui/company_list_page.dart';
 import '../../features/company/ui/company_profile_page.dart';
 import '../../features/events/ui/agenda_page.dart';
 import '../../features/events/ui/event_calendar_page.dart';
@@ -45,6 +47,8 @@ import '../../features/transfer/ui/transfer_page.dart';
 import '../../features/visa/ui/visa_application_form_page.dart';
 import '../../features/visa/ui/visa_details_page.dart';
 import '../../features/visa/ui/visa_status_page.dart';
+import '../../features/dashboard/ui/dashboard_page.dart';
+import '../../shared/layouts/event_sidebar_layout.dart';
 import '../../shared/ui/coming_soon_page.dart';
 import '../../shared/widgets/legal_document_page.dart';
 import '../error_page.dart';
@@ -53,6 +57,10 @@ import 'auth_refresh_notifier.dart';
 /// Stores the URL the user was trying to reach before being redirected to login.
 /// Simple in-memory value — consumed once by PostLoginDispatcherPage.
 String? postLoginRedirectUrl;
+
+/// Helper to wrap a child widget in a NoTransitionPage.
+Page<void> _noTransition(Widget child) =>
+    NoTransitionPage<void>(child: child);
 
 /// Riverpod provider for the app's GoRouter instance.
 final routerProvider = Provider<GoRouter>((ref) {
@@ -118,7 +126,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         // 2. Persisted last-visited event
         final eventId = ref.read(eventContextProvider).eventId;
         if (eventId != null) {
-          return '/events/$eventId/services';
+          return '/events/$eventId/dashboard';
         }
         // 3. Fall back to async dispatcher (checks registrations)
         return '/post-login';
@@ -137,7 +145,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/create-password',
         builder: (context, state) {
           final token = state.uri.queryParameters['token'] ?? '';
-          return CreatePasswordPage(token: token);
+          final eventId = state.uri.queryParameters['event'];
+          return CreatePasswordPage(token: token, eventId: eventId);
         },
       ),
       GoRoute(
@@ -193,220 +202,302 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/',
         builder: (context, state) => const EventCalendarPage(),
       ),
+      // Event details — public, no sidebar
       GoRoute(
         path: '/events/:id',
         builder: (context, state) =>
             EventDetailsPage(id: state.pathParameters['id']!),
+      ),
+      // ─── Event sub-pages — all wrapped in persistent sidebar shell ───
+      // Using pageBuilder + NoTransitionPage so content swaps instantly
+      // without slide animation (sidebar stays, only right panel changes).
+      ShellRoute(
+        builder: (context, state, child) => EventShellLayout(child: child),
         routes: [
           GoRoute(
-            path: 'menu',
+            path: '/events/:id/menu',
             redirect: (context, state) {
               final id = state.pathParameters['id'] ?? '0';
-              return '/events/$id/services';
+              return '/events/$id/dashboard';
             },
           ),
-          // --- NEW: Company Profile ---
           GoRoute(
-            path: 'company-profile',
-            builder: (context, state) => const CompanyProfilePage(),
-            routes: [
-              GoRoute(
-                path: ':companyId/preview',
-                builder: (context, state) => CompanyPreviewPage(
-                  companyId: state.pathParameters['companyId']!,
-                ),
-              ),
-            ],
+            path: '/events/:id/dashboard',
+            pageBuilder: (context, state) =>
+                _noTransition(const DashboardPage()),
           ),
-          // --- NEW: Team Members ---
           GoRoute(
-            path: 'team',
-            builder: (context, state) => const TeamMembersPage(),
+            path: '/events/:id/company-profile',
+            pageBuilder: (context, state) =>
+                _noTransition(const CompanyListPage()),
             routes: [
               GoRoute(
                 path: 'add',
-                builder: (context, state) => const AddTeamMemberPage(),
+                pageBuilder: (context, state) =>
+                    _noTransition(const CompanyProfilePage()),
+              ),
+              GoRoute(
+                path: ':companyId/edit',
+                pageBuilder: (context, state) => _noTransition(
+                  CompanyProfilePage(
+                    companyId: state.pathParameters['companyId'],
+                  ),
+                ),
+              ),
+              GoRoute(
+                path: ':companyId/preview',
+                pageBuilder: (context, state) => _noTransition(
+                  CompanyPreviewPage(
+                    companyId: state.pathParameters['companyId']!,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          GoRoute(
+            path: '/events/:id/team',
+            pageBuilder: (context, state) =>
+                _noTransition(const TeamMembersPage()),
+            routes: [
+              GoRoute(
+                path: 'add',
+                pageBuilder: (context, state) =>
+                    _noTransition(const AddTeamMemberPage()),
               ),
               GoRoute(
                 path: ':memberId/edit',
-                builder: (context, state) => AddTeamMemberPage(
-                  memberId: state.pathParameters['memberId'],
+                pageBuilder: (context, state) => _noTransition(
+                  AddTeamMemberPage(
+                    memberId: state.pathParameters['memberId'],
+                  ),
                 ),
               ),
             ],
           ),
-          // --- NEW: Event Services (Shop) ---
           GoRoute(
-            path: 'services',
-            builder: (context, state) => const EventServicesPage(),
+            path: '/events/:id/services',
+            pageBuilder: (context, state) =>
+                _noTransition(const EventServicesPage()),
             routes: [
               GoRoute(
                 path: 'cart',
-                builder: (context, state) => const ShoppingCartPage(),
+                pageBuilder: (context, state) =>
+                    _noTransition(const ShoppingCartPage()),
               ),
               GoRoute(
                 path: ':serviceId',
-                builder: (context, state) => ServiceDetailPage(
-                  serviceId: state.pathParameters['serviceId']!,
+                pageBuilder: (context, state) => _noTransition(
+                  ServiceDetailPage(
+                    serviceId: state.pathParameters['serviceId']!,
+                  ),
                 ),
               ),
             ],
           ),
-          // --- NEW: Visa & Travel Center (replaces visa-apply) ---
           GoRoute(
-            path: 'visa-travel',
-            builder: (context, state) {
+            path: '/events/:id/visa-travel',
+            pageBuilder: (context, state) {
               final idStr = state.pathParameters['id']!;
               final visaId = state.uri.queryParameters['visaId'];
-              return VisaApplicationFormPage(
-                eventId: int.tryParse(idStr) ?? 0,
-                visaId: visaId,
+              return _noTransition(
+                VisaApplicationFormPage(
+                  eventId: int.tryParse(idStr) ?? 0,
+                  visaId: visaId,
+                ),
               );
             },
           ),
-          // --- Services & Add-Ons (same as Event Services) ---
           GoRoute(
-            path: 'services-addons',
-            builder: (context, state) => const EventServicesPage(),
-          ),
-          // --- RENAMED: Schedule & Meetings (was meetings) ---
-          GoRoute(
-            path: 'schedule',
-            builder: (context, state) =>
-                MeetingGatePage(eventId: state.pathParameters['id']!),
-          ),
-          // --- NEW: Coming Soon pages ---
-          GoRoute(
-            path: 'financial',
-            builder: (context, state) =>
-                const ComingSoonPage(featureName: 'Financial Section'),
+            path: '/events/:id/services-addons',
+            pageBuilder: (context, state) =>
+                _noTransition(const EventServicesPage()),
           ),
           GoRoute(
-            path: 'analytics',
-            builder: (context, state) =>
-                const ComingSoonPage(featureName: 'Analytics'),
+            path: '/events/:id/schedule',
+            pageBuilder: (context, state) => _noTransition(
+              MeetingGatePage(eventId: state.pathParameters['id']!),
+            ),
           ),
           GoRoute(
-            path: 'hotels',
-            builder: (context, state) =>
-                const ComingSoonPage(featureName: 'Hotels'),
+            path: '/events/:id/financial',
+            pageBuilder: (context, state) => _noTransition(
+              const ComingSoonPage(featureName: 'Financial Section'),
+            ),
           ),
           GoRoute(
-            path: 'agenda',
-            builder: (context, state) =>
-                AgendaPage(eventId: state.pathParameters['id']!),
+            path: '/events/:id/analytics',
+            pageBuilder: (context, state) => _noTransition(
+              const ComingSoonPage(featureName: 'Analytics'),
+            ),
           ),
           GoRoute(
-            path: 'speakers',
-            builder: (context, state) =>
-                SpeakerListPage(eventId: state.pathParameters['id']!),
+            path: '/events/:id/travel',
+            pageBuilder: (context, state) => _noTransition(
+              const ComingSoonPage(featureName: 'Travel Information'),
+            ),
+          ),
+          GoRoute(
+            path: '/events/:id/hotels',
+            pageBuilder: (context, state) => _noTransition(
+              const ComingSoonPage(featureName: 'Hotel Information'),
+            ),
+          ),
+          GoRoute(
+            path: '/events/:id/agenda',
+            pageBuilder: (context, state) => _noTransition(
+              AgendaPage(eventId: state.pathParameters['id']!),
+            ),
+          ),
+          GoRoute(
+            path: '/events/:id/speakers',
+            pageBuilder: (context, state) => _noTransition(
+              SpeakerListPage(eventId: state.pathParameters['id']!),
+            ),
             routes: [
               GoRoute(
                 path: ':speakerId',
-                builder: (context, state) {
+                pageBuilder: (context, state) {
                   final eventId = state.pathParameters['id']!;
                   final speakerId = state.pathParameters['speakerId']!;
                   final speakerData = state.extra as Map<String, dynamic>?;
-                  return SpeakerDetailPage(
-                    eventId: eventId,
-                    speakerId: speakerId,
-                    speakerData: speakerData,
+                  return _noTransition(
+                    SpeakerDetailPage(
+                      eventId: eventId,
+                      speakerId: speakerId,
+                      speakerData: speakerData,
+                    ),
                   );
                 },
               ),
             ],
           ),
           GoRoute(
-            path: 'participants',
-            builder: (context, state) =>
-                ParticipantListPage(eventId: state.pathParameters['id']!),
+            path: '/events/:id/participants',
+            pageBuilder: (context, state) => _noTransition(
+              ParticipantListPage(eventId: state.pathParameters['id']!),
+            ),
             routes: [
               GoRoute(
                 path: ':participantId',
-                builder: (context, state) {
+                pageBuilder: (context, state) {
                   final eventId = state.pathParameters['id']!;
                   final participantId =
                       state.pathParameters['participantId']!;
                   final participantData =
                       state.extra as Map<String, dynamic>?;
-                  return ParticipantDetailPage(
-                    eventId: eventId,
-                    participantId: participantId,
-                    participantData: participantData,
+                  return _noTransition(
+                    ParticipantDetailPage(
+                      eventId: eventId,
+                      participantId: participantId,
+                      participantData: participantData,
+                    ),
                   );
                 },
               ),
             ],
           ),
           GoRoute(
-            path: 'meetings',
-            builder: (context, state) =>
-                MeetingGatePage(eventId: state.pathParameters['id']!),
+            path: '/events/:id/meetings',
+            pageBuilder: (context, state) => _noTransition(
+              MeetingGatePage(eventId: state.pathParameters['id']!),
+            ),
             routes: [
               GoRoute(
                 path: 'new',
-                builder: (context, state) {
+                pageBuilder: (context, state) {
                   final isB2G = state.uri.queryParameters['type'] == 'b2g';
-                  return NewMeetingPage(
-                    eventId: state.pathParameters['id']!,
-                    initialIsB2G: isB2G,
+                  return _noTransition(
+                    NewMeetingPage(
+                      eventId: state.pathParameters['id']!,
+                      initialIsB2G: isB2G,
+                    ),
                   );
                 },
               ),
               GoRoute(
                 path: 'new/:participantId',
-                builder: (context, state) {
+                pageBuilder: (context, state) {
                   final eventId = state.pathParameters['id']!;
                   final participantId =
                       state.pathParameters['participantId']!;
                   final participantData =
                       state.extra as Map<String, dynamic>?;
-                  return MeetingRequestPage(
-                    eventId: eventId,
-                    participantId: participantId,
-                    participantData: participantData,
+                  return _noTransition(
+                    MeetingRequestPage(
+                      eventId: eventId,
+                      participantId: participantId,
+                      participantData: participantData,
+                    ),
+                  );
+                },
+              ),
+              GoRoute(
+                path: 'speaker/:speakerId',
+                pageBuilder: (context, state) {
+                  final eventId = state.pathParameters['id']!;
+                  final speakerId =
+                      int.tryParse(state.pathParameters['speakerId']!) ?? 0;
+                  final speakerData =
+                      state.extra as Map<String, dynamic>?;
+                  final speakerName = speakerData != null
+                      ? '${speakerData['name'] ?? ''} ${speakerData['surname'] ?? ''}'.trim()
+                      : null;
+                  return _noTransition(
+                    MeetingRequestPage(
+                      eventId: eventId,
+                      participantId: '',
+                      speakerId: speakerId,
+                      speakerName: speakerName,
+                      participantData: speakerData,
+                    ),
                   );
                 },
               ),
               GoRoute(
                 path: 'b2g/new/:govEntityId',
-                builder: (context, state) {
+                pageBuilder: (context, state) {
                   final eventId = state.pathParameters['id']!;
                   final govEntityId = state.pathParameters['govEntityId']!;
                   final govEntityData =
                       state.extra as Map<String, dynamic>?;
-                  return MeetingB2GRequestPage(
-                    eventId: eventId,
-                    govEntityId: govEntityId,
-                    govEntityData: govEntityData,
+                  return _noTransition(
+                    MeetingB2GRequestPage(
+                      eventId: eventId,
+                      govEntityId: govEntityId,
+                      govEntityData: govEntityData,
+                    ),
                   );
                 },
               ),
               GoRoute(
                 path: ':meetingId',
-                builder: (context, state) {
+                pageBuilder: (context, state) {
                   final eventId = state.pathParameters['id']!;
                   final meetingId = state.pathParameters['meetingId']!;
                   final meetingData =
                       state.extra as Map<String, dynamic>?;
-                  return MeetingReviewPage(
-                    eventId: eventId,
-                    meetingId: meetingId,
-                    meetingData: meetingData,
+                  return _noTransition(
+                    MeetingReviewPage(
+                      eventId: eventId,
+                      meetingId: meetingId,
+                      meetingData: meetingData,
+                    ),
                   );
                 },
                 routes: [
                   GoRoute(
                     path: 'edit',
-                    builder: (context, state) {
+                    pageBuilder: (context, state) {
                       final eventId = state.pathParameters['id']!;
                       final meetingId = state.pathParameters['meetingId']!;
                       final meetingData =
                           state.extra as Map<String, dynamic>?;
-                      return MeetingEditPage(
-                        eventId: eventId,
-                        meetingId: meetingId,
-                        meetingData: meetingData,
+                      return _noTransition(
+                        MeetingEditPage(
+                          eventId: eventId,
+                          meetingId: meetingId,
+                          meetingData: meetingData,
+                        ),
                       );
                     },
                   ),
@@ -415,88 +506,104 @@ final routerProvider = Provider<GoRouter>((ref) {
             ],
           ),
           GoRoute(
-            path: 'news',
-            builder: (context, state) =>
-                NewsPage(eventId: state.pathParameters['id']!),
+            path: '/events/:id/news',
+            pageBuilder: (context, state) => _noTransition(
+              NewsPage(eventId: state.pathParameters['id']!),
+            ),
             routes: [
               GoRoute(
                 path: ':newsId',
-                builder: (context, state) {
+                pageBuilder: (context, state) {
                   final eventId = state.pathParameters['id']!;
                   final newsId = state.pathParameters['newsId']!;
                   final newsData = state.extra as Map<String, dynamic>?;
-                  return NewsDetailPage(
-                    eventId: eventId,
-                    newsId: newsId,
-                    newsData: newsData,
+                  return _noTransition(
+                    NewsDetailPage(
+                      eventId: eventId,
+                      newsId: newsId,
+                      newsData: newsData,
+                    ),
                   );
                 },
               ),
             ],
           ),
           GoRoute(
-            path: 'hotline',
-            builder: (context, state) => const HotlinePage(),
+            path: '/events/:id/hotline',
+            pageBuilder: (context, state) =>
+                _noTransition(const HotlinePage()),
           ),
           GoRoute(
-            path: 'faq',
-            builder: (context, state) =>
-                FAQPage(eventId: state.pathParameters['id']!),
+            path: '/events/:id/faq',
+            pageBuilder: (context, state) => _noTransition(
+              FAQPage(eventId: state.pathParameters['id']!),
+            ),
           ),
           GoRoute(
-            path: 'feedback',
-            builder: (context, state) =>
-                FeedbackPage(eventId: state.pathParameters['id']!),
+            path: '/events/:id/feedback',
+            pageBuilder: (context, state) => _noTransition(
+              FeedbackPage(eventId: state.pathParameters['id']!),
+            ),
           ),
           GoRoute(
-            path: 'transfer',
-            builder: (context, state) {
+            path: '/events/:id/transfer',
+            pageBuilder: (context, state) {
               final idStr = state.pathParameters['id']!;
-              return TransferPage(eventId: int.tryParse(idStr) ?? 0);
+              return _noTransition(
+                TransferPage(eventId: int.tryParse(idStr) ?? 0),
+              );
             },
           ),
           GoRoute(
-            path: 'flights',
-            builder: (context, state) {
+            path: '/events/:id/flights',
+            pageBuilder: (context, state) {
               final idStr = state.pathParameters['id']!;
-              return FlightsPage(eventId: int.tryParse(idStr));
+              return _noTransition(
+                FlightsPage(eventId: int.tryParse(idStr)),
+              );
             },
           ),
           GoRoute(
-            path: 'visa/form/:participantId',
-            builder: (context, state) {
+            path: '/events/:id/visa/form/:participantId',
+            pageBuilder: (context, state) {
               final eventIdStr = state.pathParameters['id']!;
               final participantId =
                   state.pathParameters['participantId']!;
               final visaId = state.uri.queryParameters['visaId'];
-              return VisaApplicationFormPage(
-                eventId: int.tryParse(eventIdStr) ?? 0,
-                participantId: participantId,
-                visaId: visaId,
+              return _noTransition(
+                VisaApplicationFormPage(
+                  eventId: int.tryParse(eventIdStr) ?? 0,
+                  participantId: participantId,
+                  visaId: visaId,
+                ),
               );
             },
           ),
           GoRoute(
-            path: 'visa/status/:participantId',
-            builder: (context, state) {
+            path: '/events/:id/visa/status/:participantId',
+            pageBuilder: (context, state) {
               final eventIdStr = state.pathParameters['id']!;
               final participantId =
                   state.pathParameters['participantId']!;
-              return VisaStatusPage(
-                eventId: int.tryParse(eventIdStr) ?? 0,
-                participantId: participantId,
+              return _noTransition(
+                VisaStatusPage(
+                  eventId: int.tryParse(eventIdStr) ?? 0,
+                  participantId: participantId,
+                ),
               );
             },
           ),
           GoRoute(
-            path: 'visa/details/:participantId',
-            builder: (context, state) {
+            path: '/events/:id/visa/details/:participantId',
+            pageBuilder: (context, state) {
               final eventIdStr = state.pathParameters['id']!;
               final participantId =
                   state.pathParameters['participantId']!;
-              return VisaDetailsPage(
-                eventId: int.tryParse(eventIdStr) ?? 0,
-                participantId: participantId,
+              return _noTransition(
+                VisaDetailsPage(
+                  eventId: int.tryParse(eventIdStr) ?? 0,
+                  participantId: participantId,
+                ),
               );
             },
           ),

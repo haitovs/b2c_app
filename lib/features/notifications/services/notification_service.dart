@@ -56,7 +56,7 @@ class NotificationService extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
 
-    final result = await _api.get<List<dynamic>>('/api/v1/notifications/');
+    final result = await _api.get<List<dynamic>>('/api/v1/notifications');
 
     if (result.isSuccess && result.data != null) {
       _notifications = result.data!

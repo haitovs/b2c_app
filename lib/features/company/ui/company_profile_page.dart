@@ -1,45 +1,42 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:flutter_quill/flutter_quill.dart' as quill;
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/app_snackbar.dart';
 import '../../../core/providers/reference_data_provider.dart';
 import '../../../core/providers/upload_provider.dart';
-import '../../../shared/layouts/event_sidebar_layout.dart';
 import '../../../shared/widgets/multi_select_field.dart';
 import '../../../shared/widgets/country_city_picker.dart';
-import '../../../shared/widgets/image_uploader.dart';
 import '../providers/company_providers.dart';
 import '../models/company.dart';
 
-/// Company Profile Page — form page for managing company profiles (max 5 per event).
-///
-/// Supports creating new companies and editing existing ones. When the user owns
-/// multiple companies for an event, tabs are shown at the top (one per company
-/// plus a "+" tab to create a new one).
+/// Form page for adding or editing a single company profile.
+/// When [companyId] is null, we're creating a new company.
 class CompanyProfilePage extends ConsumerStatefulWidget {
-  const CompanyProfilePage({super.key});
+  final String? companyId;
+
+  const CompanyProfilePage({super.key, this.companyId});
 
   @override
   ConsumerState<CompanyProfilePage> createState() => _CompanyProfilePageState();
 }
 
 class _CompanyProfilePageState extends ConsumerState<CompanyProfilePage> {
-  static const int _maxCompanies = 5;
-
-  int _selectedTabIndex = 0;
   bool _isSaving = false;
+  bool _didPopulate = false;
 
-  // Form key for validation
   final _formKey = GlobalKey<FormState>();
 
   // --- Basic Info ---
   final _nameController = TextEditingController();
   List<String> _selectedCategories = [];
   final _websiteController = TextEditingController();
-  final _aboutController = TextEditingController();
+  late quill.QuillController _aboutController;
 
   // --- Contact ---
   final _emailController = TextEditingController();
@@ -58,12 +55,14 @@ class _CompanyProfilePageState extends ConsumerState<CompanyProfilePage> {
   List<String?> _galleryUrls = [null, null, null, null];
 
   // --- Social Links ---
-  final _linkedInController = TextEditingController();
-  final _instagramController = TextEditingController();
-  final _twitterController = TextEditingController();
-  final _facebookController = TextEditingController();
-  final _whatsAppController = TextEditingController();
-  final _weChatController = TextEditingController();
+  List<_SocialLinkEntry> _socialLinks = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _aboutController = quill.QuillController.basic();
+    _nameController.addListener(() => setState(() {}));
+  }
 
   @override
   void dispose() {
@@ -72,21 +71,30 @@ class _CompanyProfilePageState extends ConsumerState<CompanyProfilePage> {
     _aboutController.dispose();
     _emailController.dispose();
     _mobileController.dispose();
-    _linkedInController.dispose();
-    _instagramController.dispose();
-    _twitterController.dispose();
-    _facebookController.dispose();
-    _whatsAppController.dispose();
-    _weChatController.dispose();
+    for (final entry in _socialLinks) {
+      entry.dispose();
+    }
     super.dispose();
   }
 
-  /// Populate form controllers from a [Company] model.
+  bool get _isEditing => widget.companyId != null;
+
   void _populateFromCompany(Company company) {
+    if (_didPopulate) return;
+    _didPopulate = true;
+
     _nameController.text = company.name;
     _selectedCategories = List<String>.from(company.categories ?? []);
     _websiteController.text = company.website ?? '';
-    _aboutController.text = company.about ?? '';
+
+    final aboutText = company.about ?? '';
+    if (aboutText.isNotEmpty) {
+      _aboutController = quill.QuillController(
+        document: quill.Document()..insert(0, aboutText),
+        selection: const TextSelection.collapsed(offset: 0),
+      );
+    }
+
     _emailController.text = company.email ?? '';
     _mobileController.text = company.mobile ?? '';
     _selectedCountry = company.country;
@@ -95,70 +103,41 @@ class _CompanyProfilePageState extends ConsumerState<CompanyProfilePage> {
     _fullLogoUrl = company.fullLogoUrl;
     _coverImageUrl = company.coverImageUrl;
 
-    // Gallery
     final urls = company.galleryUrls ?? [];
     _galleryUrls = List.generate(4, (i) => i < urls.length ? urls[i] : null);
 
-    // Social links
+    for (final entry in _socialLinks) {
+      entry.dispose();
+    }
+    _socialLinks = [];
     final social = company.socialLinks ?? {};
-    _linkedInController.text = social['linkedin'] as String? ?? '';
-    _instagramController.text = social['instagram'] as String? ?? '';
-    _twitterController.text = social['twitter'] as String? ?? '';
-    _facebookController.text = social['facebook'] as String? ?? '';
-    _whatsAppController.text = social['whatsapp'] as String? ?? '';
-    _weChatController.text = social['wechat'] as String? ?? '';
+    social.forEach((key, value) {
+      if (value != null && value.toString().isNotEmpty) {
+        _socialLinks.add(
+          _SocialLinkEntry(platform: key.toString(), url: value.toString()),
+        );
+      }
+    });
   }
 
-  /// Clear all form controllers for a fresh "new company" form.
-  void _clearForm() {
-    _nameController.clear();
-    _selectedCategories = [];
-    _websiteController.clear();
-    _aboutController.clear();
-    _emailController.clear();
-    _mobileController.clear();
-    _selectedCountry = null;
-    _selectedCity = null;
-    _brandIconUrl = null;
-    _fullLogoUrl = null;
-    _coverImageUrl = null;
-    _galleryUrls = [null, null, null, null];
-    _linkedInController.clear();
-    _instagramController.clear();
-    _twitterController.clear();
-    _facebookController.clear();
-    _whatsAppController.clear();
-    _weChatController.clear();
-  }
-
-  /// Build the payload map for create/update.
   Map<String, dynamic> _buildPayload(int eventId) {
     final socialLinks = <String, dynamic>{};
-    if (_linkedInController.text.isNotEmpty) {
-      socialLinks['linkedin'] = _linkedInController.text.trim();
+    for (final entry in _socialLinks) {
+      final platform = entry.platformController.text.trim().toLowerCase();
+      final url = entry.urlController.text.trim();
+      if (platform.isNotEmpty && url.isNotEmpty) {
+        socialLinks[platform] = url;
+      }
     }
-    if (_instagramController.text.isNotEmpty) {
-      socialLinks['instagram'] = _instagramController.text.trim();
-    }
-    if (_twitterController.text.isNotEmpty) {
-      socialLinks['twitter'] = _twitterController.text.trim();
-    }
-    if (_facebookController.text.isNotEmpty) {
-      socialLinks['facebook'] = _facebookController.text.trim();
-    }
-    if (_whatsAppController.text.isNotEmpty) {
-      socialLinks['whatsapp'] = _whatsAppController.text.trim();
-    }
-    if (_weChatController.text.isNotEmpty) {
-      socialLinks['wechat'] = _weChatController.text.trim();
-    }
+
+    final aboutPlainText = _aboutController.document.toPlainText().trim();
 
     return {
       'event_id': eventId,
       'name': _nameController.text.trim(),
       'categories': _selectedCategories,
       'website': _websiteController.text.trim(),
-      'about': _aboutController.text.trim(),
+      'about': aboutPlainText,
       'email': _emailController.text.trim(),
       'mobile': _mobileController.text.trim(),
       'country': _selectedCountry,
@@ -166,663 +145,611 @@ class _CompanyProfilePageState extends ConsumerState<CompanyProfilePage> {
       'brand_icon_url': _brandIconUrl,
       'full_logo_url': _fullLogoUrl,
       'cover_image_url': _coverImageUrl,
-      'gallery_urls':
-          _galleryUrls.where((url) => url != null && url.isNotEmpty).toList(),
+      'gallery_urls': _galleryUrls
+          .where((url) => url != null && url.isNotEmpty)
+          .toList(),
       'social_links': socialLinks,
     };
   }
 
-  /// Save the current form (create or update).
-  Future<void> _save(int eventId, List<Company> companies) async {
+  Future<void> _save(int eventId) async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isSaving = true);
 
     try {
       final service = ref.read(companyServiceProvider);
-      final isNewCompany = _selectedTabIndex >= companies.length;
 
-      if (isNewCompany) {
-        await service.createCompany(_buildPayload(eventId));
+      if (_isEditing) {
+        await service.updateCompany(widget.companyId!, _buildPayload(eventId));
       } else {
-        final companyId = companies[_selectedTabIndex].id;
-        await service.updateCompany(companyId, _buildPayload(eventId));
+        await service.createCompany(_buildPayload(eventId));
       }
 
-      // Invalidate the provider to refresh the list
       ref.invalidate(myCompaniesProvider(eventId));
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            isNewCompany
-                ? 'Company created successfully!'
-                : 'Company updated successfully!',
-          ),
-          backgroundColor: AppTheme.successColor,
-        ),
-      );
+      AppSnackBar.showSuccess(context, _isEditing
+          ? 'Company updated successfully!'
+          : 'Company created successfully!');
+
+      final eventIdStr = GoRouterState.of(context).pathParameters['id'] ?? '';
+      context.go('/events/$eventIdStr/company-profile');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to save company: $e'),
-          backgroundColor: AppTheme.errorColor,
-        ),
-      );
+      AppSnackBar.showError(context, 'Failed to save company: $e');
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
   }
+
+  // ===========================================================================
+  // BUILD
+  // ===========================================================================
 
   @override
   Widget build(BuildContext context) {
     final eventIdStr = GoRouterState.of(context).pathParameters['id'] ?? '';
     final eventId = int.tryParse(eventIdStr) ?? 0;
 
-    final companiesAsync = ref.watch(myCompaniesProvider(eventId));
+    if (_isEditing) {
+      final companyAsync = ref.watch(companyDetailProvider(widget.companyId!));
+      companyAsync.whenData((company) => _populateFromCompany(company));
 
-    return EventSidebarLayout(
-      title: 'Company Profile',
-      child: companiesAsync.when(
-        loading: () => const Center(
-          child: CircularProgressIndicator(color: AppTheme.primaryColor),
-        ),
-        error: (error, _) => _buildErrorView(error, eventId),
-        data: (companies) => _buildContent(companies, eventId),
-      ),
-    );
-  }
+      if (companyAsync.isLoading && !_didPopulate) {
+        return const Center(child: CircularProgressIndicator());
+      }
+      if (companyAsync.hasError && !_didPopulate) {
+        return Center(child: Text('Error: ${companyAsync.error}'));
+      }
+    }
 
-  Widget _buildErrorView(Object error, int eventId) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
+      child: Form(
+        key: _formKey,
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.error_outline, size: 48, color: Colors.grey.shade400),
-            const SizedBox(height: 16),
+            // Page title
             Text(
-              'Failed to load companies',
+              'Complete Company Profile',
               style: GoogleFonts.montserrat(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
+                fontSize: 24,
+                fontWeight: FontWeight.w700,
                 color: Colors.black87,
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              error.toString(),
-              style: GoogleFonts.inter(fontSize: 14, color: Colors.grey),
-              textAlign: TextAlign.center,
+            const Divider(height: 32, thickness: 1),
+
+            // 1. Basic Info Card
+            _buildSectionCard(
+              title: 'Basic Info',
+              svgAsset: 'assets/company/basic_info.svg',
+              child: _buildBasicInfoContent(eventId),
             ),
             const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: () => ref.invalidate(myCompaniesProvider(eventId)),
-              icon: const Icon(Icons.refresh, size: 18),
-              label: const Text('Retry'),
-              style: AppTheme.primaryButtonStyle,
+
+            // 2. Contact & Address Card
+            _buildSectionCard(
+              title: 'Contact & Address',
+              svgAsset: 'assets/company/contact.svg',
+              child: _buildContactAddressContent(),
             ),
+            const SizedBox(height: 24),
+
+            // 3. Branding Card
+            _buildSectionCard(
+              title: 'Branding',
+              svgAsset: 'assets/company/branding.svg',
+              child: _buildBrandingContent(),
+            ),
+            const SizedBox(height: 24),
+
+            // 4. Gallery Card
+            _buildSectionCard(
+              title: 'Gallery',
+              svgAsset: 'assets/company/gallery.svg',
+              child: _buildGalleryContent(),
+            ),
+            const SizedBox(height: 24),
+
+            _buildBottomButtons(eventId),
+            const SizedBox(height: 40),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildContent(List<Company> companies, int eventId) {
-    // Clamp tab index if companies list changed
-    final canAddNew = companies.length < _maxCompanies;
-    final maxTab = canAddNew ? companies.length : companies.length - 1;
-    if (_selectedTabIndex > maxTab) {
-      _selectedTabIndex = maxTab;
-    }
+  // ===========================================================================
+  // Section Card — individual card with shadow and blue header bar
+  // ===========================================================================
 
-    // Determine if current tab is an existing company or "new"
-    final isNewCompany = _selectedTabIndex >= companies.length;
-
-    // When we have data and the form is empty, populate from current selection
-    // We use a post-frame callback to avoid calling setState during build
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      // Only auto-populate when switching tabs or on first load
-      if (!isNewCompany && companies.isNotEmpty) {
-        final company = companies[_selectedTabIndex];
-        if (_nameController.text != company.name) {
-          _populateFromCompany(company);
-          setState(() {});
-        }
-      }
-    });
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 860),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Page header
-              _buildPageHeader(companies.length),
-              const SizedBox(height: 20),
-
-              // Company tabs (if multiple companies or can add new)
-              if (companies.isNotEmpty || canAddNew)
-                _buildCompanyTabs(companies, canAddNew),
-              const SizedBox(height: 24),
-
-              // Form card
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Form(
-                  key: _formKey,
-                  child: Padding(
-                    padding: const EdgeInsets.all(28),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildBasicInfoSection(eventId),
-                        const SizedBox(height: 32),
-                        _buildDivider(),
-                        const SizedBox(height: 32),
-                        _buildContactSection(),
-                        const SizedBox(height: 32),
-                        _buildDivider(),
-                        const SizedBox(height: 32),
-                        _buildLocationSection(),
-                        const SizedBox(height: 32),
-                        _buildDivider(),
-                        const SizedBox(height: 32),
-                        _buildBrandingSection(),
-                        const SizedBox(height: 32),
-                        _buildDivider(),
-                        const SizedBox(height: 32),
-                        _buildGallerySection(),
-                        const SizedBox(height: 32),
-                        _buildDivider(),
-                        const SizedBox(height: 32),
-                        _buildSocialLinksSection(),
-                        const SizedBox(height: 40),
-                        _buildSaveButton(companies, eventId),
-                      ],
-                    ),
+  Widget _buildSectionCard({
+    required String title,
+    required String svgAsset,
+    required Widget child,
+  }) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: const [
+          BoxShadow(
+            color: Color.fromRGBO(60, 68, 148, 0.5),
+            blurRadius: 7.6,
+            offset: Offset.zero,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Blue header bar
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: const BoxDecoration(
+              color: Color(0xFFE9ECF9),
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(12),
+                topRight: Radius.circular(12),
+              ),
+            ),
+            child: Row(
+              children: [
+                SvgPicture.asset(svgAsset, width: 20, height: 20),
+                const SizedBox(width: 10),
+                Text(
+                  title,
+                  style: GoogleFonts.montserrat(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
                   ),
                 ),
-              ),
-              const SizedBox(height: 40),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // Page Header
-  // ---------------------------------------------------------------------------
-
-  Widget _buildPageHeader(int companyCount) {
-    return Row(
-      children: [
-        Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: AppTheme.primaryColor.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: const Icon(
-            Icons.business,
-            color: AppTheme.primaryColor,
-            size: 24,
-          ),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Company Profile',
-                style: GoogleFonts.montserrat(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black87,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                '$companyCount of $_maxCompanies companies registered',
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  color: Colors.grey.shade600,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // Company Tabs
-  // ---------------------------------------------------------------------------
-
-  Widget _buildCompanyTabs(List<Company> companies, bool canAddNew) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          // One tab per existing company
-          for (int i = 0; i < companies.length; i++)
-            _buildTab(
-              label: companies[i].name,
-              index: i,
-              icon: Icons.business,
+              ],
             ),
-
-          // "+" tab for adding new
-          if (canAddNew)
-            _buildTab(
-              label: 'New Company',
-              index: companies.length,
-              icon: Icons.add,
-            ),
+          ),
+          // Content
+          Padding(
+            padding: EdgeInsets.all(isMobile ? 16 : 24),
+            child: child,
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildTab({
-    required String label,
-    required int index,
-    required IconData icon,
-  }) {
-    final isSelected = _selectedTabIndex == index;
+  // ===========================================================================
+  // 1. Basic Info Content
+  // ===========================================================================
 
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: Material(
-        color: isSelected ? AppTheme.primaryColor : Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        elevation: isSelected ? 0 : 1,
-        child: InkWell(
-          onTap: () {
-            if (_selectedTabIndex == index) return;
-            setState(() {
-              _selectedTabIndex = index;
-              _clearForm();
-            });
-          },
-          borderRadius: BorderRadius.circular(8),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: isSelected
-                    ? AppTheme.primaryColor
-                    : Colors.grey.shade300,
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  icon,
-                  size: 18,
-                  color: isSelected ? Colors.white : Colors.grey.shade600,
-                ),
-                const SizedBox(width: 8),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 160),
-                  child: Text(
-                    label,
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: isSelected ? Colors.white : Colors.black87,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // Section Header Helper
-  // ---------------------------------------------------------------------------
-
-  Widget _buildSectionHeader(String title, IconData icon) {
-    return Row(
-      children: [
-        Icon(icon, size: 20, color: AppTheme.primaryColor),
-        const SizedBox(width: 10),
-        Text(
-          title,
-          style: GoogleFonts.montserrat(
-            fontSize: 17,
-            fontWeight: FontWeight.w600,
-            color: Colors.black87,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDivider() {
-    return Divider(color: Colors.grey.shade200, height: 1);
-  }
-
-  // ---------------------------------------------------------------------------
-  // 1. Basic Info Section
-  // ---------------------------------------------------------------------------
-
-  Widget _buildBasicInfoSection(int eventId) {
+  Widget _buildBasicInfoContent(int eventId) {
     final categoriesAsync = ref.watch(companyCategoriesProvider);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionHeader('Basic Information', Icons.info_outline),
-        const SizedBox(height: 20),
-
-        // Company name (required)
-        _buildLabeledField(
-          label: 'Company Name',
-          required: true,
-          child: TextFormField(
-            controller: _nameController,
-            style: GoogleFonts.inter(fontSize: 14),
-            decoration: _inputDecoration(hintText: 'Enter company name'),
-            validator: (value) {
-              if (value == null || value.trim().isEmpty) {
-                return 'Company name is required';
-              }
-              return null;
-            },
-          ),
-        ),
-        const SizedBox(height: 20),
-
-        // Categories (multi-select)
-        categoriesAsync.when(
-          loading: () => _buildLabeledField(
-            label: 'Categories',
-            child: Container(
-              height: 48,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey.shade300),
-              ),
-              child: const Center(
-                child: SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: AppTheme.primaryColor,
+        // Company Name + Category
+        LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth < 500) {
+              return Column(
+                children: [
+                  _buildLabeledField(
+                    label: 'Company Name:',
+                    child: TextFormField(
+                      controller: _nameController,
+                      style: GoogleFonts.inter(fontSize: 14),
+                      decoration: _inputDecoration(),
+                      validator: (v) =>
+                          v == null || v.trim().isEmpty ? 'Required' : null,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  _buildCategoryField(categoriesAsync),
+                ],
+              );
+            }
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _buildLabeledField(
+                    label: 'Company Name:',
+                    child: TextFormField(
+                      controller: _nameController,
+                      style: GoogleFonts.inter(fontSize: 14),
+                      decoration: _inputDecoration(),
+                      validator: (v) =>
+                          v == null || v.trim().isEmpty ? 'Required' : null,
+                    ),
                   ),
                 ),
-              ),
-            ),
-          ),
-          error: (err, _) => _buildLabeledField(
-            label: 'Categories',
-            child: Container(
-              height: 48,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppTheme.errorColor),
-              ),
-              alignment: Alignment.centerLeft,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Text(
-                'Failed to load categories',
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  color: AppTheme.errorColor,
-                ),
-              ),
-            ),
-          ),
-          data: (categories) => MultiSelectField(
-            label: 'Categories',
-            options: categories,
-            selectedValues: _selectedCategories,
-            onChanged: (values) {
-              setState(() => _selectedCategories = values);
-            },
-            hintText: 'Select industry categories',
-          ),
+                const SizedBox(width: 16),
+                Expanded(child: _buildCategoryField(categoriesAsync)),
+              ],
+            );
+          },
         ),
         const SizedBox(height: 20),
 
         // Website
         _buildLabeledField(
-          label: 'Website',
+          label: 'Company Website:',
           child: TextFormField(
             controller: _websiteController,
             style: GoogleFonts.inter(fontSize: 14),
-            decoration: _inputDecoration(hintText: 'https://example.com'),
+            decoration: _inputDecoration(),
             keyboardType: TextInputType.url,
           ),
         ),
         const SizedBox(height: 20),
 
-        // About (textarea)
-        _buildLabeledField(
-          label: 'About',
-          child: TextFormField(
-            controller: _aboutController,
-            style: GoogleFonts.inter(fontSize: 14),
-            decoration: _inputDecoration(
-              hintText: 'Tell us about your company...',
-            ),
-            maxLines: 4,
-            minLines: 3,
+        // About Company (Quill editor)
+        Text(
+          'About Company (Maximum 2000 characters):',
+          style: GoogleFonts.inter(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey.shade300),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            children: [
+              quill.QuillSimpleToolbar(
+                controller: _aboutController,
+                config: const quill.QuillSimpleToolbarConfig(
+                  showAlignmentButtons: true,
+                  showBackgroundColorButton: false,
+                  showClearFormat: false,
+                  showFontFamily: false,
+                  showSearchButton: false,
+                  showSubscript: false,
+                  showSuperscript: false,
+                  showInlineCode: false,
+                  multiRowsDisplay: true,
+                ),
+              ),
+              const Divider(height: 1),
+              SizedBox(
+                height: 180,
+                child: quill.QuillEditor(
+                  controller: _aboutController,
+                  scrollController: ScrollController(),
+                  focusNode: FocusNode(),
+                  config: quill.QuillEditorConfig(
+                    padding: const EdgeInsets.all(12),
+                    placeholder: 'Title...',
+                    customStyles: quill.DefaultStyles(
+                      paragraph: quill.DefaultTextBlockStyle(
+                        GoogleFonts.inter(fontSize: 14, color: Colors.black87),
+                        const quill.HorizontalSpacing(0, 0),
+                        const quill.VerticalSpacing(0, 0),
+                        const quill.VerticalSpacing(0, 0),
+                        null,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ],
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // 2. Contact Section
-  // ---------------------------------------------------------------------------
-
-  Widget _buildContactSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionHeader('Contact Information', Icons.contact_mail_outlined),
-        const SizedBox(height: 20),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            if (constraints.maxWidth < 500) {
-              return Column(
-                children: [
-                  _buildLabeledField(
-                    label: 'Email',
-                    child: TextFormField(
-                      controller: _emailController,
-                      style: GoogleFonts.inter(fontSize: 14),
-                      decoration:
-                          _inputDecoration(hintText: 'company@example.com'),
-                      keyboardType: TextInputType.emailAddress,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  _buildLabeledField(
-                    label: 'Mobile',
-                    child: TextFormField(
-                      controller: _mobileController,
-                      style: GoogleFonts.inter(fontSize: 14),
-                      decoration:
-                          _inputDecoration(hintText: '+1 234 567 8900'),
-                      keyboardType: TextInputType.phone,
-                    ),
-                  ),
-                ],
-              );
-            }
-
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: _buildLabeledField(
-                    label: 'Email',
-                    child: TextFormField(
-                      controller: _emailController,
-                      style: GoogleFonts.inter(fontSize: 14),
-                      decoration:
-                          _inputDecoration(hintText: 'company@example.com'),
-                      keyboardType: TextInputType.emailAddress,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: _buildLabeledField(
-                    label: 'Mobile',
-                    child: TextFormField(
-                      controller: _mobileController,
-                      style: GoogleFonts.inter(fontSize: 14),
-                      decoration:
-                          _inputDecoration(hintText: '+1 234 567 8900'),
-                      keyboardType: TextInputType.phone,
-                    ),
-                  ),
-                ),
-              ],
-            );
-          },
+  Widget _buildCategoryField(AsyncValue<List<String>> categoriesAsync) {
+    return categoriesAsync.when(
+      loading: () => _buildLabeledField(
+        label: 'Company category:',
+        child: Container(
+          height: 48,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey.shade300),
+          ),
+          child: const Center(
+            child: SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: AppTheme.primaryColor,
+              ),
+            ),
+          ),
         ),
-      ],
+      ),
+      error: (_, __) => _buildLabeledField(
+        label: 'Company category:',
+        child: Container(
+          height: 48,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppTheme.errorColor),
+          ),
+          alignment: Alignment.centerLeft,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Text(
+            'Failed to load',
+            style: GoogleFonts.inter(fontSize: 13, color: AppTheme.errorColor),
+          ),
+        ),
+      ),
+      data: (categories) => MultiSelectField(
+        label: 'Company category:',
+        options: categories,
+        selectedValues: _selectedCategories,
+        onChanged: (v) => setState(() => _selectedCategories = v),
+        hintText: 'Select category',
+      ),
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // 3. Location Section
-  // ---------------------------------------------------------------------------
+  // ===========================================================================
+  // 2. Contact & Address Content
+  // ===========================================================================
 
-  Widget _buildLocationSection() {
+  Widget _buildContactAddressContent() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionHeader('Location', Icons.location_on_outlined),
-        const SizedBox(height: 20),
+        // Country + City
         CountryCityPicker(
           selectedCountry: _selectedCountry,
           selectedCity: _selectedCity,
-          onCountryChanged: (country) {
-            setState(() {
-              _selectedCountry = country;
-              _selectedCity = null;
-            });
-          },
-          onCityChanged: (city) {
-            setState(() => _selectedCity = city);
-          },
+          onCountryChanged: (c) => setState(() {
+            _selectedCountry = c;
+            _selectedCity = null;
+          }),
+          onCityChanged: (c) => setState(() => _selectedCity = c),
         ),
-      ],
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // 4. Branding Section
-  // ---------------------------------------------------------------------------
-
-  Widget _buildBrandingSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionHeader('Branding', Icons.palette_outlined),
         const SizedBox(height: 20),
+
+        // Email + Mobile
         LayoutBuilder(
           builder: (context, constraints) {
             if (constraints.maxWidth < 500) {
               return Column(
                 children: [
-                  ImageUploader(
-                    label: 'Brand Icon',
-                    currentImageUrl: _brandIconUrl,
-                    height: 120,
-                    onUpload: () => _onImageUpload('brand_icon'),
-                    onRemove: _brandIconUrl != null
-                        ? () => setState(() => _brandIconUrl = null)
-                        : null,
+                  _buildLabeledField(
+                    label: 'E-mail address:',
+                    child: TextFormField(
+                      controller: _emailController,
+                      style: GoogleFonts.inter(fontSize: 14),
+                      decoration: _inputDecoration(),
+                      keyboardType: TextInputType.emailAddress,
+                    ),
                   ),
                   const SizedBox(height: 20),
-                  ImageUploader(
-                    label: 'Full Logo',
-                    currentImageUrl: _fullLogoUrl,
-                    height: 120,
-                    onUpload: () => _onImageUpload('full_logo'),
-                    onRemove: _fullLogoUrl != null
-                        ? () => setState(() => _fullLogoUrl = null)
-                        : null,
+                  _buildLabeledField(
+                    label: 'Mobile number:',
+                    child: TextFormField(
+                      controller: _mobileController,
+                      style: GoogleFonts.inter(fontSize: 14),
+                      decoration: _inputDecoration(),
+                      keyboardType: TextInputType.phone,
+                    ),
                   ),
                 ],
               );
             }
-
             return Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  child: ImageUploader(
-                    label: 'Brand Icon',
-                    currentImageUrl: _brandIconUrl,
-                    height: 140,
-                    onUpload: () => _onImageUpload('brand_icon'),
-                    onRemove: _brandIconUrl != null
-                        ? () => setState(() => _brandIconUrl = null)
-                        : null,
+                  child: _buildLabeledField(
+                    label: 'E-mail address:',
+                    child: TextFormField(
+                      controller: _emailController,
+                      style: GoogleFonts.inter(fontSize: 14),
+                      decoration: _inputDecoration(),
+                      keyboardType: TextInputType.emailAddress,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
-                  child: ImageUploader(
-                    label: 'Full Logo',
-                    currentImageUrl: _fullLogoUrl,
-                    height: 140,
-                    onUpload: () => _onImageUpload('full_logo'),
-                    onRemove: _fullLogoUrl != null
-                        ? () => setState(() => _fullLogoUrl = null)
-                        : null,
+                  child: _buildLabeledField(
+                    label: 'Mobile number:',
+                    child: TextFormField(
+                      controller: _mobileController,
+                      style: GoogleFonts.inter(fontSize: 14),
+                      decoration: _inputDecoration(),
+                      keyboardType: TextInputType.phone,
+                    ),
                   ),
                 ),
               ],
             );
           },
         ),
-        const SizedBox(height: 20),
-        ImageUploader(
-          label: 'Cover Image',
+        const SizedBox(height: 24),
+
+        // Social Medias
+        _buildSocialMediasSection(),
+      ],
+    );
+  }
+
+  Widget _buildSocialMediasSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Social Medias:',
+          style: GoogleFonts.inter(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 12),
+        for (int i = 0; i < _socialLinks.length; i++)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _buildSocialLinkRow(i),
+          ),
+        InkWell(
+          onTap: () => setState(() => _socialLinks.add(_SocialLinkEntry())),
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              border: Border.all(color: AppTheme.primaryColor),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.add, size: 18, color: AppTheme.primaryColor),
+                const SizedBox(width: 6),
+                Text(
+                  'Add New',
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: AppTheme.primaryColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSocialLinkRow(int index) {
+    final entry = _socialLinks[index];
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 160,
+          child: DropdownButtonFormField<String>(
+            initialValue:
+                _platformOptions.contains(entry.platformController.text)
+                ? entry.platformController.text
+                : null,
+            decoration: _inputDecoration(hintText: 'Platform'),
+            style: GoogleFonts.inter(fontSize: 14, color: Colors.black87),
+            items: _platformOptions
+                .map((p) => DropdownMenuItem(value: p, child: Text(p)))
+                .toList(),
+            onChanged: (v) {
+              if (v != null) entry.platformController.text = v;
+            },
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: TextFormField(
+            controller: entry.urlController,
+            style: GoogleFonts.inter(fontSize: 14),
+            decoration: _inputDecoration(
+              hintText: _platformUrlHints[entry.platformController.text] ??
+                  'URL or handle',
+            ),
+            keyboardType: TextInputType.url,
+          ),
+        ),
+        IconButton(
+          onPressed: () => setState(() {
+            _socialLinks[index].dispose();
+            _socialLinks.removeAt(index);
+          }),
+          icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+          splashRadius: 20,
+        ),
+      ],
+    );
+  }
+
+  static const _platformOptions = [
+    'LinkedIn',
+    'Instagram',
+    'Twitter',
+    'Facebook',
+    'WhatsApp',
+    'WeChat',
+    'YouTube',
+    'TikTok',
+    'Telegram',
+  ];
+
+  static const _platformUrlHints = <String, String>{
+    'LinkedIn': 'https://linkedin.com/company/name',
+    'Instagram': 'https://instagram.com/username',
+    'Twitter': 'https://x.com/username',
+    'Facebook': 'https://facebook.com/pagename',
+    'WhatsApp': 'https://wa.me/phonenumber',
+    'WeChat': 'WeChat ID',
+    'YouTube': 'https://youtube.com/@channel',
+    'TikTok': 'https://tiktok.com/@username',
+    'Telegram': 'https://t.me/username',
+  };
+
+  // ===========================================================================
+  // 3. Branding Content
+  // ===========================================================================
+
+  Widget _buildBrandingContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Brand Icon
+        _buildBrandingUploadItem(
+          title: 'Brand Icon',
+          description: 'Used in listings and small previews',
+          recommendation:
+              'Recommended: 512×512px, SVG or PNG, transparent background.',
+          currentImageUrl: _brandIconUrl,
+          uploadWidth: 108,
+          uploadHeight: 108,
+          onUpload: () => _onImageUpload('brand_icon'),
+          onRemove: _brandIconUrl != null
+              ? () => setState(() => _brandIconUrl = null)
+              : null,
+        ),
+        const SizedBox(height: 24),
+
+        // Full Logo
+        _buildBrandingUploadItem(
+          title: 'Full Logo',
+          description: 'Used on your public company profile.',
+          recommendation:
+              'Recommended: 1200×400px, SVG preferred. Horizontal layout.',
+          currentImageUrl: _fullLogoUrl,
+          uploadWidth: 225,
+          uploadHeight: 108,
+          onUpload: () => _onImageUpload('full_logo'),
+          onRemove: _fullLogoUrl != null
+              ? () => setState(() => _fullLogoUrl = null)
+              : null,
+        ),
+        const SizedBox(height: 24),
+
+        // Cover Image
+        _buildBrandingUploadItem(
+          title: 'Cover Image',
+          description: 'Displayed as a banner on your profile page.',
+          recommendation:
+              'Recommended: 1200×400px, SVG preferred. Horizontal layout.',
           currentImageUrl: _coverImageUrl,
-          height: 200,
+          uploadWidth: 225,
+          uploadHeight: 108,
           onUpload: () => _onImageUpload('cover'),
           onRemove: _coverImageUrl != null
               ? () => setState(() => _coverImageUrl = null)
@@ -832,298 +759,375 @@ class _CompanyProfilePageState extends ConsumerState<CompanyProfilePage> {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // 5. Gallery Section
-  // ---------------------------------------------------------------------------
-
-  Widget _buildGallerySection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionHeader('Gallery', Icons.photo_library_outlined),
-        const SizedBox(height: 8),
-        Text(
-          'Upload up to 4 images to showcase your company',
-          style: GoogleFonts.inter(fontSize: 13, color: Colors.grey.shade600),
-        ),
-        const SizedBox(height: 16),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final crossAxisCount = constraints.maxWidth >= 500 ? 2 : 1;
-            return GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: crossAxisCount,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-                childAspectRatio: 1.6,
-              ),
-              itemCount: 4,
-              itemBuilder: (context, index) {
-                return ImageUploader(
-                  label: 'Image ${index + 1}',
-                  currentImageUrl: _galleryUrls[index],
-                  height: 140,
-                  onUpload: () => _onImageUpload('gallery_$index'),
-                  onRemove: _galleryUrls[index] != null
-                      ? () => setState(() => _galleryUrls[index] = null)
-                      : null,
-                );
-              },
-            );
-          },
-        ),
-      ],
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // 6. Social Links Section
-  // ---------------------------------------------------------------------------
-
-  Widget _buildSocialLinksSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionHeader('Social Links', Icons.link),
-        const SizedBox(height: 20),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            if (constraints.maxWidth < 500) {
-              return Column(
-                children: [
-                  _buildSocialField(
-                    label: 'LinkedIn',
-                    controller: _linkedInController,
-                    icon: Icons.business_center,
-                    hint: 'https://linkedin.com/company/...',
-                  ),
-                  const SizedBox(height: 16),
-                  _buildSocialField(
-                    label: 'Instagram',
-                    controller: _instagramController,
-                    icon: Icons.camera_alt_outlined,
-                    hint: 'https://instagram.com/...',
-                  ),
-                  const SizedBox(height: 16),
-                  _buildSocialField(
-                    label: 'Twitter / X',
-                    controller: _twitterController,
-                    icon: Icons.alternate_email,
-                    hint: 'https://x.com/...',
-                  ),
-                  const SizedBox(height: 16),
-                  _buildSocialField(
-                    label: 'Facebook',
-                    controller: _facebookController,
-                    icon: Icons.facebook,
-                    hint: 'https://facebook.com/...',
-                  ),
-                  const SizedBox(height: 16),
-                  _buildSocialField(
-                    label: 'WhatsApp',
-                    controller: _whatsAppController,
-                    icon: Icons.chat_outlined,
-                    hint: '+1234567890',
-                  ),
-                  const SizedBox(height: 16),
-                  _buildSocialField(
-                    label: 'WeChat',
-                    controller: _weChatController,
-                    icon: Icons.message_outlined,
-                    hint: 'WeChat ID',
-                  ),
-                ],
-              );
-            }
-
-            return Column(
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: _buildSocialField(
-                        label: 'LinkedIn',
-                        controller: _linkedInController,
-                        icon: Icons.business_center,
-                        hint: 'https://linkedin.com/company/...',
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: _buildSocialField(
-                        label: 'Instagram',
-                        controller: _instagramController,
-                        icon: Icons.camera_alt_outlined,
-                        hint: 'https://instagram.com/...',
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: _buildSocialField(
-                        label: 'Twitter / X',
-                        controller: _twitterController,
-                        icon: Icons.alternate_email,
-                        hint: 'https://x.com/...',
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: _buildSocialField(
-                        label: 'Facebook',
-                        controller: _facebookController,
-                        icon: Icons.facebook,
-                        hint: 'https://facebook.com/...',
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: _buildSocialField(
-                        label: 'WhatsApp',
-                        controller: _whatsAppController,
-                        icon: Icons.chat_outlined,
-                        hint: '+1234567890',
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: _buildSocialField(
-                        label: 'WeChat',
-                        controller: _weChatController,
-                        icon: Icons.message_outlined,
-                        hint: 'WeChat ID',
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            );
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSocialField({
-    required String label,
-    required TextEditingController controller,
-    required IconData icon,
-    required String hint,
+  Widget _buildBrandingUploadItem({
+    required String title,
+    required String description,
+    required String recommendation,
+    required String? currentImageUrl,
+    required double uploadWidth,
+    required double uploadHeight,
+    required VoidCallback onUpload,
+    VoidCallback? onRemove,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
       children: [
-        Row(
-          children: [
-            Icon(icon, size: 16, color: AppTheme.primaryColor),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: Colors.black87,
+        // Title (bold) + Description (light)
+        RichText(
+          text: TextSpan(
+            children: [
+              TextSpan(
+                text: '$title  ',
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+              ),
+              TextSpan(
+                text: '($description)',
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w400,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          recommendation,
+          style: GoogleFonts.inter(fontSize: 12, color: Colors.grey.shade500),
+        ),
+        const SizedBox(height: 8),
+        const Divider(height: 1),
+        const SizedBox(height: 12),
+
+        // Upload box with button
+        if (currentImageUrl != null && currentImageUrl.isNotEmpty)
+          _buildBrandingPreview(
+            imageUrl: currentImageUrl,
+            width: uploadWidth,
+            height: uploadHeight,
+            onRemove: onRemove,
+            onUpload: onUpload,
+          )
+        else
+          _buildDashedUploadBox(
+            width: uploadWidth,
+            height: uploadHeight,
+            onUpload: onUpload,
+          ),
+      ],
+    );
+  }
+
+  Widget _buildDashedUploadBox({
+    required double width,
+    required double height,
+    required VoidCallback onUpload,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        GestureDetector(
+          onTap: onUpload,
+          child: CustomPaint(
+            painter: _DashedBorderPainter(
+              color: const Color(0xFF3C4494),
+              strokeWidth: 1.5,
+              dashWidth: 6,
+              dashSpace: 4,
+              borderRadius: 8,
+            ),
+            child: SizedBox(
+              width: width,
+              height: height,
+              child: Center(
+                child: Icon(Icons.add, size: 32, color: Colors.grey.shade400),
               ),
             ),
-          ],
+          ),
         ),
-        const SizedBox(height: 6),
-        TextFormField(
-          controller: controller,
-          style: GoogleFonts.inter(fontSize: 14),
-          decoration: _inputDecoration(hintText: hint),
-          keyboardType: TextInputType.url,
+        const SizedBox(height: 8),
+        SizedBox(
+          width: width,
+          child: ElevatedButton(
+            onPressed: onUpload,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor,
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: Text(
+              'Upload',
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: Colors.white,
+              ),
+            ),
+          ),
         ),
       ],
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Save Button
-  // ---------------------------------------------------------------------------
-
-  Widget _buildSaveButton(List<Company> companies, int eventId) {
-    final isNewCompany = _selectedTabIndex >= companies.length;
-
-    return SizedBox(
-      width: double.infinity,
-      height: 50,
-      child: ElevatedButton(
-        onPressed: _isSaving ? null : () => _save(eventId, companies),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppTheme.primaryColor,
-          disabledBackgroundColor: AppTheme.primaryColor.withValues(alpha: 0.5),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
+  Widget _buildBrandingPreview({
+    required String imageUrl,
+    required double width,
+    required double height,
+    VoidCallback? onRemove,
+    required VoidCallback onUpload,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: width,
+          height: height,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey.shade300),
+            image: DecorationImage(
+              image: NetworkImage(imageUrl),
+              fit: BoxFit.contain,
+            ),
           ),
         ),
-        child: _isSaving
-            ? const SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
-                ),
-              )
-            : Text(
-                isNewCompany ? 'Create Company' : 'Save Changes',
-                style: GoogleFonts.inter(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
+        const SizedBox(height: 8),
+        SizedBox(
+          width: width,
+          child: Row(
+            children: [
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: onUpload,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryColor,
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: Text(
+                    'Replace',
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white,
+                    ),
+                  ),
                 ),
               ),
+              if (onRemove != null) ...[
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: onRemove,
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      side: const BorderSide(color: Colors.red),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: Text(
+                      'Remove',
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.red,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ===========================================================================
+  // 4. Gallery Content
+  // ===========================================================================
+
+  Widget _buildGalleryContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Upload up to 4 images that accurately represent your company, its facilities, staff, or completed projects.',
+          style: GoogleFonts.inter(fontSize: 13, color: Colors.grey.shade600),
+        ),
+        const SizedBox(height: 16),
+        Wrap(
+          spacing: 16,
+          runSpacing: 16,
+          children: List.generate(4, (index) {
+            final url = _galleryUrls[index];
+            if (url != null && url.isNotEmpty) {
+              return _buildGalleryPreview(index, url);
+            }
+            return _buildGalleryUploadBox(index);
+          }),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGalleryUploadBox(int index) {
+    return GestureDetector(
+      onTap: () => _onImageUpload('gallery_$index'),
+      child: CustomPaint(
+        painter: _DashedBorderPainter(
+          color: Colors.grey.shade400,
+          strokeWidth: 1.5,
+          dashWidth: 6,
+          dashSpace: 4,
+          borderRadius: 8,
+        ),
+        child: SizedBox(
+          width: 170,
+          height: 170,
+          child: Center(
+            child: Icon(Icons.add, size: 48, color: Colors.grey.shade400),
+          ),
+        ),
       ),
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Shared helpers
-  // ---------------------------------------------------------------------------
+  Widget _buildGalleryPreview(int index, String url) {
+    return Stack(
+      children: [
+        Container(
+          width: 170,
+          height: 170,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey.shade300),
+            image: DecorationImage(image: NetworkImage(url), fit: BoxFit.cover),
+          ),
+        ),
+        Positioned(
+          top: 4,
+          right: 4,
+          child: InkWell(
+            onTap: () => setState(() => _galleryUrls[index] = null),
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.close, size: 16, color: Colors.red),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 
-  Widget _buildLabeledField({
-    required String label,
-    required Widget child,
-    bool required = false,
-  }) {
+  // ===========================================================================
+  // Bottom Buttons
+  // ===========================================================================
+
+  Widget _buildBottomButtons(int eventId) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        OutlinedButton(
+          onPressed: _isSaving
+              ? null
+              : () {
+                  final eventIdStr =
+                      GoRouterState.of(context).pathParameters['id'] ?? '';
+                  context.go('/events/$eventIdStr/company-profile');
+                },
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+            side: BorderSide(color: Colors.grey.shade400),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+          child: Text(
+            'Cancel',
+            style: GoogleFonts.inter(
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
+              color: Colors.black87,
+            ),
+          ),
+        ),
+        const SizedBox(width: 16),
+        ElevatedButton(
+          onPressed: _isSaving ? null : () => _save(eventId),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppTheme.primaryColor,
+            disabledBackgroundColor: AppTheme.primaryColor.withValues(
+              alpha: 0.5,
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+          child: _isSaving
+              ? const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Continue',
+                      style: GoogleFonts.inter(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Icon(
+                      Icons.chevron_right,
+                      size: 20,
+                      color: Colors.white,
+                    ),
+                  ],
+                ),
+        ),
+      ],
+    );
+  }
+
+  // ===========================================================================
+  // Shared helpers
+  // ===========================================================================
+
+  Widget _buildLabeledField({required String label, required Widget child}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Row(
-          children: [
-            Text(
-              label,
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: Colors.black87,
-              ),
-            ),
-            if (required)
-              Text(
-                ' *',
-                style: GoogleFonts.inter(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: AppTheme.errorColor,
-                ),
-              ),
-          ],
+        Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Colors.black87,
+          ),
         ),
         const SizedBox(height: 6),
         child,
@@ -1131,7 +1135,7 @@ class _CompanyProfilePageState extends ConsumerState<CompanyProfilePage> {
     );
   }
 
-  InputDecoration _inputDecoration({required String hintText}) {
+  InputDecoration _inputDecoration({String? hintText}) {
     return InputDecoration(
       hintText: hintText,
       hintStyle: GoogleFonts.inter(fontSize: 14, color: Colors.grey),
@@ -1190,7 +1194,6 @@ class _CompanyProfilePageState extends ConsumerState<CompanyProfilePage> {
           case 'cover':
             _coverImageUrl = url;
           default:
-            // Gallery images: gallery_0, gallery_1, ...
             if (imageType.startsWith('gallery_')) {
               final idx = int.tryParse(imageType.replaceFirst('gallery_', ''));
               if (idx != null && idx < _galleryUrls.length) {
@@ -1201,12 +1204,77 @@ class _CompanyProfilePageState extends ConsumerState<CompanyProfilePage> {
       });
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Upload failed: $e'),
-          backgroundColor: AppTheme.errorColor,
-        ),
-      );
+      AppSnackBar.showError(context, 'Upload failed: $e');
     }
+  }
+}
+
+// =============================================================================
+// Dashed border painter for upload boxes
+// =============================================================================
+
+class _DashedBorderPainter extends CustomPainter {
+  final Color color;
+  final double strokeWidth;
+  final double dashWidth;
+  final double dashSpace;
+  final double borderRadius;
+
+  _DashedBorderPainter({
+    required this.color,
+    this.strokeWidth = 1.5,
+    this.dashWidth = 6,
+    this.dashSpace = 4,
+    this.borderRadius = 8,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = strokeWidth
+      ..style = PaintingStyle.stroke;
+
+    final rrect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(0, 0, size.width, size.height),
+      Radius.circular(borderRadius),
+    );
+
+    final path = Path()..addRRect(rrect);
+    final metrics = path.computeMetrics();
+
+    for (final metric in metrics) {
+      double distance = 0;
+      while (distance < metric.length) {
+        final end = (distance + dashWidth).clamp(0.0, metric.length);
+        canvas.drawPath(metric.extractPath(distance, end), paint);
+        distance += dashWidth + dashSpace;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashedBorderPainter oldDelegate) =>
+      color != oldDelegate.color ||
+      strokeWidth != oldDelegate.strokeWidth ||
+      dashWidth != oldDelegate.dashWidth ||
+      dashSpace != oldDelegate.dashSpace;
+}
+
+// =============================================================================
+// Social link entry model
+// =============================================================================
+
+class _SocialLinkEntry {
+  final TextEditingController platformController;
+  final TextEditingController urlController;
+
+  _SocialLinkEntry({String? platform, String? url})
+    : platformController = TextEditingController(text: platform ?? ''),
+      urlController = TextEditingController(text: url ?? '');
+
+  void dispose() {
+    platformController.dispose();
+    urlController.dispose();
   }
 }

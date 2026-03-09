@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/theme/app_theme.dart';
-import '../../../shared/layouts/event_sidebar_layout.dart';
+import '../../../core/widgets/app_snackbar.dart';
 import '../providers/shop_providers.dart';
 import '../models/event_service.dart';
 
@@ -32,9 +32,7 @@ class _ShoppingCartPageState extends ConsumerState<ShoppingCartPage> {
     final eventId = int.tryParse(eventIdStr) ?? 0;
     final cartAsync = ref.watch(cartProvider(eventId));
 
-    return EventSidebarLayout(
-      title: 'Shopping Cart',
-      child: cartAsync.when(
+    return cartAsync.when(
         loading: () => const Center(
           child: CircularProgressIndicator(color: AppTheme.primaryColor),
         ),
@@ -59,8 +57,7 @@ class _ShoppingCartPageState extends ConsumerState<ShoppingCartPage> {
             onCheckout: () => _checkout(eventId, eventIdStr),
           );
         },
-      ),
-    );
+      );
   }
 
   Future<void> _updateQuantity(
@@ -73,13 +70,7 @@ class _ShoppingCartPageState extends ConsumerState<ShoppingCartPage> {
       ref.invalidate(cartBadgeCountProvider(eventId));
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to update quantity: $e'),
-            backgroundColor: AppTheme.errorColor,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        AppSnackBar.showError(context, 'Failed to update quantity: $e');
       }
     }
   }
@@ -92,13 +83,7 @@ class _ShoppingCartPageState extends ConsumerState<ShoppingCartPage> {
       ref.invalidate(cartBadgeCountProvider(eventId));
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to remove item: $e'),
-            backgroundColor: AppTheme.errorColor,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        AppSnackBar.showError(context, 'Failed to remove item: $e');
       }
     }
   }
@@ -113,13 +98,7 @@ class _ShoppingCartPageState extends ConsumerState<ShoppingCartPage> {
       ref.invalidate(cartBadgeCountProvider(eventId));
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to clear cart: $e'),
-            backgroundColor: AppTheme.errorColor,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        AppSnackBar.showError(context, 'Failed to clear cart: $e');
       }
     }
   }
@@ -137,24 +116,12 @@ class _ShoppingCartPageState extends ConsumerState<ShoppingCartPage> {
       ref.invalidate(cartBadgeCountProvider(eventId));
       ref.invalidate(purchaseStatusProvider(eventId));
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Order placed successfully!'),
-            backgroundColor: AppTheme.successColor,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        AppSnackBar.showSuccess(context, 'Order placed successfully!');
         context.go('/events/$eventIdStr/services');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Checkout failed: $e'),
-            backgroundColor: AppTheme.errorColor,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        AppSnackBar.showError(context, 'Checkout failed: $e');
       }
     } finally {
       if (mounted) setState(() => _isCheckingOut = false);
@@ -197,55 +164,70 @@ class _CartContent extends StatelessWidget {
       children: [
         // Header: breadcrumb + Delete all
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
           child: Column(
             children: [
               Row(
                 children: [
-                  GestureDetector(
-                    onTap: () =>
-                        context.go('/events/$eventIdStr/services'),
-                    child: Text(
-                      'Event Services',
-                      style: GoogleFonts.montserrat(
-                        fontSize: 30,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.primaryColor,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  const Icon(Icons.chevron_right,
-                      size: 24, color: Colors.black54),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Shopping Cart',
-                    style: GoogleFonts.montserrat(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black,
-                    ),
-                  ),
-                  const Spacer(),
-                  GestureDetector(
-                    onTap: onRemoveAll,
+                  Expanded(
                     child: Row(
-                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.close, size: 16, color: AppTheme.errorColor),
-                        const SizedBox(width: 4),
+                        Flexible(
+                          child: GestureDetector(
+                            onTap: () =>
+                                context.go('/events/$eventIdStr/services'),
+                            child: Text(
+                              'Event Services',
+                              style: GoogleFonts.montserrat(
+                                fontSize: isMobile ? 20 : 30,
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.primaryColor,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: Icon(Icons.chevron_right,
+                              size: isMobile ? 20 : 24,
+                              color: Colors.black54),
+                        ),
                         Text(
-                          'Delete all',
-                          style: GoogleFonts.inter(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: AppTheme.errorColor,
+                          'Shopping Cart',
+                          style: GoogleFonts.montserrat(
+                            fontSize: isMobile ? 14 : 20,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black,
                           ),
                         ),
                       ],
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 8),
+              // Delete all row
+              Align(
+                alignment: Alignment.centerLeft,
+                child: GestureDetector(
+                  onTap: onRemoveAll,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.close, size: 16, color: AppTheme.errorColor),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Delete all',
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: AppTheme.errorColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
               const SizedBox(height: 12),
               Container(height: 0.5, color: const Color(0xFFCACACA)),
@@ -391,33 +373,24 @@ class _MobileCartBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Cards as wrap
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: cart.items.map((item) {
-              return SizedBox(
-                width: 184,
-                height: 246,
-                child: _CartProductCard(
-                  item: item,
-                  onRemove: () => onRemoveItem(item),
-                  onIncrement: () =>
-                      onUpdateQuantity(item, item.quantity + 1),
-                  onDecrement: item.quantity > 1
-                      ? () => onUpdateQuantity(item, item.quantity - 1)
-                      : null,
-                  onTap: () => context.go(
-                    '/events/$eventIdStr/services/${item.serviceId}',
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
+          // Horizontal cart item cards
+          ...cart.items.map((item) {
+            return _CartHorizontalCard(
+              item: item,
+              onRemove: () => onRemoveItem(item),
+              onIncrement: () => onUpdateQuantity(item, item.quantity + 1),
+              onDecrement: item.quantity > 1
+                  ? () => onUpdateQuantity(item, item.quantity - 1)
+                  : null,
+              onTap: () => context.go(
+                '/events/$eventIdStr/services/${item.serviceId}',
+              ),
+            );
+          }),
           const SizedBox(height: 24),
           _CartSummaryPanel(cart: cart),
           const SizedBox(height: 24),
@@ -455,7 +428,7 @@ class _CartProductCard extends StatelessWidget {
     final service = item.service;
     final name = service?.name ?? 'Service #${item.serviceId}';
     final hasDiscount = (service?.discountPercent ?? 0) > 0;
-    final originalPrice = service?.priceUsd ?? item.unitPriceUsd;
+    final originalPrice = service?.price ?? item.unitPrice;
     final qty = item.quantity;
 
     return GestureDetector(
@@ -524,7 +497,7 @@ class _CartProductCard extends StatelessWidget {
                     child: Row(
                       children: [
                         Text(
-                          '${_fmt(item.unitPriceUsd)} \$',
+                          '${_fmt(item.unitPrice)} ${item.currency == "TMT" ? "TMT" : "\$"}',
                           style: GoogleFonts.roboto(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
@@ -534,7 +507,7 @@ class _CartProductCard extends StatelessWidget {
                         if (hasDiscount) ...[
                           const SizedBox(width: 6),
                           Text(
-                            '${_fmt(originalPrice)} \$',
+                            '${_fmt(originalPrice)} ${item.currency == "TMT" ? "TMT" : "\$"}',
                             style: GoogleFonts.roboto(
                               fontSize: 12,
                               color: Colors.grey,
@@ -613,6 +586,163 @@ class _CartProductCard extends StatelessWidget {
       color: Colors.grey.shade100,
       child: Center(
         child: Icon(Icons.image_outlined, size: 32, color: Colors.grey.shade400),
+      ),
+    );
+  }
+
+  static String _fmt(double v) =>
+      v == v.roundToDouble() ? v.toInt().toString() : v.toStringAsFixed(2);
+}
+
+// ---------------------------------------------------------------------------
+// Horizontal cart card for mobile — image left, info right
+// ---------------------------------------------------------------------------
+class _CartHorizontalCard extends StatelessWidget {
+  final CartItem item;
+  final VoidCallback onRemove;
+  final VoidCallback onIncrement;
+  final VoidCallback? onDecrement;
+  final VoidCallback onTap;
+
+  const _CartHorizontalCard({
+    required this.item,
+    required this.onRemove,
+    required this.onIncrement,
+    this.onDecrement,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final service = item.service;
+    final name = service?.name ?? 'Service #${item.serviceId}';
+    final hasDiscount = (service?.discountPercent ?? 0) > 0;
+    final originalPrice = service?.price ?? item.unitPrice;
+    final qty = item.quantity;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            // Image
+            ClipRRect(
+              borderRadius: const BorderRadius.horizontal(
+                left: Radius.circular(8),
+              ),
+              child: SizedBox(
+                width: 100,
+                height: 110,
+                child: service?.imageUrl != null
+                    ? Image.network(
+                        service!.imageUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => _placeholder(),
+                      )
+                    : _placeholder(),
+              ),
+            ),
+            // Info
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Name
+                    Text(
+                      name,
+                      style: GoogleFonts.roboto(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    // Price row
+                    Row(
+                      children: [
+                        Text(
+                          '${_fmt(item.unitPrice)} ${item.currency == "TMT" ? "TMT" : "\$"}',
+                          style: GoogleFonts.roboto(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black,
+                          ),
+                        ),
+                        if (hasDiscount) ...[
+                          const SizedBox(width: 6),
+                          Text(
+                            '${_fmt(originalPrice)} ${item.currency == "TMT" ? "TMT" : "\$"}',
+                            style: GoogleFonts.roboto(
+                              fontSize: 12,
+                              color: Colors.grey,
+                              decoration: TextDecoration.lineThrough,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.red,
+                              borderRadius: BorderRadius.circular(3),
+                            ),
+                            child: Text(
+                              '-${service!.discountPercent.round()}%',
+                              style: GoogleFonts.roboto(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    // Quantity bar
+                    SizedBox(
+                      height: 29,
+                      child: _QuantityBar(
+                        quantity: qty,
+                        onIncrement: onIncrement,
+                        onDecrement: onDecrement,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static Widget _placeholder() {
+    return Container(
+      color: Colors.grey.shade100,
+      child: Center(
+        child:
+            Icon(Icons.image_outlined, size: 32, color: Colors.grey.shade400),
       ),
     );
   }
@@ -733,12 +863,16 @@ class _CartSummaryPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(5),
-        border: Border.all(color: const Color(0xFFDDDDDD)),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: isMobile ? AppTheme.primaryColor : const Color(0xFFDDDDDD),
+          width: isMobile ? 1.5 : 1,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -752,19 +886,37 @@ class _CartSummaryPanel extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          _summaryRow('Price:', '\$${_fmt(cart.totalUsd + cart.discountUsd)}'),
+          if (cart.totalUsd + cart.discountUsd > 0)
+            _summaryRow('Price (USD):', '\$${_fmt(cart.totalUsd + cart.discountUsd)}'),
+          if (cart.totalTmt + cart.discountTmt > 0) ...[
+            const SizedBox(height: 4),
+            _summaryRow('Price (TMT):', '${_fmt(cart.totalTmt + cart.discountTmt)} TMT'),
+          ],
           const SizedBox(height: 8),
           if (cart.discountUsd > 0) ...[
-            _summaryRow('Discount:', '- \$${_fmt(cart.discountUsd)}'),
-            const SizedBox(height: 8),
+            _summaryRow('Discount (USD):', '- \$${_fmt(cart.discountUsd)}'),
+            const SizedBox(height: 4),
+          ],
+          if (cart.discountTmt > 0) ...[
+            _summaryRow('Discount (TMT):', '- ${_fmt(cart.discountTmt)} TMT'),
+            const SizedBox(height: 4),
           ],
           const Divider(height: 1, color: Color(0xFFDDDDDD)),
           const SizedBox(height: 12),
-          _summaryRow(
-            'Total price:',
-            '\$${_fmt(cart.totalUsd)}',
-            bold: true,
-          ),
+          if (cart.totalUsd > 0)
+            _summaryRow(
+              'Total (USD):',
+              '\$${_fmt(cart.totalUsd)}',
+              bold: true,
+            ),
+          if (cart.totalTmt > 0) ...[
+            if (cart.totalUsd > 0) const SizedBox(height: 4),
+            _summaryRow(
+              'Total (TMT):',
+              '${_fmt(cart.totalTmt)} TMT',
+              bold: true,
+            ),
+          ],
         ],
       ),
     );

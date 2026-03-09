@@ -10,8 +10,8 @@ import 'package:google_fonts/google_fonts.dart';
 class ProductCard extends StatelessWidget {
   final String name;
   final String? imageUrl;
-  final double priceUsd;
-  final double priceTmt;
+  final double price;
+  final String currency; // USD or TMT
   final double discountPercent;
   final String? subtitle;
   final int cartQuantity;
@@ -24,8 +24,8 @@ class ProductCard extends StatelessWidget {
     super.key,
     required this.name,
     this.imageUrl,
-    required this.priceUsd,
-    required this.priceTmt,
+    required this.price,
+    required this.currency,
     this.discountPercent = 0,
     this.subtitle,
     this.cartQuantity = 0,
@@ -38,8 +38,6 @@ class ProductCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasDiscount = discountPercent > 0;
-    final discountedPrice =
-        hasDiscount ? priceUsd * (1 - discountPercent / 100) : priceUsd;
 
     return Material(
       color: Colors.white,
@@ -107,10 +105,13 @@ class ProductCard extends StatelessWidget {
 
                 const SizedBox(height: 4),
 
-                // Price row — Roboto SemiBold 16px
+                // Price row — single currency
                 _PriceRow(
-                  currentPrice: discountedPrice,
-                  originalPrice: hasDiscount ? priceUsd : null,
+                  currentPrice: hasDiscount
+                      ? price * (1 - discountPercent / 100)
+                      : price,
+                  currency: currency,
+                  originalPrice: hasDiscount ? price : null,
                   discountPercent: hasDiscount ? discountPercent : null,
                 ),
 
@@ -146,62 +147,59 @@ class ProductCard extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Price row: current price + optional strikethrough + discount badge
+// Price row: single currency + optional strikethrough + discount badge
 // ---------------------------------------------------------------------------
 class _PriceRow extends StatelessWidget {
   final double currentPrice;
+  final String currency;
   final double? originalPrice;
   final double? discountPercent;
 
   const _PriceRow({
     required this.currentPrice,
+    required this.currency,
     this.originalPrice,
     this.discountPercent,
   });
 
   @override
   Widget build(BuildContext context) {
+    final suffix = currency == 'TMT' ? ' TMT' : ' \$';
+
     return Row(
       children: [
-        Flexible(
-          child: Text(
-            '${_fmt(currentPrice)} \$',
-            style: GoogleFonts.roboto(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Colors.black,
-            ),
-            overflow: TextOverflow.ellipsis,
+        Text(
+          '${_fmt(currentPrice)}$suffix',
+          style: GoogleFonts.roboto(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.black,
           ),
         ),
         if (originalPrice != null) ...[
-          const SizedBox(width: 6),
-          Flexible(
-            child: Text(
-              '${_fmt(originalPrice!)} \$',
-              style: GoogleFonts.roboto(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: const Color(0xFFB2B2B2),
-                decoration: TextDecoration.lineThrough,
-                decorationColor: const Color(0xFF828282),
-              ),
-              overflow: TextOverflow.ellipsis,
+          const SizedBox(width: 4),
+          Text(
+            '${_fmt(originalPrice!)}$suffix',
+            style: GoogleFonts.roboto(
+              fontSize: 11,
+              color: const Color(0xFFB2B2B2),
+              decoration: TextDecoration.lineThrough,
+              decorationColor: const Color(0xFF828282),
             ),
           ),
         ],
         const Spacer(),
         if (discountPercent != null)
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
             decoration: BoxDecoration(
               color: const Color(0xFFFF0000),
-              borderRadius: BorderRadius.circular(5),
+              borderRadius: BorderRadius.circular(3),
             ),
             child: Text(
               '-${discountPercent!.round()}%',
               style: GoogleFonts.roboto(
-                fontSize: 13,
+                fontSize: 11,
                 fontWeight: FontWeight.w600,
                 color: Colors.white,
               ),

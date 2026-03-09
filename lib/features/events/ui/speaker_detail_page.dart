@@ -8,8 +8,6 @@ import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/config/app_config.dart';
-import '../../../core/providers/event_context_provider.dart';
-import '../../../shared/layouts/event_sidebar_layout.dart';
 import 'widgets/profile_dropdown.dart';
 
 class SpeakerDetailPage extends ConsumerStatefulWidget {
@@ -47,17 +45,12 @@ class _SpeakerDetailPageState extends ConsumerState<SpeakerDetailPage> {
 
   Future<void> _fetchSpeaker() async {
     try {
-      // Use EventContextService for site_id
-      final siteId = ref.read(eventContextProvider).siteId;
-      final uri = siteId != null
-          ? Uri.parse(
-              '${AppConfig.tourismApiBaseUrl}/speakers/${widget.speakerId}?site_id=$siteId',
-            )
-          : Uri.parse(
-              '${AppConfig.tourismApiBaseUrl}/speakers/${widget.speakerId}',
-            );
+      final uri = Uri.parse(
+        '${AppConfig.b2cApiBaseUrl}/api/v1/speakers/${widget.speakerId}',
+      );
 
       final response = await http.get(uri);
+      if (!mounted) return;
       if (response.statusCode == 200) {
         setState(() {
           _speaker = jsonDecode(response.body);
@@ -69,6 +62,7 @@ class _SpeakerDetailPageState extends ConsumerState<SpeakerDetailPage> {
       }
     } catch (e) {
       debugPrint('Error fetching speaker: $e');
+      if (!mounted) return;
       setState(() => _isLoading = false);
     }
   }
@@ -77,10 +71,17 @@ class _SpeakerDetailPageState extends ConsumerState<SpeakerDetailPage> {
     if (_isProfileOpen) setState(() => _isProfileOpen = false);
   }
 
+  void _requestMeeting() {
+    context.push(
+      '/events/${widget.eventId}/meetings/speaker/${widget.speakerId}',
+      extra: _speaker,
+    );
+  }
+
   String _buildImageUrl(String? path) {
     if (path == null || path.isEmpty) return '';
     if (path.startsWith('http')) return path;
-    return '${AppConfig.tourismApiBaseUrl}$path';
+    return '${AppConfig.b2cApiBaseUrl}$path';
   }
 
   Future<void> _launchUrl(String url) async {
@@ -102,9 +103,7 @@ class _SpeakerDetailPageState extends ConsumerState<SpeakerDetailPage> {
     final isMobile = screenWidth < 600;
     final horizontalPadding = isMobile ? 16.0 : 50.0;
 
-    return EventSidebarLayout(
-      title: 'Speaker',
-      child: GestureDetector(
+    return GestureDetector(
         onTap: _closeProfile,
         behavior: HitTestBehavior.translucent,
         child: Stack(
@@ -165,8 +164,7 @@ class _SpeakerDetailPageState extends ConsumerState<SpeakerDetailPage> {
               ),
           ],
         ),
-      ),
-    );
+      );
   }
 
   Widget _buildContent(bool isMobile) {
@@ -202,17 +200,17 @@ class _SpeakerDetailPageState extends ConsumerState<SpeakerDetailPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Breadcrumb
+          // Breadcrumb + Meeting request button (desktop only)
           Row(
             children: [
               GestureDetector(
                 onTap: () => context.go('/events/${widget.eventId}/speakers'),
                 child: Text(
                   'Speakers',
-                  style: GoogleFonts.roboto(
-                    fontSize: isMobile ? 14 : 18,
-                    fontWeight: FontWeight.w500,
-                    color: const Color(0xFF616161),
+                  style: GoogleFonts.montserrat(
+                    fontSize: isMobile ? 18 : 24,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF3C4494),
                   ),
                 ),
               ),
@@ -220,18 +218,39 @@ class _SpeakerDetailPageState extends ConsumerState<SpeakerDetailPage> {
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: Icon(
                   Icons.chevron_right,
-                  size: isMobile ? 18 : 20,
+                  size: isMobile ? 18 : 22,
                   color: const Color(0xFF616161),
                 ),
               ),
-              Text(
-                'Speaker',
-                style: GoogleFonts.roboto(
-                  fontSize: isMobile ? 14 : 18,
-                  fontWeight: FontWeight.w500,
-                  color: const Color(0xFF616161),
+              Expanded(
+                child: Text(
+                  fullName.isNotEmpty ? fullName : 'Speaker',
+                  style: GoogleFonts.inter(
+                    fontSize: isMobile ? 14 : 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
+              if (!isMobile)
+                OutlinedButton.icon(
+                  onPressed: () => _requestMeeting(),
+                  icon: const Icon(Icons.calendar_today, size: 16),
+                  label: const Text('Meeting request'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    backgroundColor: const Color(0xFF3C4494),
+                    side: BorderSide.none,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                  ),
+                ),
             ],
           ),
 
@@ -280,106 +299,125 @@ class _SpeakerDetailPageState extends ConsumerState<SpeakerDetailPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Photo
-        Center(
-          child: Container(
-            width: 200,
-            height: 240,
-            decoration: BoxDecoration(
-              color: Colors.grey[300],
-              borderRadius: BorderRadius.circular(10),
+        // Photo + basic info side by side
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Photo
+            Container(
+              width: 140,
+              height: 180,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: photoUrl.isNotEmpty
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Image.network(
+                        photoUrl,
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        height: double.infinity,
+                        errorBuilder: (_, __, ___) => const Center(
+                          child:
+                              Icon(Icons.person, size: 60, color: Colors.grey),
+                        ),
+                      ),
+                    )
+                  : const Center(
+                      child: Icon(Icons.person, size: 60, color: Colors.grey),
+                    ),
             ),
-            child: photoUrl.isNotEmpty
-                ? ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: Image.network(
-                      photoUrl,
-                      fit: BoxFit.cover,
-                      width: double.infinity,
-                      height: double.infinity,
-                      errorBuilder: (_, __, ___) => const Center(
-                        child: Icon(Icons.person, size: 80, color: Colors.grey),
+            const SizedBox(width: 16),
+            // Name + company + meeting button
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Meeting request button
+                  OutlinedButton.icon(
+                    onPressed: () => _requestMeeting(),
+                    icon: const Icon(Icons.calendar_today, size: 14),
+                    label: const Text('Meting request'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      backgroundColor: const Color(0xFF3C4494),
+                      side: BorderSide.none,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
                       ),
                     ),
-                  )
-                : const Center(
-                    child: Icon(Icons.person, size: 80, color: Colors.grey),
                   ),
-          ),
+                  const SizedBox(height: 12),
+                  // Name
+                  Text(
+                    fullName.isNotEmpty ? fullName : 'Unknown Speaker',
+                    style: GoogleFonts.roboto(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF151938),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  // Company logo + position
+                  if (companyPhotoUrl.isNotEmpty)
+                    Image.network(
+                      companyPhotoUrl,
+                      height: 40,
+                      fit: BoxFit.contain,
+                      alignment: Alignment.centerLeft,
+                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                    ),
+                ],
+              ),
+            ),
+          ],
         ),
+
+        const SizedBox(height: 20),
+
+        // Position text
+        if (position.isNotEmpty)
+          Text(
+            position.isNotEmpty && company.isNotEmpty
+                ? '$position, $company'
+                : position,
+            style: GoogleFonts.roboto(
+              fontSize: 16,
+              fontWeight: FontWeight.w400,
+              color: const Color(0xFF151938),
+            ),
+          ),
+
+        if (position.isNotEmpty) const SizedBox(height: 16),
+
+        // Description
+        if (description.isNotEmpty)
+          Text(
+            description,
+            style: GoogleFonts.roboto(
+              fontSize: 16,
+              fontWeight: FontWeight.w400,
+              height: 1.6,
+              color: Colors.black,
+            ),
+          ),
 
         const SizedBox(height: 24),
 
-        // Info Card
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Personal Information label
-              Text(
-                'Personal Information',
-                style: GoogleFonts.roboto(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w400,
-                  color: const Color(0xFF151938).withValues(alpha: 0.85),
-                ),
-              ),
+        // Social Links
+        if (socialLinks.isNotEmpty) _buildSocialLinks(socialLinks, true),
 
-              const SizedBox(height: 8),
+        const SizedBox(height: 16),
 
-              // Name
-              Text(
-                fullName.isNotEmpty ? fullName : 'Unknown Speaker',
-                style: GoogleFonts.roboto(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w600,
-                  color: const Color(0xFF151938),
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              // Company and Position
-              _buildCompanyPositionRow(
-                company,
-                position,
-                companyPhotoUrl,
-                true,
-              ),
-
-              const SizedBox(height: 20),
-
-              // Description
-              if (description.isNotEmpty)
-                Text(
-                  description,
-                  style: GoogleFonts.roboto(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w400,
-                    height: 1.6,
-                    color: Colors.black,
-                  ),
-                ),
-
-              const SizedBox(height: 24),
-
-              // Social Links
-              if (socialLinks.isNotEmpty) _buildSocialLinks(socialLinks, true),
-
-              const SizedBox(height: 16),
-
-              // Contacts
-              if (phone.isNotEmpty || email.isNotEmpty)
-                _buildContacts(phone, email, true),
-            ],
-          ),
-        ),
+        // Contacts
+        if (phone.isNotEmpty || email.isNotEmpty)
+          _buildContacts(phone, email, true),
       ],
     );
   }
@@ -437,44 +475,13 @@ class _SpeakerDetailPageState extends ConsumerState<SpeakerDetailPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Top row with label and meeting request button
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Personal Information',
-                      style: GoogleFonts.roboto(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w400,
-                        color: const Color(0xFF151938).withValues(alpha: 0.85),
-                      ),
-                    ),
-                    // Meeting request button
-                    OutlinedButton.icon(
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Use B2B Meetings to request meetings with participants',
-                            ),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.arrow_forward, size: 16),
-                      label: const Text('Meeting request'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF151938),
-                        side: const BorderSide(color: Color(0xFF383B56)),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
-                      ),
-                    ),
-                  ],
+                Text(
+                  'Personal Information',
+                  style: GoogleFonts.roboto(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w400,
+                    color: const Color(0xFF151938).withValues(alpha: 0.85),
+                  ),
                 ),
 
                 const SizedBox(height: 16),

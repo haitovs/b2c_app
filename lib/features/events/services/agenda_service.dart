@@ -5,18 +5,12 @@ class AgendaService {
 
   AgendaService(this._api);
 
-  /// Fetch agenda days from tourism backend
-  Future<List<dynamic>> fetchAgendaDays({int? siteId}) async {
-    final queryParams = <String, String>{};
-    if (siteId != null) {
-      queryParams['site_id'] = siteId.toString();
-    }
-
-    // Note: Tourism API uses different base URL
+  /// Fetch agenda days for an event from B2C backend
+  Future<List<dynamic>> fetchAgendaDays({required int eventId}) async {
     final result = await _api.get<List<dynamic>>(
-      '/agenda/days',
+      '/api/v1/agenda/days',
       auth: false,
-      queryParams: queryParams.isNotEmpty ? queryParams : null,
+      queryParams: {'event_id': eventId.toString()},
     );
 
     if (result.isSuccess && result.data != null) {
@@ -25,17 +19,11 @@ class AgendaService {
     return [];
   }
 
-  /// Fetch episodes for a specific day from tourism backend
-  Future<List<dynamic>> fetchEpisodesForDay(int dayId, {int? siteId}) async {
-    final queryParams = <String, String>{};
-    if (siteId != null) {
-      queryParams['site_id'] = siteId.toString();
-    }
-
+  /// Fetch episodes for a specific day from B2C backend
+  Future<List<dynamic>> fetchEpisodesForDay(int dayId) async {
     final result = await _api.get<List<dynamic>>(
-      '/agenda/day/$dayId/episodes',
+      '/api/v1/agenda/day/$dayId/episodes',
       auth: false,
-      queryParams: queryParams.isNotEmpty ? queryParams : null,
     );
 
     if (result.isSuccess && result.data != null) {

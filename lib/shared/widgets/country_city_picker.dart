@@ -5,33 +5,14 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../core/providers/reference_data_provider.dart';
 import '../../core/theme/app_theme.dart';
 
-/// A pair of dropdowns for selecting a country and its associated city.
+/// A pair of searchable dropdowns for selecting a country and its associated city.
 ///
-/// The country list is loaded from [countriesProvider] and the city list from
-/// [citiesProvider] (keyed by the selected country). The city dropdown remains
+/// Uses [Autocomplete] for type-ahead search. The city dropdown remains
 /// disabled until a country is selected.
-///
-/// Both dropdowns use the standard [InputDecoration] styling from [AppTheme].
-///
-/// ```dart
-/// CountryCityPicker(
-///   selectedCountry: _country,
-///   selectedCity: _city,
-///   onCountryChanged: (c) => setState(() { _country = c; _city = null; }),
-///   onCityChanged: (c) => setState(() => _city = c),
-/// )
-/// ```
-class CountryCityPicker extends ConsumerWidget {
-  /// Currently selected country, or `null` when none is chosen.
+class CountryCityPicker extends ConsumerStatefulWidget {
   final String? selectedCountry;
-
-  /// Currently selected city, or `null` when none is chosen.
   final String? selectedCity;
-
-  /// Called when the user picks a different country (or clears the selection).
   final ValueChanged<String?> onCountryChanged;
-
-  /// Called when the user picks a different city (or clears the selection).
   final ValueChanged<String?> onCityChanged;
 
   const CountryCityPicker({
@@ -43,56 +24,59 @@ class CountryCityPicker extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CountryCityPicker> createState() => _CountryCityPickerState();
+}
+
+class _CountryCityPickerState extends ConsumerState<CountryCityPicker> {
+  @override
+  Widget build(BuildContext context) {
     final countriesAsync = ref.watch(countriesProvider);
-    final citiesAsync = selectedCountry != null
-        ? ref.watch(citiesProvider(selectedCountry!))
+    final citiesAsync = widget.selectedCountry != null
+        ? ref.watch(citiesProvider(widget.selectedCountry!))
         : null;
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Country dropdown
+        // Country
         Expanded(
           child: countriesAsync.when(
-            loading: () => _buildLoadingField(label: 'Country'),
-            error: (err, _) => _buildErrorField(label: 'Country', error: err),
-            data: (countries) => _buildDropdown(
-              label: 'Country',
-              hint: 'Select country',
-              value: selectedCountry,
+            loading: () => _buildLoadingField(label: 'Country:'),
+            error: (err, _) => _buildErrorField(label: 'Country:'),
+            data: (countries) => _buildSearchableField(
+              label: 'Country:',
+              hint: 'Search country...',
+              value: widget.selectedCountry,
               items: countries,
-              onChanged: (value) {
-                onCountryChanged(value);
-                // Reset city when country changes.
-                onCityChanged(null);
+              onSelected: (value) {
+                widget.onCountryChanged(value);
+                widget.onCityChanged(null);
               },
             ),
           ),
         ),
         const SizedBox(width: 12),
 
-        // City dropdown
+        // City
         Expanded(
           child: citiesAsync == null
-              ? _buildDropdown(
-                  label: 'City',
-                  hint: 'Select city',
+              ? _buildSearchableField(
+                  label: 'City:',
+                  hint: 'Select country first',
                   value: null,
                   items: const [],
-                  onChanged: null,
+                  onSelected: null,
                   enabled: false,
                 )
               : citiesAsync.when(
-                  loading: () => _buildLoadingField(label: 'City'),
-                  error: (err, _) =>
-                      _buildErrorField(label: 'City', error: err),
-                  data: (cities) => _buildDropdown(
-                    label: 'City',
-                    hint: 'Select city',
-                    value: selectedCity,
+                  loading: () => _buildLoadingField(label: 'City:'),
+                  error: (err, _) => _buildErrorField(label: 'City:'),
+                  data: (cities) => _buildSearchableField(
+                    label: 'City:',
+                    hint: 'Search city...',
+                    value: widget.selectedCity,
                     items: cities,
-                    onChanged: onCityChanged,
+                    onSelected: widget.onCityChanged,
                   ),
                 ),
         ),
@@ -100,20 +84,16 @@ class CountryCityPicker extends ConsumerWidget {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Helpers
-  // ---------------------------------------------------------------------------
-
-  Widget _buildDropdown({
+  Widget _buildSearchableField({
     required String label,
     required String hint,
     required String? value,
     required List<String> items,
-    required ValueChanged<String?>? onChanged,
+    required ValueChanged<String?>? onSelected,
     bool enabled = true,
   }) {
-    // Ensure the current value exists in the items list; otherwise drop it.
-    final effectiveValue = (value != null && items.contains(value)) ? value : null;
+    final effectiveValue =
+        (value != null && items.contains(value)) ? value : null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -128,47 +108,101 @@ class CountryCityPicker extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 6),
-        DropdownButtonFormField<String>(
-          initialValue: effectiveValue,
-          onChanged: enabled ? onChanged : null,
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: GoogleFonts.inter(fontSize: 14, color: Colors.grey),
-            filled: true,
-            fillColor: enabled ? Colors.white : Colors.grey.shade100,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey.shade300),
+        if (!enabled || items.isEmpty)
+          TextFormField(
+            enabled: false,
+            style: GoogleFonts.inter(fontSize: 14),
+            decoration: _inputDeco(hint).copyWith(
+              fillColor: Colors.grey.shade100,
+              suffixIcon: Icon(Icons.keyboard_arrow_down_rounded,
+                  color: Colors.grey.shade400),
             ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey.shade300),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide:
-                  const BorderSide(color: AppTheme.primaryColor, width: 2),
-            ),
-          ),
-          icon: Icon(
-            Icons.keyboard_arrow_down_rounded,
-            color: enabled ? Colors.grey.shade600 : Colors.grey.shade400,
-          ),
-          isExpanded: true,
-          style: GoogleFonts.inter(fontSize: 14, color: Colors.black87),
-          items: items
-              .map((item) => DropdownMenuItem<String>(
-                    value: item,
-                    child: Text(
-                      item,
-                      overflow: TextOverflow.ellipsis,
+          )
+        else
+          Autocomplete<String>(
+            initialValue: TextEditingValue(text: effectiveValue ?? ''),
+            optionsBuilder: (textEditingValue) {
+              if (textEditingValue.text.isEmpty) return items;
+              final query = textEditingValue.text.toLowerCase();
+              return items
+                  .where((item) => item.toLowerCase().contains(query))
+                  .toList();
+            },
+            onSelected: (selection) => onSelected?.call(selection),
+            fieldViewBuilder:
+                (context, textController, focusNode, onFieldSubmitted) {
+              return TextFormField(
+                controller: textController,
+                focusNode: focusNode,
+                style: GoogleFonts.inter(fontSize: 14),
+                decoration: _inputDeco(hint).copyWith(
+                  suffixIcon: Icon(Icons.keyboard_arrow_down_rounded,
+                      color: Colors.grey.shade600),
+                ),
+                onFieldSubmitted: (_) => onFieldSubmitted(),
+                onChanged: (val) {
+                  if (val.isEmpty) onSelected?.call(null);
+                },
+              );
+            },
+            optionsViewBuilder: (context, onSel, options) {
+              return Align(
+                alignment: Alignment.topLeft,
+                child: Material(
+                  elevation: 4,
+                  borderRadius: BorderRadius.circular(8),
+                  child: ConstrainedBox(
+                    constraints:
+                        const BoxConstraints(maxHeight: 240, maxWidth: 400),
+                    child: ListView.builder(
+                      padding: EdgeInsets.zero,
+                      shrinkWrap: true,
+                      itemCount: options.length,
+                      itemBuilder: (context, index) {
+                        final option = options.elementAt(index);
+                        return InkWell(
+                          onTap: () => onSel(option),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 12),
+                            child: Text(
+                              option,
+                              style: GoogleFonts.inter(
+                                  fontSize: 14, color: Colors.black87),
+                            ),
+                          ),
+                        );
+                      },
                     ),
-                  ))
-              .toList(),
-        ),
+                  ),
+                ),
+              );
+            },
+          ),
       ],
+    );
+  }
+
+  InputDecoration _inputDeco(String hint) {
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: GoogleFonts.inter(fontSize: 14, color: Colors.grey),
+      filled: true,
+      fillColor: Colors.white,
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(color: Colors.grey.shade300),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(color: Colors.grey.shade300),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: AppTheme.primaryColor, width: 2),
+      ),
     );
   }
 
@@ -210,7 +244,7 @@ class CountryCityPicker extends ConsumerWidget {
     );
   }
 
-  Widget _buildErrorField({required String label, required Object error}) {
+  Widget _buildErrorField({required String label}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,

@@ -11,8 +11,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/providers/event_context_provider.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/app_snackbar.dart';
 import '../../../l10n/generated/app_localizations.dart';
-import '../../../shared/layouts/event_sidebar_layout.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../shop/providers/shop_providers.dart';
 
@@ -32,8 +32,6 @@ class EventMenuPage extends ConsumerStatefulWidget {
 class _EventMenuPageState extends ConsumerState<EventMenuPage> {
   List<Map<String, dynamic>> _sponsors = [];
   bool _isLoadingSponsors = true;
-  Map<String, dynamic>? _eventData;
-
   late ScrollController _sponsorScrollController;
   Timer? _sponsorScrollTimer;
   Timer? _sponsorRefreshTimer;
@@ -49,25 +47,11 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
     await ref
         .read(eventContextProvider.notifier)
         .ensureEventContext(widget.eventId);
-    _fetchEvent();
     _fetchSponsors();
     _sponsorRefreshTimer = Timer.periodic(
       const Duration(minutes: 2),
       (_) => _fetchSponsors(),
     );
-  }
-
-  Future<void> _fetchEvent() async {
-    try {
-      final uri = Uri.parse(
-        '${AppConfig.b2cApiBaseUrl}/api/v1/events/${widget.eventId}',
-      );
-      final response = await http.get(uri);
-      if (!mounted) return;
-      if (response.statusCode == 200) {
-        setState(() => _eventData = jsonDecode(response.body));
-      }
-    } catch (_) {}
   }
 
   Future<void> _fetchSponsors() async {
@@ -121,12 +105,9 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
     final l10n = AppLocalizations.of(context)!;
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
-    final eventTitle = _eventData?['title'] ?? 'Dashboard';
     final hasPurchased = ref.watch(hasPurchasedProvider(widget.eventId));
 
-    return EventSidebarLayout(
-      title: eventTitle,
-      child: SingleChildScrollView(
+    return SingleChildScrollView(
         padding: EdgeInsets.all(isMobile ? 16 : 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -198,8 +179,7 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
             ),
           ],
         ),
-      ),
-    );
+      );
   }
 }
 
@@ -503,15 +483,7 @@ class _DashboardGrid extends StatelessWidget {
 
   void _handleTap(BuildContext context, _MenuItem item, bool isDisabled) {
     if (isDisabled) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Purchase a service package to unlock this feature'),
-          action: SnackBarAction(
-            label: 'View Services',
-            onPressed: () => context.go('/events/$eventId/services'),
-          ),
-        ),
-      );
+      AppSnackBar.showInfo(context, 'Purchase a service package to unlock this feature');
       return;
     }
 

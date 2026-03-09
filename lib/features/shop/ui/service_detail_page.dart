@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/theme/app_theme.dart';
-import '../../../shared/layouts/event_sidebar_layout.dart';
+import '../../../core/widgets/app_snackbar.dart';
 import '../providers/shop_providers.dart';
 import '../models/event_service.dart';
 
@@ -23,9 +23,7 @@ class ServiceDetailPage extends ConsumerWidget {
       serviceDetailProvider(int.tryParse(serviceId) ?? 0),
     );
 
-    return EventSidebarLayout(
-      title: 'Service Details',
-      child: serviceAsync.when(
+    return serviceAsync.when(
         loading: () => const Center(
           child: CircularProgressIndicator(color: AppTheme.primaryColor),
         ),
@@ -44,8 +42,7 @@ class ServiceDetailPage extends ConsumerWidget {
             eventIdStr: eventIdStr,
           );
         },
-      ),
-    );
+      );
   }
 }
 
@@ -97,32 +94,28 @@ class _ServiceDetailContentState extends ConsumerState<_ServiceDetailContent> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Service title (large, centered)
-                Center(
-                  child: Text(
-                    service.name,
-                    style: GoogleFonts.inter(
-                      fontSize: isMobile ? 22 : 30,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.black,
-                    ),
-                    textAlign: TextAlign.center,
+                // Service title
+                Text(
+                  service.name,
+                  style: GoogleFonts.inter(
+                    fontSize: isMobile ? 22 : 30,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.black,
                   ),
+                  textAlign: isMobile ? TextAlign.left : TextAlign.center,
                 ),
 
                 // Subtitle
                 if (service.subtitle != null) ...[
                   const SizedBox(height: 6),
-                  Center(
-                    child: Text(
-                      service.subtitle!,
-                      style: GoogleFonts.inter(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w400,
-                        color: Colors.black,
-                      ),
-                      textAlign: TextAlign.center,
+                  Text(
+                    service.subtitle!,
+                    style: GoogleFonts.inter(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w400,
+                      color: Colors.black,
                     ),
+                    textAlign: isMobile ? TextAlign.left : TextAlign.center,
                   ),
                 ],
 
@@ -192,30 +185,11 @@ class _ServiceDetailContentState extends ConsumerState<_ServiceDetailContent> {
       ref.invalidate(cartProvider(widget.eventId));
       ref.invalidate(cartBadgeCountProvider(widget.eventId));
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '${widget.service.name} added to cart',
-              style: GoogleFonts.inter(fontSize: 14),
-            ),
-            backgroundColor: AppTheme.successColor,
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 2),
-          ),
-        );
+        AppSnackBar.showSuccess(context, '${widget.service.name} added to cart');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Failed to add to cart: $e',
-              style: GoogleFonts.inter(fontSize: 14),
-            ),
-            backgroundColor: AppTheme.errorColor,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        AppSnackBar.showError(context, 'Failed to add to cart: $e');
       }
     } finally {
       if (mounted) setState(() => _isAddingToCart = false);
@@ -237,33 +211,40 @@ class _DetailHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+      padding: EdgeInsets.fromLTRB(isMobile ? 16 : 20, 16, isMobile ? 16 : 20, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              GestureDetector(
-                onTap: () =>
-                    context.go('/events/$eventIdStr/services'),
-                child: Text(
-                  'Event Services',
-                  style: GoogleFonts.montserrat(
-                    fontSize: 30,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.primaryColor,
+              Flexible(
+                child: GestureDetector(
+                  onTap: () =>
+                      context.go('/events/$eventIdStr/services'),
+                  child: Text(
+                    'Event Services',
+                    style: GoogleFonts.montserrat(
+                      fontSize: isMobile ? 20 : 30,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.primaryColor,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
-              const Icon(Icons.chevron_right, size: 24, color: Colors.black54),
-              const SizedBox(width: 8),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Icon(Icons.chevron_right,
+                    size: isMobile ? 20 : 24, color: Colors.black54),
+              ),
               Expanded(
                 child: Text(
                   serviceName,
                   style: GoogleFonts.montserrat(
-                    fontSize: 20,
+                    fontSize: isMobile ? 14 : 20,
                     fontWeight: FontWeight.w600,
                     color: Colors.black,
                   ),
@@ -321,7 +302,7 @@ class _DesktopBody extends StatelessWidget {
 
               // Price — Inter Medium 50px
               Text(
-                '${_fmt(service.priceUsd)} \$',
+                '${_fmt(service.price)} ${service.currency == "TMT" ? "TMT" : "\$"}',
                 style: GoogleFonts.inter(
                   fontSize: 50,
                   fontWeight: FontWeight.w500,
@@ -402,6 +383,7 @@ class _DesktopBody extends StatelessWidget {
                         items: service.notIncluded!
                             .map((e) => e.toString())
                             .toList(),
+                        isNotIncluded: true,
                       ),
                     ),
                 ],
@@ -449,13 +431,13 @@ class _MobileBody extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Image
+        // Image with blue border
         Center(
           child: Container(
             constraints: const BoxConstraints(maxWidth: 272, maxHeight: 264),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(5),
-              border: Border.all(color: const Color(0xFFDDDDDD)),
+              border: Border.all(color: AppTheme.primaryColor, width: 1.5),
             ),
             clipBehavior: Clip.antiAlias,
             child: AspectRatio(
@@ -472,22 +454,30 @@ class _MobileBody extends StatelessWidget {
         ),
         const SizedBox(height: 16),
 
-        // Price
-        Text(
-          '${_fmt(service.priceUsd)} \$',
-          style: GoogleFonts.inter(
-            fontSize: 36,
-            fontWeight: FontWeight.w500,
-            color: Colors.black,
+        // Price — right-aligned
+        Align(
+          alignment: Alignment.centerRight,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '${_fmt(service.price)} ${service.currency == "TMT" ? "TMT" : "\$"}',
+                style: GoogleFonts.inter(
+                  fontSize: 36,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black,
+                ),
+              ),
+              if (service.minOrder > 1) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'Minimum order: ${service.minOrder} sq. m.',
+                  style: GoogleFonts.inter(fontSize: 14, color: Colors.black),
+                ),
+              ],
+            ],
           ),
         ),
-        if (service.minOrder > 1) ...[
-          const SizedBox(height: 4),
-          Text(
-            'Minimum order: ${service.minOrder} sq. m.',
-            style: GoogleFonts.inter(fontSize: 16, color: Colors.black),
-          ),
-        ],
         const SizedBox(height: 20),
 
         // Description
@@ -523,6 +513,7 @@ class _MobileBody extends StatelessWidget {
             title: 'Not Included',
             items:
                 service.notIncluded!.map((e) => e.toString()).toList(),
+            isNotIncluded: true,
           ),
       ],
     );
@@ -547,8 +538,13 @@ class _MobileBody extends StatelessWidget {
 class _IncludedList extends StatelessWidget {
   final String title;
   final List<String> items;
+  final bool isNotIncluded;
 
-  const _IncludedList({required this.title, required this.items});
+  const _IncludedList({
+    required this.title,
+    required this.items,
+    this.isNotIncluded = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -572,9 +568,13 @@ class _IncludedList extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Icon(
-                  Icons.add_circle_outline,
+                  isNotIncluded
+                      ? Icons.remove_circle_outline
+                      : Icons.add_circle_outline,
                   size: 19,
-                  color: AppTheme.primaryColor,
+                  color: isNotIncluded
+                      ? AppTheme.errorColor
+                      : AppTheme.primaryColor,
                 ),
                 const SizedBox(width: 10),
                 Expanded(

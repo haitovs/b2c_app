@@ -12,8 +12,9 @@ import 'widgets/auth_page_layout.dart';
 /// Accessed via one-time token link (e.g. /create-password?token=xxx).
 class CreatePasswordPage extends ConsumerStatefulWidget {
   final String token;
+  final String? eventId;
 
-  const CreatePasswordPage({super.key, required this.token});
+  const CreatePasswordPage({super.key, required this.token, this.eventId});
 
   @override
   ConsumerState<CreatePasswordPage> createState() =>
@@ -28,7 +29,6 @@ class _CreatePasswordPageState extends ConsumerState<CreatePasswordPage> {
   bool _obscureConfirm = true;
   bool _isLoading = false;
   String? _errorMessage;
-  bool _success = false;
 
   @override
   void dispose() {
@@ -53,10 +53,13 @@ class _CreatePasswordPageState extends ConsumerState<CreatePasswordPage> {
     if (!mounted) return;
 
     if (error == null) {
-      setState(() {
-        _isLoading = false;
-        _success = true;
-      });
+      if (!mounted) return;
+      // If we have an event ID, go directly to that event's dashboard
+      if (widget.eventId != null && widget.eventId!.isNotEmpty) {
+        context.go('/events/${widget.eventId}/dashboard');
+      } else {
+        context.go('/post-login');
+      }
     } else {
       setState(() {
         _isLoading = false;
@@ -70,47 +73,7 @@ class _CreatePasswordPageState extends ConsumerState<CreatePasswordPage> {
     return AuthPageLayout(
       scrollable: true,
       desktopCardHeight: 620,
-      child: _success ? _buildSuccess() : _buildForm(),
-    );
-  }
-
-  Widget _buildSuccess() {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 72,
-          height: 72,
-          decoration: BoxDecoration(
-            color: const Color(0xFF3BAC3B).withValues(alpha: 0.12),
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(Icons.check_circle, color: Color(0xFF3BAC3B), size: 40),
-        ),
-        const SizedBox(height: 24),
-        Text(
-          'Password Created!',
-          style: GoogleFonts.montserrat(
-            fontSize: 22,
-            fontWeight: FontWeight.w700,
-            color: const Color(0xFF333333),
-          ),
-        ),
-        const SizedBox(height: 12),
-        Text(
-          'Your account has been set up successfully. You can now log in with your email and password.',
-          textAlign: TextAlign.center,
-          style: GoogleFonts.inter(fontSize: 14, color: Colors.grey.shade600, height: 1.5),
-        ),
-        const SizedBox(height: 32),
-        SizedBox(
-          width: double.infinity,
-          child: AuthButton(
-            text: 'Go to Login',
-            onTap: () => context.go('/login'),
-          ),
-        ),
-      ],
+      child: _buildForm(),
     );
   }
 
@@ -121,18 +84,15 @@ class _CreatePasswordPageState extends ConsumerState<CreatePasswordPage> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Create Password',
-            style: GoogleFonts.montserrat(
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
-              color: const Color(0xFF333333),
+          Center(
+            child: Text(
+              'Create Password',
+              style: GoogleFonts.montserrat(
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFF333333),
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Set up your account to get started',
-            style: GoogleFonts.inter(fontSize: 14, color: Colors.grey.shade600),
           ),
           const SizedBox(height: 24),
           const AuthInfoBox(
@@ -150,7 +110,7 @@ class _CreatePasswordPageState extends ConsumerState<CreatePasswordPage> {
             obscureText: _obscurePassword,
             decoration: InputDecoration(
               hintText: 'Enter your password',
-              prefixIcon: const Icon(Icons.lock_outline, size: 20),
+
               suffixIcon: IconButton(
                 icon: Icon(
                   _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
@@ -175,7 +135,7 @@ class _CreatePasswordPageState extends ConsumerState<CreatePasswordPage> {
             obscureText: _obscureConfirm,
             decoration: InputDecoration(
               hintText: 'Re-enter your password',
-              prefixIcon: const Icon(Icons.lock_outline, size: 20),
+
               suffixIcon: IconButton(
                 icon: Icon(
                   _obscureConfirm ? Icons.visibility_off_outlined : Icons.visibility_outlined,

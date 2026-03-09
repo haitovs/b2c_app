@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/app_theme.dart';
+import '../../../core/widgets/app_snackbar.dart';
 import '../../../core/widgets/app_text_field.dart';
 import '../providers/auth_provider.dart';
 import 'widgets/auth_page_layout.dart';
@@ -344,15 +345,7 @@ class _RegistrationPageState extends ConsumerState<RegistrationPage> {
       if (!mounted) return;
 
       if (errorMessage == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              "Registration successful! Please check your email to verify your account.",
-            ),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 4),
-          ),
-        );
+        AppSnackBar.showSuccess(context, "Registration successful! Please check your email to verify your account.");
 
         final email = Uri.encodeComponent(_emailController.text.trim());
         final password = Uri.encodeComponent(_passwordController.text);
@@ -376,13 +369,6 @@ class _RegistrationPageState extends ConsumerState<RegistrationPage> {
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-        duration: const Duration(seconds: 4),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    AppSnackBar.showError(context, message);
   }
 }

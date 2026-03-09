@@ -404,9 +404,11 @@ class _EventDetailsPageState extends ConsumerState<EventDetailsPage> {
                   )
                 else
                   _fallbackDescription(isDesktop, l10n),
-                // Gallery carousel — inside the scrollable area
-                SizedBox(height: isDesktop ? 30 : 20),
-                _galleryInCard(gallery, isDesktop),
+                // Gallery carousel — only if images exist
+                if (gallery.isNotEmpty) ...[
+                  SizedBox(height: isDesktop ? 30 : 20),
+                  _galleryInCard(gallery, isDesktop),
+                ],
               ],
             ),
           ),
@@ -481,11 +483,19 @@ class _EventDetailsPageState extends ConsumerState<EventDetailsPage> {
 
   // ─── Gallery (inside the card) ────────────────────────────────────
 
+  bool _showGalleryArrows = false;
+
+  void _checkGalleryOverflow() {
+    if (!_galleryScrollCtrl.hasClients) return;
+    final needsScroll = _galleryScrollCtrl.position.maxScrollExtent > 0;
+    if (needsScroll != _showGalleryArrows) {
+      setState(() => _showGalleryArrows = needsScroll);
+    }
+  }
+
   Widget _galleryInCard(List<String> images, bool isDesktop) {
     final imgSize = isDesktop ? 160.0 : 110.0;
     final gap = isDesktop ? 16.0 : 10.0;
-    final hasReal = images.isNotEmpty;
-    final count = hasReal ? images.length : 6;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -501,22 +511,29 @@ class _EventDetailsPageState extends ConsumerState<EventDetailsPage> {
         const SizedBox(height: 12),
         Row(
           children: [
-            _GalleryArrow(
-              icon: Icons.chevron_left,
-              size: isDesktop ? 32 : 24,
-              onTap: () => _scrollGallery(-imgSize - gap),
-            ),
-            const SizedBox(width: 8),
+            if (_showGalleryArrows) ...[
+              _GalleryArrow(
+                icon: Icons.chevron_left,
+                size: isDesktop ? 32 : 24,
+                onTap: () => _scrollGallery(-imgSize - gap),
+              ),
+              const SizedBox(width: 8),
+            ],
             Expanded(
               child: SizedBox(
                 height: imgSize,
-                child: ListView.separated(
-                  controller: _galleryScrollCtrl,
-                  scrollDirection: Axis.horizontal,
-                  itemCount: count,
-                  separatorBuilder: (_, __) => SizedBox(width: gap),
-                  itemBuilder: (_, i) {
-                    if (hasReal) {
+                child: NotificationListener<ScrollMetricsNotification>(
+                  onNotification: (_) {
+                    WidgetsBinding.instance
+                        .addPostFrameCallback((_) => _checkGalleryOverflow());
+                    return false;
+                  },
+                  child: ListView.separated(
+                    controller: _galleryScrollCtrl,
+                    scrollDirection: Axis.horizontal,
+                    itemCount: images.length,
+                    separatorBuilder: (_, __) => SizedBox(width: gap),
+                    itemBuilder: (_, i) {
                       return ClipRRect(
                         borderRadius: BorderRadius.circular(12),
                         child: Image.network(
@@ -533,18 +550,19 @@ class _EventDetailsPageState extends ConsumerState<EventDetailsPage> {
                           ),
                         ),
                       );
-                    }
-                    return _GalleryPlaceholder(size: imgSize, index: i);
-                  },
+                    },
+                  ),
                 ),
               ),
             ),
-            const SizedBox(width: 8),
-            _GalleryArrow(
-              icon: Icons.chevron_right,
-              size: isDesktop ? 32 : 24,
-              onTap: () => _scrollGallery(imgSize + gap),
-            ),
+            if (_showGalleryArrows) ...[
+              const SizedBox(width: 8),
+              _GalleryArrow(
+                icon: Icons.chevron_right,
+                size: isDesktop ? 32 : 24,
+                onTap: () => _scrollGallery(imgSize + gap),
+              ),
+            ],
           ],
         ),
       ],
@@ -576,13 +594,7 @@ class _EventDetailsPageState extends ConsumerState<EventDetailsPage> {
         ),
       );
     }
-    return SizedBox.expand(
-      child: Image.asset(
-        'assets/event_detail/event_photo.png',
-        fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _fallbackCover(),
-      ),
-    );
+    return SizedBox.expand(child: _fallbackCover());
   }
 
   Widget _fallbackCover() {
@@ -631,13 +643,9 @@ class _EventLogo extends StatelessWidget {
   }
 
   Widget _placeholder() {
-    return Image.asset(
-      'assets/event_detail/logo_mini.png',
-      fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => Container(
-        color: Colors.white,
-        child: Icon(Icons.event, size: size * 0.4, color: _kBlue),
-      ),
+    return Container(
+      color: Colors.white,
+      child: Icon(Icons.event, size: size * 0.4, color: _kBlue),
     );
   }
 }
@@ -716,49 +724,3 @@ class _GalleryArrow extends StatelessWidget {
   }
 }
 
-class _GalleryPlaceholder extends StatelessWidget {
-  final double size;
-  final int index;
-
-  const _GalleryPlaceholder({required this.size, required this.index});
-
-  static const _gradients = [
-    [Color(0xFF4A6FA5), Color(0xFF2C4364)],
-    [Color(0xFF6B8E23), Color(0xFF3D5A1E)],
-    [Color(0xFFCD853F), Color(0xFF8B6914)],
-    [Color(0xFF708090), Color(0xFF2F4F4F)],
-    [Color(0xFF9370DB), Color(0xFF4B0082)],
-    [Color(0xFFDB7093), Color(0xFF8B0000)],
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = _gradients[index % _gradients.length];
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: colors,
-          ),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.image_outlined,
-                size: size * 0.2, color: Colors.white60),
-            const SizedBox(height: 4),
-            Text(
-              'Gallery ${index + 1}',
-              style: GoogleFonts.roboto(fontSize: 12, color: Colors.white70),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

@@ -57,7 +57,7 @@ class RegistrationService {
   /// Create a new registration
   Future<Map<String, dynamic>?> createRegistration(int eventId) async {
     final result = await _api.post<Map<String, dynamic>>(
-      '/api/v1/registrations/',
+      '/api/v1/registrations',
       body: {'event_id': eventId},
     );
 

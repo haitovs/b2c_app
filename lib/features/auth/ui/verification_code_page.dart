@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/app_theme.dart';
+import '../../../core/widgets/app_snackbar.dart';
 import '../providers/auth_provider.dart';
 import 'widgets/auth_info_box.dart';
 import 'widgets/auth_page_layout.dart';
@@ -225,13 +226,7 @@ class _VerificationCodePageState extends ConsumerState<VerificationCodePage> {
 
         // Fallback: redirect to login if auto-login not possible
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Email verified successfully! Please login."),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 3),
-          ),
-        );
+        AppSnackBar.showSuccess(context, "Email verified successfully! Please login.");
         context.go('/login');
       } else {
         _showError(error);
@@ -258,13 +253,7 @@ class _VerificationCodePageState extends ConsumerState<VerificationCodePage> {
       if (!mounted) return;
 
       if (error == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Verification code sent! Check your email."),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 3),
-          ),
-        );
+        AppSnackBar.showSuccess(context, "Verification code sent! Check your email.");
       } else {
         _showError(error);
       }
@@ -280,13 +269,6 @@ class _VerificationCodePageState extends ConsumerState<VerificationCodePage> {
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-        duration: const Duration(seconds: 4),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    AppSnackBar.showError(context, message);
   }
 }

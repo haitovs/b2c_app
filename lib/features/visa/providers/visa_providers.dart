@@ -5,7 +5,10 @@ import '../services/visa_service.dart';
 
 /// Provider for VisaService.
 final visaServiceProvider = Provider<VisaService>((ref) {
-  return VisaService(ref.watch(authNotifierProvider.notifier));
+  return VisaService(
+    ref.watch(authApiClientProvider),
+    ref.watch(authNotifierProvider.notifier),
+  );
 });
 
 /// List all visa applications for a given event.

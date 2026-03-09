@@ -8,10 +8,10 @@ final meetingServiceProvider = Provider<MeetingService>((ref) {
   return MeetingService(ref.watch(authApiClientProvider));
 });
 
-/// Fetch current user's meetings.
+/// Fetch current user's meetings, optionally filtered by event.
 final myMeetingsProvider =
-    FutureProvider<List<Map<String, dynamic>>>((ref) {
-  return ref.watch(meetingServiceProvider).fetchMyMeetings();
+    FutureProvider.family<List<Map<String, dynamic>>, int?>((ref, eventId) {
+  return ref.watch(meetingServiceProvider).fetchMyMeetings(eventId: eventId);
 });
 
 /// Fetch government entities.

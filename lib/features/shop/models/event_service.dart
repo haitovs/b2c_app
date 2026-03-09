@@ -17,8 +17,8 @@ class EventServiceItem {
   final String? subtitle;
   final String? description;
   final String? imageUrl;
-  final double priceUsd;
-  final double priceTmt;
+  final double price;
+  final String currency; // USD or TMT
   final String category;
   final int minOrder;
   final List<dynamic>? included;
@@ -35,8 +35,8 @@ class EventServiceItem {
     this.subtitle,
     this.description,
     this.imageUrl,
-    required this.priceUsd,
-    required this.priceTmt,
+    required this.price,
+    required this.currency,
     required this.category,
     this.minOrder = 1,
     this.included,
@@ -55,8 +55,8 @@ class EventServiceItem {
       subtitle: json['subtitle'] as String?,
       description: json['description'] as String?,
       imageUrl: json['image_url'] as String?,
-      priceUsd: (json['price_usd'] as num).toDouble(),
-      priceTmt: (json['price_tmt'] as num).toDouble(),
+      price: (json['price'] as num).toDouble(),
+      currency: json['currency'] as String? ?? 'USD',
       category: json['category'] as String,
       minOrder: json['min_order'] as int? ?? 1,
       included: json['included'] as List<dynamic>?,
@@ -76,8 +76,8 @@ class EventServiceItem {
       'subtitle': subtitle,
       'description': description,
       'image_url': imageUrl,
-      'price_usd': priceUsd,
-      'price_tmt': priceTmt,
+      'price': price,
+      'currency': currency,
       'category': category,
       'min_order': minOrder,
       'included': included,
@@ -96,8 +96,8 @@ class CartItem {
   final int eventId;
   final int serviceId;
   final int quantity;
-  final double unitPriceUsd;
-  final double unitPriceTmt;
+  final double unitPrice;
+  final String currency; // USD or TMT
   final EventServiceItem? service;
   final String? createdAt;
 
@@ -107,8 +107,8 @@ class CartItem {
     required this.eventId,
     required this.serviceId,
     required this.quantity,
-    required this.unitPriceUsd,
-    required this.unitPriceTmt,
+    required this.unitPrice,
+    required this.currency,
     this.service,
     this.createdAt,
   });
@@ -120,8 +120,8 @@ class CartItem {
       eventId: json['event_id'] as int,
       serviceId: json['service_id'] as int,
       quantity: json['quantity'] as int,
-      unitPriceUsd: (json['unit_price_usd'] as num).toDouble(),
-      unitPriceTmt: (json['unit_price_tmt'] as num).toDouble(),
+      unitPrice: (json['unit_price'] as num).toDouble(),
+      currency: json['currency'] as String? ?? 'USD',
       service: json['service'] != null
           ? EventServiceItem.fromJson(json['service'] as Map<String, dynamic>)
           : null,
@@ -208,16 +208,16 @@ class OrderItem {
   final String id;
   final int? serviceId;
   final int quantity;
-  final double unitPriceUsd;
-  final double unitPriceTmt;
+  final double unitPrice;
+  final String currency; // USD or TMT
   final EventServiceItem? service;
 
   const OrderItem({
     required this.id,
     this.serviceId,
     required this.quantity,
-    required this.unitPriceUsd,
-    required this.unitPriceTmt,
+    required this.unitPrice,
+    required this.currency,
     this.service,
   });
 
@@ -226,8 +226,8 @@ class OrderItem {
       id: json['id'] as String,
       serviceId: json['service_id'] as int?,
       quantity: json['quantity'] as int,
-      unitPriceUsd: (json['unit_price_usd'] as num).toDouble(),
-      unitPriceTmt: (json['unit_price_tmt'] as num).toDouble(),
+      unitPrice: (json['unit_price'] as num).toDouble(),
+      currency: json['currency'] as String? ?? 'USD',
       service: json['service'] != null
           ? EventServiceItem.fromJson(json['service'] as Map<String, dynamic>)
           : null,

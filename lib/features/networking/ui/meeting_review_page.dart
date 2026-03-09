@@ -1,12 +1,9 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:http/http.dart' as http;
-import '../../../core/config/app_config.dart';
-import '../../../core/providers/event_context_provider.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/app_snackbar.dart';
 import '../../../core/widgets/custom_app_bar.dart';
 import '../../events/ui/widgets/profile_dropdown.dart';
 import '../../notifications/ui/notification_drawer.dart';
@@ -67,39 +64,19 @@ class _MeetingReviewPageState extends ConsumerState<MeetingReviewPage> {
 
   Future<void> _fetchMeeting() async {
     try {
-      final siteId = ref.read(eventContextProvider).siteId;
-      var uriString =
-          '${AppConfig.tourismApiBaseUrl}/meetings/${widget.meetingId}';
-      if (siteId != null) {
-        uriString += '?site_id=$siteId';
-      }
-
-      final response = await http.get(Uri.parse(uriString));
-      if (response.statusCode == 200) {
+      final meetingService = ref.read(meetingServiceProvider);
+      final data = await meetingService.fetchMeeting(widget.meetingId);
+      if (mounted) {
         setState(() {
-          _meeting = jsonDecode(response.body);
+          _meeting = data;
           _isLoading = false;
         });
-      } else {
-        setState(() => _isLoading = false);
       }
     } catch (e) {
       debugPrint('Error fetching meeting: $e');
-      setState(() => _isLoading = false);
-
-      // For demo purposes, use mock data
-      setState(() {
-        _meeting = {
-          'id': int.parse(widget.meetingId),
-          'subject': 'Marketing Campaign Brainstorm',
-          'scheduled_date': '2025-05-20',
-          'scheduled_time': '13:30',
-          'location': 'Ashgabat, TKM',
-          'status': 'pending',
-          'requester': {'id': 1, 'name': 'Balkan Tour', 'logo': null},
-        };
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -115,22 +92,12 @@ class _MeetingReviewPageState extends ConsumerState<MeetingReviewPage> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Meeting confirmed!'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        AppSnackBar.showSuccess(context, 'Meeting confirmed!');
         context.pop(true);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to confirm: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppSnackBar.showError(context, 'Failed to confirm: $e');
       }
     } finally {
       if (mounted) {
@@ -176,22 +143,12 @@ class _MeetingReviewPageState extends ConsumerState<MeetingReviewPage> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Meeting declined'),
-            backgroundColor: Colors.orange,
-          ),
-        );
+        AppSnackBar.showWarning(context, 'Meeting declined');
         context.pop(true);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to decline: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppSnackBar.showError(context, 'Failed to decline: $e');
       }
     } finally {
       if (mounted) {
@@ -203,11 +160,16 @@ class _MeetingReviewPageState extends ConsumerState<MeetingReviewPage> {
   String _buildImageUrl(String? imagePath) {
     if (imagePath == null || imagePath.isEmpty) return '';
     if (imagePath.startsWith('http')) return imagePath;
-    return '${AppConfig.tourismApiBaseUrl}$imagePath';
+    return imagePath;
   }
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final horizontalMargin = isMobile ? 10.0 : 20.0;
+    final contentPadding = isMobile ? 16.0 : 30.0;
+
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: const Color(0xFF3C4494),
@@ -219,13 +181,13 @@ class _MeetingReviewPageState extends ConsumerState<MeetingReviewPage> {
             SafeArea(
               child: Column(
                 children: [
-                  // Header
-                  _buildHeader(),
-                  const SizedBox(height: 20),
-                  // Content
+                  _buildHeader(isMobile),
+                  SizedBox(height: isMobile ? 10 : 20),
                   Expanded(
                     child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 20),
+                      margin: EdgeInsets.symmetric(
+                        horizontal: horizontalMargin,
+                      ),
                       decoration: const BoxDecoration(
                         color: Color(0xFFF1F1F6),
                         borderRadius: BorderRadius.vertical(
@@ -235,7 +197,7 @@ class _MeetingReviewPageState extends ConsumerState<MeetingReviewPage> {
                       child: _isLoading
                           ? const Center(child: CircularProgressIndicator())
                           : SingleChildScrollView(
-                              padding: const EdgeInsets.all(30),
+                              padding: EdgeInsets.all(contentPadding),
                               child: _buildContent(),
                             ),
                     ),
@@ -243,7 +205,6 @@ class _MeetingReviewPageState extends ConsumerState<MeetingReviewPage> {
                 ],
               ),
             ),
-            // Profile dropdown overlay
             if (_isProfileOpen)
               Positioned(
                 top: 100,
@@ -256,33 +217,41 @@ class _MeetingReviewPageState extends ConsumerState<MeetingReviewPage> {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(bool isMobile) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+      padding: EdgeInsets.only(
+        left: isMobile ? 12 : 20,
+        right: isMobile ? 12 : 20,
+        top: isMobile ? 12 : 20,
+      ),
       child: Row(
         children: [
-          // Back button
           IconButton(
             icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
             onPressed: () => context.pop(),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
           ),
-          const SizedBox(width: 8),
-          // Title
-          Text(
-            'Meeting',
-            style: GoogleFonts.montserrat(
-              fontSize: 32,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
+          SizedBox(width: isMobile ? 4 : 8),
+          Flexible(
+            child: Text(
+              'Request',
+              style: GoogleFonts.montserrat(
+                fontSize: isMobile ? 20 : 28,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
           const Spacer(),
-          // Notification & Profile icons
           CustomAppBar(
             onNotificationTap: () {
               _scaffoldKey.currentState?.openEndDrawer();
             },
             onProfileTap: _toggleProfile,
+            isMobile: isMobile,
+            showLogo: false,
           ),
         ],
       ),
@@ -295,108 +264,192 @@ class _MeetingReviewPageState extends ConsumerState<MeetingReviewPage> {
       return const Center(child: Text('Meeting not found'));
     }
 
-    final requester = meeting['requester'] as Map<String, dynamic>?;
-    final requesterName = requester?['name'] ?? 'Unknown Company';
-    final requesterLogo = requester?['logo'];
+    // Use requester_info from the API response (for incoming meetings)
+    final requesterInfo = meeting['requester_info'] as Map<String, dynamic>?;
+    final firstName = requesterInfo?['first_name'] ?? '';
+    final lastName = requesterInfo?['last_name'] ?? '';
+    final requesterName = '$firstName $lastName'.trim().isNotEmpty
+        ? '$firstName $lastName'.trim()
+        : 'Unknown Sender';
+    final requesterLogo = requesterInfo?['photo_url'];
     final logoUrl = _buildImageUrl(requesterLogo);
+    final requesterCompany = requesterInfo?['company_name'] ?? '';
 
     final subject = meeting['subject'] ?? '';
-    final date = meeting['scheduled_date'] ?? '';
-    final time = meeting['scheduled_time'] ?? '';
+    final message = meeting['message'] ?? '';
+    // Parse start_time/end_time instead of scheduled_date/scheduled_time
+    final startTime = meeting['start_time']?.toString() ?? '';
+    final date = _formatDate(startTime);
+    final time = _formatTime(startTime);
     final location = meeting['location'] ?? '';
 
-    return Container(
-      padding: const EdgeInsets.all(30),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final isWide = constraints.maxWidth > 600;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth > 600;
 
-          if (isWide) {
-            // Desktop layout
-            return Column(
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Left side - Requester image
-                    SizedBox(
-                      width: 250,
-                      height: 300,
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(15),
-                        child: logoUrl.isNotEmpty
-                            ? Image.network(
-                                logoUrl,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) =>
-                                    _buildImagePlaceholder(requesterName),
-                              )
-                            : _buildImagePlaceholder(requesterName),
+        if (isWide) {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Left: Sender personal info card
+              _buildSenderInfoCard(
+                requesterName: requesterName,
+                company: requesterCompany,
+                logoUrl: logoUrl,
+              ),
+              const SizedBox(width: 30),
+              // Right: Meeting details + action buttons
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(30),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Meeting information',
+                        style: GoogleFonts.montserrat(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 40),
-                    // Right side - Meeting details
-                    Expanded(
-                      child: _buildMeetingDetails(
+                      const SizedBox(height: 24),
+                      _buildMeetingDetails(
                         subject: subject,
                         date: date,
                         time: time,
                         location: location,
+                        message: message,
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 40),
-                // Action buttons
-                _buildActionButtons(),
-              ],
-            );
-          } else {
-            // Mobile layout
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Requester image
-                SizedBox(
-                  height: 200,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(15),
-                    child: logoUrl.isNotEmpty
-                        ? Image.network(
-                            logoUrl,
-                            fit: BoxFit.contain,
-                            errorBuilder: (context, error, stackTrace) =>
-                                _buildImagePlaceholder(requesterName),
-                          )
-                        : _buildImagePlaceholder(requesterName),
+                      const SizedBox(height: 32),
+                      _buildActionButtons(),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 24),
-                // Meeting details
-                _buildMeetingDetails(
-                  subject: subject,
-                  date: date,
-                  time: time,
-                  location: location,
+              ),
+            ],
+          );
+        } else {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildSenderInfoCard(
+                requesterName: requesterName,
+                company: requesterCompany,
+                logoUrl: logoUrl,
+              ),
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                const SizedBox(height: 30),
-                // Action buttons
-                _buildActionButtons(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Meeting information',
+                      style: GoogleFonts.montserrat(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    _buildMeetingDetails(
+                      subject: subject,
+                      date: date,
+                      time: time,
+                      location: location,
+                      message: message,
+                    ),
+                    const SizedBox(height: 24),
+                    _buildActionButtons(),
+                  ],
+                ),
+              ),
+            ],
+          );
+        }
+      },
+    );
+  }
+
+  Widget _buildSenderInfoCard({
+    required String requesterName,
+    required String company,
+    required String logoUrl,
+  }) {
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 288),
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Photo/Avatar
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              color: AppTheme.primaryColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: logoUrl.isNotEmpty
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.network(
+                      logoUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Icon(
+                        Icons.person,
+                        size: 40,
+                        color: AppTheme.primaryColor,
+                      ),
+                    ),
+                  )
+                : Icon(Icons.person, size: 40, color: AppTheme.primaryColor),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            requesterName,
+            style: GoogleFonts.inter(
+              fontSize: 20,
+              fontWeight: FontWeight.w500,
+              color: const Color(0xFF1A1A2E),
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          if (company.isNotEmpty) ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.business, size: 16, color: Color(0xFF6B7280)),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    company,
+                    style: GoogleFonts.inter(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: const Color(0xFF6B7280),
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
               ],
-            );
-          }
-        },
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -406,71 +459,65 @@ class _MeetingReviewPageState extends ConsumerState<MeetingReviewPage> {
     required String date,
     required String time,
     required String location,
+    String message = '',
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Header
-        Text(
-          'Information',
-          style: GoogleFonts.inter(
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-            color: Colors.black,
-          ),
-        ),
-        const SizedBox(height: 24),
-        // Subject and Date row
+        _buildReadOnlyField('Subject:', subject),
+        const SizedBox(height: 16),
         LayoutBuilder(
           builder: (context, constraints) {
             if (constraints.maxWidth > 400) {
               return Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(child: _buildReadOnlyField('Subjects:', subject)),
-                  const SizedBox(width: 20),
                   Expanded(
                     child: _buildReadOnlyField('Date:', date, hasIcon: true),
                   ),
+                  const SizedBox(width: 20),
+                  Expanded(child: _buildReadOnlyField('Time:', time)),
                 ],
               );
             } else {
               return Column(
                 children: [
-                  _buildReadOnlyField('Subjects:', subject),
-                  const SizedBox(height: 16),
                   _buildReadOnlyField('Date:', date, hasIcon: true),
+                  const SizedBox(height: 16),
+                  _buildReadOnlyField('Time:', time),
                 ],
               );
             }
           },
         ),
         const SizedBox(height: 16),
-        // Time and Location row
-        LayoutBuilder(
-          builder: (context, constraints) {
-            if (constraints.maxWidth > 400) {
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(child: _buildReadOnlyField('Time:', time)),
-                  const SizedBox(width: 20),
-                  Expanded(child: _buildReadOnlyField('Location:', location)),
-                ],
-              );
-            } else {
-              return Column(
-                children: [
-                  _buildReadOnlyField('Time:', time),
-                  const SizedBox(height: 16),
-                  _buildReadOnlyField('Location:', location),
-                ],
-              );
-            }
-          },
-        ),
+        _buildReadOnlyField('Location:', location),
+        if (message.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          _buildReadOnlyField('Message:', message),
+        ],
       ],
     );
+  }
+
+  String _formatDate(String? dateTime) {
+    if (dateTime == null || dateTime.isEmpty) return 'N/A';
+    try {
+      final dt = DateTime.parse(dateTime);
+      return '${dt.day.toString().padLeft(2, '0')}.${dt.month.toString().padLeft(2, '0')}.${dt.year}';
+    } catch (_) {
+      return dateTime;
+    }
+  }
+
+  String _formatTime(String? dateTime) {
+    if (dateTime == null || dateTime.isEmpty) return 'N/A';
+    try {
+      final dt = DateTime.parse(dateTime);
+      return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    } catch (_) {
+      return dateTime;
+    }
   }
 
   Widget _buildReadOnlyField(
@@ -520,82 +567,63 @@ class _MeetingReviewPageState extends ConsumerState<MeetingReviewPage> {
   }
 
   Widget _buildActionButtons() {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+    final buttonPadding = isMobile
+        ? const EdgeInsets.symmetric(horizontal: 24, vertical: 12)
+        : const EdgeInsets.symmetric(horizontal: 40, vertical: 14);
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        // Decline button
-        OutlinedButton(
-          onPressed: _isProcessing ? null : _declineMeeting,
-          style: OutlinedButton.styleFrom(
-            foregroundColor: Colors.red,
-            side: const BorderSide(color: Colors.red),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(50),
+        Flexible(
+          child: OutlinedButton(
+            onPressed: _isProcessing ? null : _declineMeeting,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF374151),
+              side: const BorderSide(color: Color(0xFFE5E7EB)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(5),
+              ),
+              padding: buttonPadding,
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 14),
-          ),
-          child: Text(
-            'Decline',
-            style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w500),
+            child: Text(
+              'Decline',
+              style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w500),
+            ),
           ),
         ),
-        const SizedBox(width: 20),
-        // Confirm button
-        ElevatedButton(
-          onPressed: _isProcessing ? null : _confirmMeeting,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF008000),
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(50),
+        const SizedBox(width: 16),
+        Flexible(
+          child: ElevatedButton(
+            onPressed: _isProcessing ? null : _confirmMeeting,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(5),
+              ),
+              padding: buttonPadding,
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 14),
+            child: _isProcessing
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                : Text(
+                    'Confirm',
+                    style: GoogleFonts.inter(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
           ),
-          child: _isProcessing
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                  ),
-                )
-              : Text(
-                  'Confirm',
-                  style: GoogleFonts.inter(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
         ),
       ],
     );
   }
 
-  Widget _buildImagePlaceholder(String name) {
-    return Container(
-      color: Colors.grey[200],
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.business, size: 48, color: Colors.grey[400]),
-            const SizedBox(height: 8),
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Text(
-                name,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[600],
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }

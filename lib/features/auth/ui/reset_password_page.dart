@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/app_theme.dart';
+import '../../../core/widgets/app_snackbar.dart';
 import '../../../core/widgets/app_text_field.dart';
 import '../providers/auth_provider.dart';
 import 'widgets/auth_info_box.dart';
@@ -125,15 +126,7 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
       if (!mounted) return;
 
       if (error == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              "Password reset successfully! Please login with your new password.",
-            ),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 4),
-          ),
-        );
+        AppSnackBar.showSuccess(context, "Password reset successfully! Please login with your new password.");
         context.go('/login');
       } else {
         _showError(error);
@@ -150,13 +143,6 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-        duration: const Duration(seconds: 4),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    AppSnackBar.showError(context, message);
   }
 }

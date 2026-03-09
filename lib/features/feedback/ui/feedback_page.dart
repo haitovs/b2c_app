@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/widgets/app_snackbar.dart';
 import '../providers/feedback_providers.dart';
 import '../services/feedback_service.dart';
 
@@ -79,12 +80,7 @@ class _FeedbackPageState extends ConsumerState<FeedbackPage> {
 
   Future<void> _submitFeedback() async {
     if (_feedbackController.text.trim().length < 10) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Feedback must be at least 10 characters'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      AppSnackBar.showWarning(context, 'Feedback must be at least 10 characters');
       return;
     }
 
@@ -101,21 +97,11 @@ class _FeedbackPageState extends ConsumerState<FeedbackPage> {
 
       if (success) {
         _feedbackController.clear();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Feedback submitted successfully!'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        AppSnackBar.showSuccess(context, 'Feedback submitted successfully!');
         // Reload feedbacks
         _loadData();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to submit feedback'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppSnackBar.showError(context, 'Failed to submit feedback');
       }
     }
   }

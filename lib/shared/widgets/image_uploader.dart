@@ -3,28 +3,14 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/theme/app_theme.dart';
 
-/// Image uploader widget with preview.
-///
-/// Shows a drop zone / button to select an image, with preview of the current
-/// image (either a network URL or a local placeholder).
 class ImageUploader extends StatelessWidget {
-  /// Label displayed above the upload area.
   final String label;
-
-  /// Current image URL (if already uploaded).
   final String? currentImageUrl;
-
-  /// Callback when user taps to upload.
   final VoidCallback? onUpload;
-
-  /// Callback when user taps to remove the current image.
   final VoidCallback? onRemove;
-
-  /// Width of the upload area. Defaults to double.infinity.
   final double? width;
-
-  /// Height of the upload area. Defaults to 160.
   final double height;
+  final String? recommendation;
 
   const ImageUploader({
     super.key,
@@ -34,6 +20,7 @@ class ImageUploader extends StatelessWidget {
     this.onRemove,
     this.width,
     this.height = 160,
+    this.recommendation,
   });
 
   @override
@@ -42,12 +29,24 @@ class ImageUploader extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(label, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w500)),
+        Text(label,
+            style: GoogleFonts.inter(
+                fontSize: 14, fontWeight: FontWeight.w500)),
         const SizedBox(height: 8),
         if (currentImageUrl != null && currentImageUrl!.isNotEmpty)
           _buildPreview()
         else
           _buildDropZone(),
+        if (recommendation != null) ...[
+          const SizedBox(height: 6),
+          Text(
+            recommendation!,
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              color: Colors.grey.shade500,
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -68,7 +67,6 @@ class ImageUploader extends StatelessWidget {
               errorBuilder: (_, __, ___) => _buildDropZone(),
             ),
           ),
-          // Remove button
           if (onRemove != null)
             Positioned(
               top: 8,
@@ -82,12 +80,12 @@ class ImageUploader extends StatelessWidget {
                   customBorder: const CircleBorder(),
                   child: const Padding(
                     padding: EdgeInsets.all(6),
-                    child: Icon(Icons.close, size: 18, color: Colors.red),
+                    child:
+                        Icon(Icons.close, size: 18, color: Colors.red),
                   ),
                 ),
               ),
             ),
-          // Change button
           if (onUpload != null)
             Positioned(
               bottom: 8,
@@ -99,10 +97,14 @@ class ImageUploader extends StatelessWidget {
                   onTap: onUpload,
                   borderRadius: BorderRadius.circular(8),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 6),
                     child: Text(
                       'Change',
-                      style: GoogleFonts.inter(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w500),
+                      style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: Colors.white,
+                          fontWeight: FontWeight.w500),
                     ),
                   ),
                 ),
@@ -116,31 +118,103 @@ class ImageUploader extends StatelessWidget {
   Widget _buildDropZone() {
     return GestureDetector(
       onTap: onUpload,
-      child: Container(
-        width: width ?? double.infinity,
-        height: height,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey.shade300, style: BorderStyle.solid),
-          color: Colors.grey.shade50,
+      child: CustomPaint(
+        painter: _DashedBorderPainter(
+          color: AppTheme.primaryColor.withValues(alpha: 0.4),
+          borderRadius: 12,
+          dashWidth: 6,
+          dashSpace: 4,
+          strokeWidth: 1.5,
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.cloud_upload_outlined, size: 40, color: Colors.grey.shade400),
-            const SizedBox(height: 8),
-            Text(
-              'Click to upload',
-              style: GoogleFonts.inter(fontSize: 14, color: Colors.grey.shade600),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'PNG, JPG up to 5MB',
-              style: GoogleFonts.inter(fontSize: 12, color: Colors.grey.shade400),
-            ),
-          ],
+        child: Container(
+          width: width ?? double.infinity,
+          height: height,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            color: AppTheme.primaryColor.withValues(alpha: 0.03),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                ),
+                child: const Icon(
+                  Icons.add,
+                  size: 24,
+                  color: AppTheme.primaryColor,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Upload $label',
+                style: GoogleFonts.inter(
+                    fontSize: 14,
+                    color: Colors.grey.shade600,
+                    fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'PNG, JPG, SVG up to 5MB',
+                style: GoogleFonts.inter(
+                    fontSize: 12, color: Colors.grey.shade400),
+              ),
+            ],
+          ),
         ),
       ),
     );
+  }
+}
+
+class _DashedBorderPainter extends CustomPainter {
+  final Color color;
+  final double borderRadius;
+  final double dashWidth;
+  final double dashSpace;
+  final double strokeWidth;
+
+  _DashedBorderPainter({
+    required this.color,
+    required this.borderRadius,
+    required this.dashWidth,
+    required this.dashSpace,
+    required this.strokeWidth,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = strokeWidth
+      ..style = PaintingStyle.stroke;
+
+    final rrect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(0, 0, size.width, size.height),
+      Radius.circular(borderRadius),
+    );
+
+    final path = Path()..addRRect(rrect);
+    final metrics = path.computeMetrics();
+
+    for (final metric in metrics) {
+      double distance = 0;
+      while (distance < metric.length) {
+        final end = (distance + dashWidth).clamp(0, metric.length);
+        final extracted = metric.extractPath(distance, end.toDouble());
+        canvas.drawPath(extracted, paint);
+        distance += dashWidth + dashSpace;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashedBorderPainter oldDelegate) {
+    return oldDelegate.color != color ||
+        oldDelegate.borderRadius != borderRadius;
   }
 }

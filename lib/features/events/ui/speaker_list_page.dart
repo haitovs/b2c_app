@@ -9,7 +9,6 @@ import 'package:http/http.dart' as http;
 import '../../../core/config/app_config.dart';
 import '../../../core/providers/event_context_provider.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../shared/layouts/event_sidebar_layout.dart';
 
 class SpeakerListPage extends ConsumerStatefulWidget {
   final String eventId;
@@ -51,11 +50,7 @@ class _SpeakerListPageState extends ConsumerState<SpeakerListPage> {
 
   Future<void> _fetchSpeakers() async {
     try {
-      final siteId = ref.read(eventContextProvider).siteId;
-      final uri = siteId != null
-          ? Uri.parse(
-              '${AppConfig.tourismApiBaseUrl}/speakers/?site_id=$siteId')
-          : Uri.parse('${AppConfig.tourismApiBaseUrl}/speakers/');
+      final uri = Uri.parse('${AppConfig.b2cApiBaseUrl}/api/v1/speakers/');
 
       final response = await http.get(uri);
       if (response.statusCode == 200) {
@@ -105,41 +100,42 @@ class _SpeakerListPageState extends ConsumerState<SpeakerListPage> {
   String _buildImageUrl(String? path) {
     if (path == null || path.isEmpty) return '';
     if (path.startsWith('http')) return path;
-    return '${AppConfig.tourismApiBaseUrl}$path';
+    return '${AppConfig.b2cApiBaseUrl}$path';
   }
 
   @override
   Widget build(BuildContext context) {
-    return EventSidebarLayout(
-      title: 'Speakers',
-      child: Column(
+    return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Header: "Speakers" title + divider
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Speakers',
-                  style: GoogleFonts.montserrat(
-                    fontSize: 30,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.primaryColor,
+          Builder(builder: (context) {
+            final isMobile = MediaQuery.of(context).size.width < 600;
+            return Padding(
+              padding: EdgeInsets.fromLTRB(isMobile ? 16 : 20, isMobile ? 12 : 20, isMobile ? 16 : 20, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Speakers',
+                    style: GoogleFonts.montserrat(
+                      fontSize: isMobile ? 22 : 30,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.primaryColor,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                Container(height: 0.5, color: const Color(0xFFCACACA)),
-              ],
-            ),
-          ),
+                  const SizedBox(height: 12),
+                  Container(height: 0.5, color: const Color(0xFFCACACA)),
+                ],
+              ),
+            );
+          }),
 
           const SizedBox(height: 12),
 
           // Search bar + Sort button
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
+            padding: EdgeInsets.symmetric(horizontal: MediaQuery.of(context).size.width < 600 ? 16 : 20),
             child: Row(
               children: [
                 // Search bar
@@ -184,20 +180,41 @@ class _SpeakerListPageState extends ConsumerState<SpeakerListPage> {
                     : _buildGrid(),
           ),
         ],
-      ),
-    );
+      );
   }
 
   Widget _buildGrid() {
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
 
+    if (isMobile) {
+      return ListView.builder(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        itemCount: _filteredSpeakers.length,
+        itemBuilder: (context, index) {
+          final speaker = _filteredSpeakers[index];
+          return _SpeakerHorizontalCard(
+            name: '${speaker['name'] ?? ''} ${speaker['surname'] ?? ''}'.trim(),
+            company: speaker['company'] ?? '',
+            position: speaker['position'] ?? '',
+            country: speaker['country'] ?? '',
+            photoUrl: _buildImageUrl(speaker['photo']),
+            flagUrl: _buildImageUrl(speaker['country_flag']),
+            onViewProfile: () => context.push(
+              '/events/${widget.eventId}/speakers/${speaker['id']}',
+              extra: speaker,
+            ),
+          );
+        },
+      );
+    }
+
     return GridView.builder(
       padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-      gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
         maxCrossAxisExtent: 220,
-        crossAxisSpacing: isMobile ? 10 : 12,
-        mainAxisSpacing: isMobile ? 10 : 12,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
         childAspectRatio: 184 / 246,
       ),
       itemCount: _filteredSpeakers.length,
@@ -279,36 +296,46 @@ class _SortButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(5),
       child: Container(
-        width: 150,
+        width: isMobile ? 40 : 150,
         height: 38,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
+        padding: EdgeInsets.symmetric(horizontal: isMobile ? 0 : 10),
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.3),
           borderRadius: BorderRadius.circular(5),
           border: Border.all(color: const Color(0xFFCBCBCB)),
         ),
-        child: Row(
-          children: [
-            Text(
-              isAZ ? 'Sort by: A - Z' : 'Sort by: Z - A',
-              style: GoogleFonts.roboto(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: const Color(0xFF757A8A),
+        child: isMobile
+            ? const Center(
+                child: Icon(
+                  Icons.sort,
+                  size: 20,
+                  color: Color(0xFF757A8A),
+                ),
+              )
+            : Row(
+                children: [
+                  Text(
+                    isAZ ? 'Sort by: A - Z' : 'Sort by: Z - A',
+                    style: GoogleFonts.roboto(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: const Color(0xFF757A8A),
+                    ),
+                  ),
+                  const Spacer(),
+                  const Icon(
+                    Icons.chevron_right,
+                    size: 16,
+                    color: Color(0xFF757A8A),
+                  ),
+                ],
               ),
-            ),
-            const Spacer(),
-            Icon(
-              Icons.chevron_right,
-              size: 16,
-              color: const Color(0xFF757A8A),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -484,6 +511,178 @@ class _SpeakerCard extends StatelessWidget {
       color: Colors.grey.shade200,
       child: Center(
         child: Icon(Icons.person, size: 40, color: Colors.grey.shade400),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Horizontal Speaker Card — mobile list layout (photo left, info right)
+// ---------------------------------------------------------------------------
+class _SpeakerHorizontalCard extends StatelessWidget {
+  final String name;
+  final String company;
+  final String position;
+  final String country;
+  final String photoUrl;
+  final String flagUrl;
+  final VoidCallback onViewProfile;
+
+  const _SpeakerHorizontalCard({
+    required this.name,
+    required this.company,
+    required this.position,
+    required this.country,
+    required this.photoUrl,
+    required this.flagUrl,
+    required this.onViewProfile,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: IntrinsicHeight(
+        child: Row(
+          children: [
+            // Photo
+            ClipRRect(
+              borderRadius: const BorderRadius.horizontal(
+                left: Radius.circular(8),
+              ),
+              child: SizedBox(
+                width: 110,
+                child: photoUrl.isNotEmpty
+                    ? Image.network(
+                        photoUrl,
+                        fit: BoxFit.cover,
+                        height: double.infinity,
+                        errorBuilder: (_, __, ___) => Container(
+                          color: Colors.grey.shade200,
+                          child: Icon(
+                            Icons.person,
+                            size: 40,
+                            color: Colors.grey.shade400,
+                          ),
+                        ),
+                      )
+                    : Container(
+                        color: Colors.grey.shade200,
+                        child: Icon(
+                          Icons.person,
+                          size: 40,
+                          color: Colors.grey.shade400,
+                        ),
+                      ),
+              ),
+            ),
+            // Info
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name.isNotEmpty ? name : 'Unknown',
+                      style: GoogleFonts.roboto(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      position.isNotEmpty && company.isNotEmpty
+                          ? '$position, $company'
+                          : position.isNotEmpty
+                              ? position
+                              : company,
+                      style: GoogleFonts.roboto(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w400,
+                        color: Colors.grey.shade700,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 8),
+                    // Flag + country
+                    Row(
+                      children: [
+                        if (flagUrl.isNotEmpty) ...[
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(1),
+                            child: Image.network(
+                              flagUrl,
+                              width: 20,
+                              height: 14,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) =>
+                                  const SizedBox.shrink(),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                        ],
+                        Expanded(
+                          child: Text(
+                            country.isNotEmpty ? country : '',
+                            style: GoogleFonts.roboto(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w400,
+                              color: Colors.black,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    // View Profile button
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        onPressed: onViewProfile,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppTheme.primaryColor,
+                          side: const BorderSide(color: AppTheme.primaryColor),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(5),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: Text(
+                          'View Profile',
+                          style: GoogleFonts.roboto(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: AppTheme.primaryColor,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -64,6 +64,15 @@ class HotlineService {
     return result.isSuccess;
   }
 
+  /// Send a message with media attachment via REST API
+  Future<bool> sendMessageWithMedia(String content, String mediaUrl) async {
+    final result = await _api.post<Map<String, dynamic>>(
+      '/api/v1/chat/send?content=${Uri.encodeComponent(content)}&media_url=${Uri.encodeComponent(mediaUrl)}',
+    );
+
+    return result.isSuccess;
+  }
+
   /// Get WebSocket URL for real-time chat
   Future<String?> getWebSocketUrl() async {
     final token = await _tokenProvider.getToken();

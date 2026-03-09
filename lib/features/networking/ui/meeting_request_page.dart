@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import '../../../core/config/app_config.dart';
 import '../../../core/providers/event_context_provider.dart';
+import '../../../core/widgets/app_snackbar.dart';
 import '../../../core/widgets/custom_app_bar.dart';
 import '../../events/ui/widgets/profile_dropdown.dart';
 import '../../notifications/ui/notification_drawer.dart';
@@ -20,11 +20,17 @@ class MeetingRequestPage extends ConsumerStatefulWidget {
   final String participantId;
   final Map<String, dynamic>? participantData;
 
+  /// When set, this is a speaker meeting request (uses targetOfficialId).
+  final int? speakerId;
+  final String? speakerName;
+
   const MeetingRequestPage({
     super.key,
     required this.eventId,
     required this.participantId,
     this.participantData,
+    this.speakerId,
+    this.speakerName,
   });
 
   @override
@@ -62,10 +68,6 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
   TimeOfDay _startTime = TimeOfDay(hour: 9, minute: 0);
   TimeOfDay _endTime = TimeOfDay(hour: 10, minute: 0);
 
-  // Attachment image
-  Uint8List? _attachmentImage;
-  String? _attachmentImageName;
-
   // Data
   Map<String, dynamic>? _participant;
   bool _isLoading = true;
@@ -86,8 +88,16 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
     _fetchData();
   }
 
+  bool get _isSpeakerMeeting => widget.speakerId != null;
+
   Future<void> _fetchData() async {
-    if (widget.participantData != null) {
+    if (_isSpeakerMeeting) {
+      // For speaker meetings, build a synthetic participant record
+      _participant = {
+        'name': widget.speakerName ?? 'Speaker',
+        'id': widget.speakerId.toString(),
+      };
+    } else if (widget.participantData != null) {
       _participant = widget.participantData;
     } else {
       await _fetchParticipant();
@@ -219,25 +229,6 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
     }
   }
 
-  Future<void> _pickImage() async {
-    // Image attachments not supported for meetings
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Image attachments are not available for meetings'),
-          backgroundColor: Colors.blue,
-        ),
-      );
-    }
-  }
-
-  void _removeImage() {
-    setState(() {
-      _attachmentImage = null;
-      _attachmentImageName = null;
-    });
-  }
-
   void _addAttendee() {
     setState(() {
       _attendeeControllers.add(TextEditingController());
@@ -273,12 +264,7 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
 
     // Validate day selection
     if (_selectedDay == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select a day for the meeting'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      AppSnackBar.showWarning(context, 'Please select a day for the meeting');
       return;
     }
 
@@ -302,11 +288,17 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
         '${dayDate}T${_endTime.hour.toString().padLeft(2, '0')}:${_endTime.minute.toString().padLeft(2, '0')}:00',
       );
 
-      // Get the target user ID - use route param (which is the B2C user UUID)
-      // Or fallback to participant data 'id' field
-      String? targetUserId = widget.participantId;
-      if (targetUserId.isEmpty && _participant != null) {
-        targetUserId = _participant!['id']?.toString();
+      // Determine target based on meeting type (speaker vs participant)
+      String? targetUserId;
+      int? targetOfficialId;
+
+      if (_isSpeakerMeeting) {
+        targetOfficialId = widget.speakerId;
+      } else {
+        targetUserId = widget.participantId;
+        if (targetUserId.isEmpty && _participant != null) {
+          targetUserId = _participant!['id']?.toString();
+        }
       }
 
       // Make API call to create meeting
@@ -316,28 +308,20 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
         subject: _subjectController.text.trim(),
         startTime: startTime,
         endTime: endTime,
-        location: 'Ashgabat, TKM', // Default location
+        location: 'Ashgabat, TKM',
         targetUserId: targetUserId,
+        targetOfficialId: targetOfficialId,
         attendeesText: attendeesText.isEmpty ? null : attendeesText,
+        language: _selectedLanguage,
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Meeting request sent successfully!'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        AppSnackBar.showSuccess(context, 'Meeting request sent successfully!');
         context.pop(true); // Return true to signal refresh needed
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to send request: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppSnackBar.showError(context, 'Failed to send request: $e');
       }
     } finally {
       if (mounted) {
@@ -411,31 +395,39 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
 
   Widget _buildHeader(bool isMobile, double horizontalPadding) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+      padding: EdgeInsets.only(
+        left: horizontalPadding,
+        right: horizontalPadding,
+        top: isMobile ? 12 : 20,
+      ),
       child: Row(
         children: [
-          // Back button
           IconButton(
             icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
             onPressed: () => context.pop(),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
           ),
-          const SizedBox(width: 8),
-          // Title
-          Text(
-            'Meeting Request',
-            style: GoogleFonts.montserrat(
-              fontSize: 28,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
+          SizedBox(width: isMobile ? 4 : 8),
+          Flexible(
+            child: Text(
+              'Meeting Request',
+              style: GoogleFonts.montserrat(
+                fontSize: isMobile ? 20 : 28,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
           const Spacer(),
-          // Notification & Profile icons
           CustomAppBar(
             onNotificationTap: () {
               _scaffoldKey.currentState?.openEndDrawer();
             },
             onProfileTap: _toggleProfile,
+            isMobile: isMobile,
+            showLogo: false,
           ),
         ],
       ),
@@ -487,9 +479,12 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
   }
 
   Widget _buildImageCard(String logoUrl, String name) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
     return Container(
-      width: 300,
-      height: 351,
+      constraints: isMobile
+          ? const BoxConstraints(maxHeight: 280)
+          : const BoxConstraints(maxWidth: 300, maxHeight: 351),
+      width: isMobile ? double.infinity : 300,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(15),
@@ -511,8 +506,9 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
   }
 
   Widget _buildFormCard() {
+    final isMobile = MediaQuery.of(context).size.width < 600;
     return Container(
-      padding: const EdgeInsets.all(40),
+      padding: EdgeInsets.all(isMobile ? 20 : 40),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(10),
@@ -553,8 +549,6 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
                           _buildSubjectsField(),
                           const SizedBox(height: 20),
                           _buildCommentsField(),
-                          const SizedBox(height: 20),
-                          _buildAttachmentSection(),
                         ],
                       ),
                     ),
@@ -594,8 +588,6 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
                     _buildLanguageDropdown(),
                     const SizedBox(height: 20),
                     _buildCommentsField(),
-                    const SizedBox(height: 20),
-                    _buildAttachmentSection(),
                   ],
                 );
               }
@@ -1027,7 +1019,7 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Comments:',
+          'Message:',
           style: GoogleFonts.inter(
             fontSize: 18,
             fontWeight: FontWeight.w500,
@@ -1046,7 +1038,7 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
             maxLines: 5,
             style: GoogleFonts.roboto(fontSize: 18),
             decoration: InputDecoration(
-              hintText: 'Enter comments...',
+              hintText: 'Enter message...',
               hintStyle: GoogleFonts.roboto(
                 fontSize: 18,
                 color: Colors.black.withValues(alpha: 0.7),
@@ -1055,114 +1047,6 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
               contentPadding: const EdgeInsets.all(15),
             ),
           ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildAttachmentSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Attachment:',
-          style: GoogleFonts.inter(
-            fontSize: 18,
-            fontWeight: FontWeight.w500,
-            color: Colors.black,
-          ),
-        ),
-        const SizedBox(height: 15),
-        Container(
-          height: 120,
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: const Color(0xFFB7B7B7),
-              style: BorderStyle.solid,
-            ),
-            borderRadius: BorderRadius.circular(5),
-          ),
-          child: _attachmentImage != null
-              ? Stack(
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: Image.memory(
-                        _attachmentImage!,
-                        width: double.infinity,
-                        height: double.infinity,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                    Positioned(
-                      top: 8,
-                      right: 8,
-                      child: GestureDetector(
-                        onTap: _removeImage,
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: const BoxDecoration(
-                            color: Colors.red,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.close,
-                            color: Colors.white,
-                            size: 16,
-                          ),
-                        ),
-                      ),
-                    ),
-                    if (_attachmentImageName != null)
-                      Positioned(
-                        bottom: 8,
-                        left: 8,
-                        right: 8,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.black54,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            _attachmentImageName!,
-                            style: GoogleFonts.roboto(
-                              color: Colors.white,
-                              fontSize: 12,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ),
-                  ],
-                )
-              : InkWell(
-                  onTap: _pickImage,
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.cloud_upload_outlined,
-                          size: 40,
-                          color: Colors.grey[400],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Click to upload image',
-                          style: GoogleFonts.roboto(
-                            color: Colors.grey[500],
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
         ),
       ],
     );

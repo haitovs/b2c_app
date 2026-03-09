@@ -241,7 +241,8 @@ class AuthNotifier extends Notifier<AuthState> implements TokenProvider {
   }
 
   /// Create password for a team member invitation token.
-  /// Returns null on success, or error message on failure.
+  /// On success, auto-logs in the user and returns null.
+  /// Returns error message on failure.
   Future<String?> createPassword(String token, String password) async {
     final result = await _api.post<Map<String, dynamic>>(
       '/api/v1/team-members/create-password',
@@ -249,7 +250,15 @@ class AuthNotifier extends Notifier<AuthState> implements TokenProvider {
       auth: false,
     );
 
-    if (result.isSuccess) return null;
+    if (result.isSuccess && result.data != null) {
+      final accessToken = result.data!['access_token'] as String?;
+      if (accessToken != null) {
+        await _prefs.setString('auth_token', accessToken);
+        state = state.copyWith(token: accessToken);
+        await _fetchCurrentUser();
+      }
+      return null;
+    }
     return _getUserFriendlyError(
       result.error?.message ?? 'Failed to create password',
     );

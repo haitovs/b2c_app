@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/widgets/app_snackbar.dart';
 import '../models/flight.dart';
 import '../models/flight_booking.dart';
 import '../providers/flight_providers.dart';
@@ -60,9 +61,7 @@ class _FlightBookingPageState extends ConsumerState<FlightBookingPage> {
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Failed to load flight: $e')));
+        AppSnackBar.showError(context, 'Failed to load flight: $e');
       }
     }
   }
@@ -74,15 +73,11 @@ class _FlightBookingPageState extends ConsumerState<FlightBookingPage> {
   Future<void> _submitBooking() async {
     if (!_formKey.currentState!.validate()) return;
     if (_dob == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select date of birth')),
-      );
+      AppSnackBar.showInfo(context, 'Please select date of birth');
       return;
     }
     if (_gender.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Please select gender')));
+      AppSnackBar.showInfo(context, 'Please select gender');
       return;
     }
 
@@ -106,24 +101,15 @@ class _FlightBookingPageState extends ConsumerState<FlightBookingPage> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Booking confirmed! Reference: ${result.bookingReference}',
-            ),
-            backgroundColor: Colors.green,
-          ),
+        AppSnackBar.showSuccess(
+          context,
+          'Booking confirmed! Reference: ${result.bookingReference}',
         );
         context.pop();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Booking failed: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppSnackBar.showError(context, 'Booking failed: $e');
       }
     } finally {
       if (mounted) setState(() => _isBooking = false);

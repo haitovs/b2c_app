@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/widgets/app_snackbar.dart';
 import '../providers/transfer_providers.dart';
 import '../services/transfer_service.dart';
 import 'booking_confirmation_page.dart';
@@ -139,9 +140,7 @@ class _TransferBookingPageState extends ConsumerState<TransferBookingPage> {
   Future<void> _createBooking() async {
     if (!_formKey.currentState!.validate()) return;
     if (!_agreedToTerms) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please agree to terms and conditions')),
-      );
+      AppSnackBar.showInfo(context, 'Please agree to terms and conditions');
       return;
     }
 
@@ -217,9 +216,7 @@ class _TransferBookingPageState extends ConsumerState<TransferBookingPage> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
+      AppSnackBar.showError(context, 'Error: ${e.toString()}');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

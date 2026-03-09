@@ -5,24 +5,14 @@ import '../../core/theme/app_theme.dart';
 
 /// An order summary card for the shopping cart / checkout flow.
 ///
-/// Displays item count, subtotal in dual currencies (USD + TMT), an optional
-/// discount row, a bold total, and a full-width checkout button.
-///
-/// ```dart
-/// CartSummaryWidget(
-///   totalUsd: 250,
-///   totalTmt: 875,
-///   discountUsd: 25,
-///   discountTmt: 87.5,
-///   itemCount: 3,
-///   onCheckout: () => context.go('/checkout'),
-/// )
-/// ```
+/// Displays item count, subtotals per currency (USD / TMT — only currencies
+/// present in the cart), an optional discount row, a bold total, and a
+/// full-width checkout button.
 class CartSummaryWidget extends StatelessWidget {
-  /// Grand total in US dollars (after discount).
+  /// Grand total in US dollars (after discount). 0 if no USD items.
   final double totalUsd;
 
-  /// Grand total in Turkmen manat (after discount).
+  /// Grand total in Turkmen manat (after discount). 0 if no TMT items.
   final double totalTmt;
 
   /// Discount amount in US dollars. Hidden when 0.
@@ -53,6 +43,8 @@ class CartSummaryWidget extends StatelessWidget {
     final subtotalUsd = totalUsd + discountUsd;
     final subtotalTmt = totalTmt + discountTmt;
     final hasDiscount = discountUsd > 0 || discountTmt > 0;
+    final hasUsd = subtotalUsd > 0 || totalUsd > 0;
+    final hasTmt = subtotalTmt > 0 || totalTmt > 0;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -90,20 +82,34 @@ class CartSummaryWidget extends StatelessWidget {
           ),
           const SizedBox(height: 10),
 
-          // Subtotal (dual currency)
-          _SummaryRow(
-            label: 'Subtotal',
-            value: '\$${_fmt(subtotalUsd)} / ${_fmt(subtotalTmt)} TMT',
-          ),
+          // Subtotal per currency
+          if (hasUsd)
+            _SummaryRow(
+              label: 'Subtotal (USD)',
+              value: '\$${_fmt(subtotalUsd)}',
+            ),
+          if (hasUsd && hasTmt) const SizedBox(height: 4),
+          if (hasTmt)
+            _SummaryRow(
+              label: 'Subtotal (TMT)',
+              value: '${_fmt(subtotalTmt)} TMT',
+            ),
 
           // Discount (shown only when > 0)
           if (hasDiscount) ...[
             const SizedBox(height: 10),
-            _SummaryRow(
-              label: 'Discount',
-              value: '-\$${_fmt(discountUsd)} / -${_fmt(discountTmt)} TMT',
-              valueColor: AppTheme.successColor,
-            ),
+            if (discountUsd > 0)
+              _SummaryRow(
+                label: 'Discount (USD)',
+                value: '-\$${_fmt(discountUsd)}',
+                valueColor: AppTheme.successColor,
+              ),
+            if (discountTmt > 0)
+              _SummaryRow(
+                label: 'Discount (TMT)',
+                value: '-${_fmt(discountTmt)} TMT',
+                valueColor: AppTheme.successColor,
+              ),
           ],
 
           const SizedBox(height: 14),
@@ -113,28 +119,52 @@ class CartSummaryWidget extends StatelessWidget {
 
           const SizedBox(height: 14),
 
-          // Total (bold, dual currency)
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Total',
-                style: GoogleFonts.inter(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.black87,
+          // Total per currency
+          if (hasUsd)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Total (USD)',
+                  style: GoogleFonts.inter(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black87,
+                  ),
                 ),
-              ),
-              Text(
-                '\$${_fmt(totalUsd)} / ${_fmt(totalTmt)} TMT',
-                style: GoogleFonts.inter(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.black87,
+                Text(
+                  '\$${_fmt(totalUsd)}',
+                  style: GoogleFonts.inter(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black87,
+                  ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
+          if (hasUsd && hasTmt) const SizedBox(height: 4),
+          if (hasTmt)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Total (TMT)',
+                  style: GoogleFonts.inter(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black87,
+                  ),
+                ),
+                Text(
+                  '${_fmt(totalTmt)} TMT',
+                  style: GoogleFonts.inter(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black87,
+                  ),
+                ),
+              ],
+            ),
 
           const SizedBox(height: 20),
 

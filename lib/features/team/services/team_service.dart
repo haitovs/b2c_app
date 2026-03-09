@@ -10,7 +10,7 @@ class TeamService {
   /// Get all team members for a given company.
   Future<List<TeamMember>> getTeamMembers(String companyId) async {
     final result = await _api.get<List<dynamic>>(
-      '/api/v1/team-members/',
+      '/api/v1/team-members',
       queryParams: {'company_id': companyId},
     );
 
@@ -37,7 +37,7 @@ class TeamService {
   /// Create a new team member.
   Future<TeamMember> createTeamMember(Map<String, dynamic> data) async {
     final result = await _api.post<Map<String, dynamic>>(
-      '/api/v1/team-members/',
+      '/api/v1/team-members',
       body: data,
     );
 
@@ -85,5 +85,16 @@ class TeamService {
       return TeamMember.fromJson(result.data!);
     }
     throw result.error ?? Exception('Failed to change team member role');
+  }
+
+  /// Resend invitation email to a team member.
+  Future<void> resendInvitation(String memberId) async {
+    final result = await _api.post<Map<String, dynamic>>(
+      '/api/v1/team-members/$memberId/resend-invitation',
+    );
+
+    if (!result.isSuccess) {
+      throw result.error ?? Exception('Failed to resend invitation');
+    }
   }
 }

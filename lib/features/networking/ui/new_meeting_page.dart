@@ -1,16 +1,14 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:http/http.dart' as http;
 import '../../../core/config/app_config.dart';
 import '../../../core/providers/event_context_provider.dart';
 import '../../../core/widgets/custom_app_bar.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../events/ui/widgets/profile_dropdown.dart';
 import '../../notifications/ui/notification_drawer.dart';
+import '../providers/meeting_providers.dart';
 
 /// New Meeting Page - Grid of participants/entities to select for meeting
 class NewMeetingPage extends ConsumerStatefulWidget {
@@ -107,30 +105,18 @@ class _NewMeetingPageState extends ConsumerState<NewMeetingPage> {
     setState(() => _isLoading = true);
 
     try {
-      final token = await ref.read(authNotifierProvider.notifier).getToken();
-
-      // Fetch B2C users for B2B meetings
-      // These have UUID IDs for meeting requests between app users
+      // Fetch B2C users for B2B meetings using ApiClient
       try {
-        final usersResponse = await http.get(
-          Uri.parse('${AppConfig.b2cApiBaseUrl}/api/v1/users/'),
-          headers: {
-            'Authorization': 'Bearer $token',
-            'Content-Type': 'application/json',
-          },
-        );
-
-        if (usersResponse.statusCode == 200) {
-          final List data = jsonDecode(usersResponse.body);
-          _participants = data.cast<Map<String, dynamic>>();
-        } else {
-          debugPrint('Failed to fetch B2C users: ${usersResponse.statusCode}');
+        final apiClient = ref.read(authApiClientProvider);
+        final result = await apiClient.get<List<dynamic>>('/api/v1/users');
+        if (result.isSuccess && result.data != null) {
+          _participants = result.data!.cast<Map<String, dynamic>>();
         }
       } catch (usersError) {
         debugPrint('Error fetching B2C users: $usersError');
       }
 
-      // Note: B2G gov entities are now fetched lazily when user switches to B2G tab
+      // B2G gov entities fetched lazily when user switches to B2G tab
       // BUT if page opened with B2G mode, fetch them immediately
       if (!_isB2B) {
         await _fetchGovEntities();
@@ -150,23 +136,12 @@ class _NewMeetingPageState extends ConsumerState<NewMeetingPage> {
     if (_govEntities.isNotEmpty) return; // Already loaded
 
     try {
-      final token = await ref.read(authNotifierProvider.notifier).getToken();
-
-      final govResponse = await http.get(
-        Uri.parse('${AppConfig.b2cApiBaseUrl}/api/v1/meetings/gov-entities'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-      );
-
-      if (govResponse.statusCode == 200) {
-        final List govData = jsonDecode(govResponse.body);
-        setState(() {
-          _govEntities = govData.cast<Map<String, dynamic>>();
-          _applyFilters();
-        });
-      }
+      final meetingService = ref.read(meetingServiceProvider);
+      final entities = await meetingService.fetchGovEntities();
+      setState(() {
+        _govEntities = entities;
+        _applyFilters();
+      });
     } catch (govError) {
       debugPrint('Error fetching gov entities: $govError');
     }
@@ -271,32 +246,41 @@ class _NewMeetingPageState extends ConsumerState<NewMeetingPage> {
   }
 
   Widget _buildHeader() {
+    final isMobile = MediaQuery.of(context).size.width < 600;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+      padding: EdgeInsets.only(
+        left: isMobile ? 12 : 20,
+        right: isMobile ? 12 : 20,
+        top: isMobile ? 12 : 20,
+      ),
       child: Row(
         children: [
-          // Back button
           IconButton(
             icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
             onPressed: () => context.pop(),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
           ),
-          const SizedBox(width: 8),
-          // Title
-          Text(
-            'New Meeting',
-            style: GoogleFonts.montserrat(
-              fontSize: 28,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
+          SizedBox(width: isMobile ? 4 : 8),
+          Flexible(
+            child: Text(
+              'New Meeting',
+              style: GoogleFonts.montserrat(
+                fontSize: isMobile ? 20 : 28,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
           const Spacer(),
-          // Notification & Profile icons
           CustomAppBar(
             onNotificationTap: () {
               _scaffoldKey.currentState?.openEndDrawer();
             },
             onProfileTap: _toggleProfile,
+            isMobile: isMobile,
+            showLogo: false,
           ),
         ],
       ),
@@ -448,12 +432,15 @@ class _NewMeetingPageState extends ConsumerState<NewMeetingPage> {
           childAspectRatio = 0.85;
         }
 
+        final gridPadding = constraints.maxWidth < 600 ? 16.0 : 30.0;
+        final gridSpacing = constraints.maxWidth < 600 ? 12.0 : 30.0;
+
         return GridView.builder(
-          padding: const EdgeInsets.all(30),
+          padding: EdgeInsets.all(gridPadding),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: crossAxisCount,
-            crossAxisSpacing: 30,
-            mainAxisSpacing: 30,
+            crossAxisSpacing: gridSpacing,
+            mainAxisSpacing: gridSpacing,
             childAspectRatio: childAspectRatio,
           ),
           itemCount: _filteredItems.length,

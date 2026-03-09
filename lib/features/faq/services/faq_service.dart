@@ -18,7 +18,7 @@ class FAQService {
     }
 
     final result = await _api.get<List<dynamic>>(
-      '/api/v1/faq/',
+      '/api/v1/faq',
       auth: false,
       queryParams: queryParams.isNotEmpty ? queryParams : null,
     );

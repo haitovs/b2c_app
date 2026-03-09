@@ -63,22 +63,25 @@ class BookingConfirmationPage extends StatelessWidget {
           ),
         ],
       ),
-      body: Container(
-        margin: const EdgeInsets.all(16),
+      body: LayoutBuilder(
+        builder: (context, outerConstraints) {
+        final isMobile = outerConstraints.maxWidth < 600;
+        return Container(
+        margin: EdgeInsets.all(isMobile ? 12 : 16),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: const Color(0xFF3C4494), width: 2),
         ),
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: EdgeInsets.all(isMobile ? 16 : 24),
           child: Column(
             children: [
               // Header
               Text(
                 _title,
-                style: const TextStyle(
-                  fontSize: 22,
+                style: TextStyle(
+                  fontSize: isMobile ? 18 : 22,
                   fontWeight: FontWeight.bold,
                 ),
                 textAlign: TextAlign.center,
@@ -91,14 +94,17 @@ class BookingConfirmationPage extends StatelessWidget {
               ),
               const SizedBox(height: 24),
 
-              // Details cards row
+              // Details cards — stack on mobile
+              if (isMobile) ...[
+                _buildReservationDetails(),
+                const SizedBox(height: 16),
+                _buildDriverInfo(),
+              ] else
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Reservation Details
                   Expanded(child: _buildReservationDetails()),
                   const SizedBox(width: 16),
-                  // Driver/Contact Information
                   Expanded(child: _buildDriverInfo()),
                 ],
               ),
@@ -163,6 +169,8 @@ class BookingConfirmationPage extends StatelessWidget {
             ],
           ),
         ),
+      );
+        },
       ),
     );
   }
@@ -343,13 +351,14 @@ class BookingConfirmationPage extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(
-          width: 100,
+        ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 80, maxWidth: 110),
           child: Text(
             label,
             style: const TextStyle(fontSize: 11, color: Colors.grey),
           ),
         ),
+        const SizedBox(width: 4),
         Expanded(child: Text(value, style: const TextStyle(fontSize: 11))),
       ],
     );

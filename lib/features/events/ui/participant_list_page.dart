@@ -7,7 +7,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import '../../../core/config/app_config.dart';
 import '../../../core/providers/event_context_provider.dart';
-import '../../../shared/layouts/event_sidebar_layout.dart';
 import 'widgets/profile_dropdown.dart';
 
 class ParticipantListPage extends ConsumerStatefulWidget {
@@ -190,9 +189,7 @@ class _ParticipantListPageState extends ConsumerState<ParticipantListPage> {
     final isMobile = screenWidth < 600;
     final horizontalPadding = isMobile ? 16.0 : 50.0;
 
-    return EventSidebarLayout(
-      title: 'Participants',
-      child: GestureDetector(
+    return GestureDetector(
         onTap: _closeProfile,
         behavior: HitTestBehavior.translucent,
         child: Stack(
@@ -296,8 +293,7 @@ class _ParticipantListPageState extends ConsumerState<ParticipantListPage> {
               ),
           ],
         ),
-      ),
-    );
+      );
   }
 
   Widget _buildSearchBar(bool isMobile) {

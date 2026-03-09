@@ -76,11 +76,16 @@ class ApiClient {
     String path, {
     dynamic body,
     bool auth = true,
+    Map<String, String>? queryParams,
     T Function(dynamic json)? parser,
   }) async {
     try {
+      var uri = Uri.parse('$baseUrl$path');
+      if (queryParams != null && queryParams.isNotEmpty) {
+        uri = uri.replace(queryParameters: queryParams);
+      }
       final response = await http.post(
-        Uri.parse('$baseUrl$path'),
+        uri,
         headers: await _headers(auth: auth),
         body: body != null ? jsonEncode(body) : null,
       );
@@ -145,11 +150,16 @@ class ApiClient {
     String path, {
     dynamic body,
     bool auth = true,
+    Map<String, String>? queryParams,
     T Function(dynamic json)? parser,
   }) async {
     try {
+      var uri = Uri.parse('$baseUrl$path');
+      if (queryParams != null && queryParams.isNotEmpty) {
+        uri = uri.replace(queryParameters: queryParams);
+      }
       final response = await http.put(
-        Uri.parse('$baseUrl$path'),
+        uri,
         headers: await _headers(auth: auth),
         body: body != null ? jsonEncode(body) : null,
       );
