@@ -63,7 +63,9 @@ class ApiClient {
 
       final response = await http.get(uri, headers: await _headers(auth: auth));
 
-      return _handleResponse(response, parser);
+      return _handleResponseWithRetry(response, parser, retryRequest: auth
+          ? () async => http.get(uri, headers: await _headers(auth: true))
+          : null);
     } catch (e) {
       return ApiResult.failure(
         ApiException(statusCode: 0, message: 'Network error: $e'),
@@ -79,13 +81,18 @@ class ApiClient {
     T Function(dynamic json)? parser,
   }) async {
     try {
+      final uri = Uri.parse('$baseUrl$path');
+      final encodedBody = body != null ? jsonEncode(body) : null;
+
       final response = await http.post(
-        Uri.parse('$baseUrl$path'),
+        uri,
         headers: await _headers(auth: auth),
-        body: body != null ? jsonEncode(body) : null,
+        body: encodedBody,
       );
 
-      return _handleResponse(response, parser);
+      return _handleResponseWithRetry(response, parser, retryRequest: auth
+          ? () async => http.post(uri, headers: await _headers(auth: true), body: encodedBody)
+          : null);
     } catch (e) {
       return ApiResult.failure(
         ApiException(statusCode: 0, message: 'Network error: $e'),
@@ -126,13 +133,18 @@ class ApiClient {
     T Function(dynamic json)? parser,
   }) async {
     try {
+      final uri = Uri.parse('$baseUrl$path');
+      final encodedBody = body != null ? jsonEncode(body) : null;
+
       final response = await http.patch(
-        Uri.parse('$baseUrl$path'),
+        uri,
         headers: await _headers(auth: auth),
-        body: body != null ? jsonEncode(body) : null,
+        body: encodedBody,
       );
 
-      return _handleResponse(response, parser);
+      return _handleResponseWithRetry(response, parser, retryRequest: auth
+          ? () async => http.patch(uri, headers: await _headers(auth: true), body: encodedBody)
+          : null);
     } catch (e) {
       return ApiResult.failure(
         ApiException(statusCode: 0, message: 'Network error: $e'),
@@ -148,13 +160,18 @@ class ApiClient {
     T Function(dynamic json)? parser,
   }) async {
     try {
+      final uri = Uri.parse('$baseUrl$path');
+      final encodedBody = body != null ? jsonEncode(body) : null;
+
       final response = await http.put(
-        Uri.parse('$baseUrl$path'),
+        uri,
         headers: await _headers(auth: auth),
-        body: body != null ? jsonEncode(body) : null,
+        body: encodedBody,
       );
 
-      return _handleResponse(response, parser);
+      return _handleResponseWithRetry(response, parser, retryRequest: auth
+          ? () async => http.put(uri, headers: await _headers(auth: true), body: encodedBody)
+          : null);
     } catch (e) {
       return ApiResult.failure(
         ApiException(statusCode: 0, message: 'Network error: $e'),
@@ -169,17 +186,48 @@ class ApiClient {
     T Function(dynamic json)? parser,
   }) async {
     try {
+      final uri = Uri.parse('$baseUrl$path');
+
       final response = await http.delete(
-        Uri.parse('$baseUrl$path'),
+        uri,
         headers: await _headers(auth: auth),
       );
 
-      return _handleResponse(response, parser);
+      return _handleResponseWithRetry(response, parser, retryRequest: auth
+          ? () async => http.delete(uri, headers: await _headers(auth: true))
+          : null);
     } catch (e) {
       return ApiResult.failure(
         ApiException(statusCode: 0, message: 'Network error: $e'),
       );
     }
+  }
+
+  /// Check if response indicates an expired/invalid token
+  bool _isAuthError(http.Response response) {
+    return response.statusCode == 401 || response.statusCode == 403;
+  }
+
+  /// Handle HTTP response, with automatic token refresh on auth errors.
+  /// [retryRequest] is called to retry the original request after token refresh.
+  Future<ApiResult<T>> _handleResponseWithRetry<T>(
+    http.Response response,
+    T Function(dynamic json)? parser, {
+    Future<http.Response> Function()? retryRequest,
+  }) async {
+    // If auth error and we have a retry function, try refreshing the token
+    if (_isAuthError(response) && retryRequest != null) {
+      final refreshed = await _authService.tryRefreshToken();
+      if (refreshed) {
+        final retryResponse = await retryRequest();
+        return _handleResponse(retryResponse, parser);
+      } else {
+        // Refresh failed — force logout so user gets redirected to login
+        await _authService.logout();
+      }
+    }
+
+    return _handleResponse(response, parser);
   }
 
   /// Handle HTTP response

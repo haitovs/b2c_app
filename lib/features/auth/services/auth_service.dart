@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -12,6 +14,7 @@ class AuthService extends ChangeNotifier {
 
   Map<String, dynamic>? _currentUser;
   String? _token;
+  String? _refreshToken;
   bool _isInitialized = false;
 
   // Lazy-initialized API client (can't be created in constructor due to circular dependency)
@@ -89,9 +92,13 @@ class AuthService extends ChangeNotifier {
 
     if (result.isSuccess && result.data != null) {
       _token = result.data!['access_token'];
+      _refreshToken = result.data!['refresh_token'];
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('auth_token', _token!);
+      if (_refreshToken != null) {
+        await prefs.setString('refresh_token', _refreshToken!);
+      }
       await prefs.setBool('remember_me', rememberMe);
 
       await _fetchCurrentUser();
@@ -124,9 +131,20 @@ class AuthService extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     if (prefs.containsKey('auth_token')) {
       _token = prefs.getString('auth_token');
+      _refreshToken = prefs.getString('refresh_token');
       await _fetchCurrentUser();
       if (_currentUser == null) {
-        await logout();
+        // Token might be expired — try refreshing
+        if (_refreshToken != null) {
+          final refreshed = await tryRefreshToken();
+          if (refreshed) {
+            await _fetchCurrentUser();
+          }
+        }
+        // If still no user after refresh attempt, logout
+        if (_currentUser == null) {
+          await logout();
+        }
       }
     }
     _isInitialized = true;
@@ -135,10 +153,41 @@ class AuthService extends ChangeNotifier {
 
   Future<void> logout() async {
     _token = null;
+    _refreshToken = null;
     _currentUser = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_token');
+    await prefs.remove('refresh_token');
     notifyListeners();
+  }
+
+  /// Try to refresh the access token using the stored refresh token.
+  /// Returns true if successful, false otherwise.
+  Future<bool> tryRefreshToken() async {
+    if (_refreshToken == null) return false;
+
+    try {
+      final response = await http.post(
+        Uri.parse('${AppConfig.b2cApiBaseUrl}/api/v1/auth/refresh'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'refresh_token': _refreshToken}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        _token = data['access_token'];
+        _refreshToken = data['refresh_token'];
+
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('auth_token', _token!);
+        await prefs.setString('refresh_token', _refreshToken!);
+        notifyListeners();
+        return true;
+      }
+    } catch (e) {
+      debugPrint('Token refresh failed: $e');
+    }
+    return false;
   }
 
   /// Register a new user. Returns null on success, or error message.
