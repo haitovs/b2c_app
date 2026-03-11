@@ -7,6 +7,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../core/providers/event_context_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_snackbar.dart';
+import '../../features/auth/providers/auth_provider.dart';
+import '../../features/events/ui/widgets/profile_dropdown.dart';
 import '../../features/notifications/providers/notification_providers.dart';
 import '../../features/shop/providers/shop_providers.dart';
 
@@ -53,67 +55,14 @@ class EventShellLayout extends ConsumerWidget {
     final unreadCount = ref.watch(unreadNotificationCountProvider);
 
     if (isDesktop) {
-      return Scaffold(
-        backgroundColor: AppTheme.backgroundColor,
-        body: Column(
-          children: [
-            _EventTopBar(
-              eventName: eventName,
-              eventId: eventId,
-              logoUrl: logoUrl,
-              unreadCount: unreadCount,
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-                child: Row(
-                  children: [
-                    // Sidebar — separate rounded card
-                    Container(
-                      width: 260,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.08),
-                            blurRadius: 16,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      clipBehavior: Clip.antiAlias,
-                      child: _EventSidebar(
-                        eventId: eventId,
-                        eventIdInt: eventIdInt,
-                        currentPath: currentPath,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    // Content — separate rounded card
-                    Expanded(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.08),
-                              blurRadius: 16,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        child: child,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
+      return _DesktopShell(
+        eventName: eventName,
+        eventId: eventId,
+        eventIdInt: eventIdInt,
+        logoUrl: logoUrl,
+        unreadCount: unreadCount,
+        currentPath: currentPath,
+        child: child,
       );
     }
 
@@ -130,8 +79,139 @@ class EventShellLayout extends ConsumerWidget {
   }
 }
 
-// Mobile shell — StatefulWidget so we can open the drawer via GlobalKey.
-class _MobileShell extends StatefulWidget {
+// Desktop shell — StatefulWidget to manage profile dropdown overlay.
+class _DesktopShell extends ConsumerStatefulWidget {
+  final String eventName;
+  final String eventId;
+  final int eventIdInt;
+  final String? logoUrl;
+  final int unreadCount;
+  final String currentPath;
+  final Widget child;
+
+  const _DesktopShell({
+    required this.eventName,
+    required this.eventId,
+    required this.eventIdInt,
+    required this.logoUrl,
+    required this.unreadCount,
+    required this.currentPath,
+    required this.child,
+  });
+
+  @override
+  ConsumerState<_DesktopShell> createState() => _DesktopShellState();
+}
+
+class _DesktopShellState extends ConsumerState<_DesktopShell> {
+  bool _isProfileOpen = false;
+
+  void _toggleProfile() {
+    setState(() => _isProfileOpen = !_isProfileOpen);
+  }
+
+  void _closeProfile() {
+    if (_isProfileOpen) setState(() => _isProfileOpen = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppTheme.backgroundColor,
+      body: Stack(
+        children: [
+          // Main content
+          Column(
+            children: [
+              _EventTopBar(
+                eventName: widget.eventName,
+                eventId: widget.eventId,
+                logoUrl: widget.logoUrl,
+                unreadCount: widget.unreadCount,
+                onProfileTap: _toggleProfile,
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 260,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.08),
+                              blurRadius: 16,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: _EventSidebar(
+                          eventId: widget.eventId,
+                          eventIdInt: widget.eventIdInt,
+                          currentPath: widget.currentPath,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.08),
+                                blurRadius: 16,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: widget.child,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          // Click-outside overlay to close dropdown
+          if (_isProfileOpen)
+            Positioned.fill(
+              child: GestureDetector(
+                onTap: _closeProfile,
+                behavior: HitTestBehavior.translucent,
+                child: Container(color: Colors.transparent),
+              ),
+            ),
+
+          // Profile dropdown
+          if (_isProfileOpen)
+            Positioned(
+              top: 105,
+              right: 28,
+              child: ProfileDropdown(
+                onLogout: () async {
+                  _closeProfile();
+                  await ref.read(authNotifierProvider.notifier).logout();
+                  if (context.mounted) context.go('/login');
+                },
+                onClose: _closeProfile,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// Mobile shell — ConsumerStatefulWidget for drawer + profile dropdown.
+class _MobileShell extends ConsumerStatefulWidget {
   final String eventName;
   final String eventId;
   final int eventIdInt;
@@ -151,11 +231,20 @@ class _MobileShell extends StatefulWidget {
   });
 
   @override
-  State<_MobileShell> createState() => _MobileShellState();
+  ConsumerState<_MobileShell> createState() => _MobileShellState();
 }
 
-class _MobileShellState extends State<_MobileShell> {
+class _MobileShellState extends ConsumerState<_MobileShell> {
   final _scaffoldKey = GlobalKey<ScaffoldState>();
+  bool _isProfileOpen = false;
+
+  void _toggleProfile() {
+    setState(() => _isProfileOpen = !_isProfileOpen);
+  }
+
+  void _closeProfile() {
+    if (_isProfileOpen) setState(() => _isProfileOpen = false);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -170,7 +259,11 @@ class _MobileShellState extends State<_MobileShell> {
           logoUrl: widget.logoUrl,
           unreadCount: widget.unreadCount,
           showMenuButton: true,
-          onMenuPressed: () => _scaffoldKey.currentState?.openDrawer(),
+          onMenuPressed: () {
+            _closeProfile();
+            _scaffoldKey.currentState?.openDrawer();
+          },
+          onProfileTap: _toggleProfile,
         ),
       ),
       drawer: Drawer(
@@ -184,7 +277,37 @@ class _MobileShellState extends State<_MobileShell> {
           ),
         ),
       ),
-      body: widget.child,
+      body: Stack(
+        children: [
+          widget.child,
+
+          // Click-outside overlay
+          if (_isProfileOpen)
+            Positioned.fill(
+              child: GestureDetector(
+                onTap: _closeProfile,
+                behavior: HitTestBehavior.translucent,
+                child: Container(color: Colors.transparent),
+              ),
+            ),
+
+          // Profile dropdown
+          if (_isProfileOpen)
+            Positioned(
+              top: 5,
+              right: 16,
+              left: 16,
+              child: ProfileDropdown(
+                onLogout: () async {
+                  _closeProfile();
+                  await ref.read(authNotifierProvider.notifier).logout();
+                  if (context.mounted) context.go('/login');
+                },
+                onClose: _closeProfile,
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -200,6 +323,7 @@ class _EventTopBar extends StatelessWidget {
   final int unreadCount;
   final bool showMenuButton;
   final VoidCallback? onMenuPressed;
+  final VoidCallback? onProfileTap;
 
   const _EventTopBar({
     required this.eventName,
@@ -208,6 +332,7 @@ class _EventTopBar extends StatelessWidget {
     required this.unreadCount,
     this.showMenuButton = false,
     this.onMenuPressed,
+    this.onProfileTap,
   });
 
   @override
@@ -301,7 +426,7 @@ class _EventTopBar extends StatelessWidget {
               height: actionIconSize,
             ),
             tooltip: 'Profile',
-            onPressed: () => context.go('/profile'),
+            onPressed: onProfileTap ?? () => context.go('/profile'),
           ),
         ],
       ),

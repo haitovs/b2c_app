@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
@@ -57,6 +58,9 @@ const List<String> _countries = [
   'Ukraine', 'United Arab Emirates', 'United Kingdom', 'United States',
   'Uruguay', 'Uzbekistan', 'Vanuatu', 'Vatican City', 'Venezuela',
   'Vietnam', 'Yemen', 'Zambia', 'Zimbabwe',
+  // Historical countries (for place of birth)
+  'USSR (Soviet Union)', 'Yugoslavia', 'Czechoslovakia',
+  'East Germany (GDR)', 'West Germany (FRG)',
 ];
 
 const List<String> _passportTypes = [
@@ -98,12 +102,19 @@ class _VisaApplicationFormPageState
   List<Map<String, dynamic>> _allVisas = [];
   int _selectedVisaIndex = 0;
   String? _visaId;
+  String _currentVisaStatus = 'FILL_OUT';
   bool _isSwitchingTab = false;
   bool _isCreatingVisa = false;
+  bool _isLoadingCities = false;
+
+  // City data loaded from csc_picker_plus asset
+  static Map<String, List<String>>? _cityCache;
+  List<String> _availableCities = [];
 
   // Personal Information Controllers
   final _nameController = TextEditingController();
   final _surnameController = TextEditingController();
+  final _fatherNameController = TextEditingController();
   final _surnameAtBirthController = TextEditingController();
   final _placeOfBirthController = TextEditingController();
   final _countryOfBirthController = TextEditingController();
@@ -164,6 +175,7 @@ class _VisaApplicationFormPageState
   void dispose() {
     _nameController.dispose();
     _surnameController.dispose();
+    _fatherNameController.dispose();
     _surnameAtBirthController.dispose();
     _placeOfBirthController.dispose();
     _countryOfBirthController.dispose();
@@ -199,6 +211,14 @@ class _VisaApplicationFormPageState
   Future<void> _loadVisaData() async {
     try {
       if (!mounted) return;
+
+      if (widget.eventId <= 0) {
+        setState(() {
+          _errorMessage = 'Invalid event. Please go back and try again.';
+          _isLoading = false;
+        });
+        return;
+      }
 
       final visaService = ref.read(visaServiceProvider);
 
@@ -252,11 +272,13 @@ class _VisaApplicationFormPageState
   /// Load a single visa's data into all form controllers.
   Future<void> _loadVisaIntoForm(Map<String, dynamic> visa) async {
     _visaId = visa['id'] as String?;
+    _currentVisaStatus = visa['status'] as String? ?? 'FILL_OUT';
 
     // Pre-fill form data
     _nameController.text = visa['first_name'] ?? '';
     _surnameController.text = visa['last_name'] ?? '';
     _surnameAtBirthController.text = visa['surname_at_birth'] ?? '';
+    _fatherNameController.text = visa['father_name'] ?? '';
     _gender = visa['gender'];
     _placeOfBirthController.text = visa['place_of_birth'] ?? '';
     _countryOfBirthController.text = visa['country_of_birth'] ?? '';
@@ -267,8 +289,13 @@ class _VisaApplicationFormPageState
         ? DateTime.parse(visa['date_of_birth'])
         : null;
 
-    // Passport
-    _typeOfPassport = visa['type_of_passport'];
+    // Passport (migrate legacy 'Ordinary' value)
+    final rawPassportType = visa['type_of_passport'] as String?;
+    if (rawPassportType == 'Ordinary') {
+      _typeOfPassport = 'P - Milli Pasport (National)';
+    } else {
+      _typeOfPassport = rawPassportType;
+    }
     _passportNumberController.text = visa['passport_number'] ?? '';
     _passportDateIssue = visa['passport_date_of_issue'] != null
         ? DateTime.parse(visa['passport_date_of_issue'])
@@ -354,6 +381,13 @@ class _VisaApplicationFormPageState
       }
     }
 
+    // Load cities for the country of birth
+    if (_countryOfBirthController.text.isNotEmpty) {
+      _loadCitiesForCountry(_countryOfBirthController.text);
+    } else {
+      _availableCities = [];
+    }
+
     // Reset photo/scan state for new visa
     _photoFile = null;
     _photoBytes = null;
@@ -373,6 +407,7 @@ class _VisaApplicationFormPageState
       'first_name': _nameController.text.trim(),
       'last_name': _surnameController.text.trim(),
       'surname_at_birth': _surnameAtBirthController.text.trim(),
+      'father_name': _fatherNameController.text.trim(),
       'gender': _gender,
       'place_of_birth': _placeOfBirthController.text.trim(),
       'country_of_birth': _countryOfBirthController.text.trim(),
@@ -424,9 +459,87 @@ class _VisaApplicationFormPageState
     };
   }
 
+  // ---------------------------------------------------------------------------
+  // STATUS & EDIT RESTRICTIONS
+  // ---------------------------------------------------------------------------
+
+  bool get _isVisaEditable =>
+      _currentVisaStatus == 'FILL_OUT' ||
+      _currentVisaStatus == 'NOT_STARTED' ||
+      _currentVisaStatus == 'DECLINED';
+
+  Color _statusColor(String status) {
+    switch (status) {
+      case 'PENDING':
+        return const Color(0xFFE89B0C);
+      case 'APPROVED':
+        return _greenColor;
+      case 'DECLINED':
+        return _redColor;
+      default:
+        return _primaryColor;
+    }
+  }
+
+  String _statusLabel(String status) {
+    switch (status) {
+      case 'PENDING':
+        return 'Under Review';
+      case 'APPROVED':
+        return 'Approved';
+      case 'DECLINED':
+        return 'Declined';
+      default:
+        return 'Draft';
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // CITY CACHE
+  // ---------------------------------------------------------------------------
+
+  Future<void> _loadCityCache() async {
+    if (_cityCache != null) return;
+    try {
+      final jsonStr = await rootBundle.loadString(
+        'packages/csc_picker_plus/lib/assets/countries.json',
+      );
+      final List<dynamic> data = json.decode(jsonStr);
+      final map = <String, List<String>>{};
+      for (final country in data) {
+        final name = country['name'] as String;
+        final cities = <String>{};
+        for (final state in (country['state'] as List? ?? [])) {
+          for (final city in (state['city'] as List? ?? [])) {
+            cities.add(city['name'] as String);
+          }
+        }
+        final sorted = cities.toList()..sort();
+        map[name] = sorted;
+      }
+      _cityCache = map;
+    } catch (_) {
+      _cityCache = {};
+    }
+  }
+
+  Future<void> _loadCitiesForCountry(String country) async {
+    setState(() => _isLoadingCities = true);
+    try {
+      await _loadCityCache();
+      if (mounted) {
+        setState(() {
+          _availableCities = _cityCache?[country] ?? [];
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _isLoadingCities = false);
+    }
+  }
+
   /// Silently save current visa form data without submitting.
   Future<void> _saveCurrentVisa() async {
-    if (_visaId == null) return;
+    if (_visaId == null || !_isVisaEditable) return;
     try {
       final visaService = ref.read(visaServiceProvider);
       final formData = _buildFormData();
@@ -752,6 +865,16 @@ class _VisaApplicationFormPageState
   }
 
   Future<void> submitForm() async {
+    if (!_isVisaEditable) {
+      AppSnackBar.showError(
+        context,
+        _currentVisaStatus == 'PENDING'
+            ? 'Your visa application is under review and cannot be edited.'
+            : 'This visa application has been approved and cannot be modified.',
+      );
+      return;
+    }
+
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -955,19 +1078,35 @@ class _VisaApplicationFormPageState
                       _buildVisaTabs(),
                       const SizedBox(height: 16),
 
-                      // 5. Main form card
-                      _buildMainFormCard(),
+                      // 5. Status banner (when not editable)
+                      if (!_isVisaEditable) ...[
+                        _buildStatusBanner(),
+                        const SizedBox(height: 16),
+                      ],
+
+                      // 6. Main form card + Marital status (disabled when not editable)
+                      IgnorePointer(
+                        ignoring: !_isVisaEditable,
+                        child: Opacity(
+                          opacity: _isVisaEditable ? 1.0 : 0.6,
+                          child: Column(
+                            children: [
+                              _buildMainFormCard(),
+                              const SizedBox(height: 24),
+                              _buildMaritalStatusCard(),
+                            ],
+                          ),
+                        ),
+                      ),
                       const SizedBox(height: 24),
 
-                      // 6. Marital status card
-                      _buildMaritalStatusCard(),
-                      const SizedBox(height: 24),
+                      // 7. Confirmation checkbox (only when editable)
+                      if (_isVisaEditable) ...[
+                        _buildConfirmationCheckbox(),
+                        const SizedBox(height: 24),
+                      ],
 
-                      // 7. Confirmation checkbox
-                      _buildConfirmationCheckbox(),
-                      const SizedBox(height: 24),
-
-                      // 8. Cancel + Submit buttons
+                      // 8. Conditional buttons
                       _buildButtonRow(),
                       const SizedBox(height: 32),
                     ],
@@ -1078,48 +1217,57 @@ class _VisaApplicationFormPageState
     final isActive = index == _selectedVisaIndex;
     final visa = _allVisas[index];
     final status = visa['status'] as String? ?? 'FILL_OUT';
+    final isEditable = status == 'FILL_OUT' || status == 'NOT_STARTED' || status == 'DECLINED';
     final isSubmitted = status == 'PENDING' || status == 'APPROVED';
+    final statusCol = _statusColor(status);
 
-    return Padding(
-      padding: const EdgeInsets.only(right: 2),
-      child: InkWell(
-        onTap: () => _switchToVisa(index),
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(10),
-          topRight: Radius.circular(10),
-        ),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          decoration: BoxDecoration(
-            color: isActive ? Colors.white : const Color(0xFFE8E8F0),
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(10),
-              topRight: Radius.circular(10),
-            ),
-            border: isActive
-                ? Border.all(color: _primaryColor, width: 1.5)
-                : null,
+    return Tooltip(
+      message: _statusLabel(status),
+      child: Padding(
+        padding: const EdgeInsets.only(right: 2),
+        child: InkWell(
+          onTap: () => _switchToVisa(index),
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(10),
+            topRight: Radius.circular(10),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Visa ${index + 1}',
-                style: TextStyle(
-                  color: isActive ? _primaryColor : Colors.black87,
-                  fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-                  fontSize: 13,
-                ),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: isActive && !isEditable
+                  ? statusCol.withAlpha(20)
+                  : isActive
+                      ? Colors.white
+                      : const Color(0xFFE8E8F0),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(10),
+                topRight: Radius.circular(10),
               ),
-              if (isSubmitted) ...[
-                const SizedBox(width: 6),
-                Icon(
-                  status == 'APPROVED' ? Icons.check_circle : Icons.schedule,
-                  size: 14,
-                  color: status == 'APPROVED' ? _greenColor : const Color(0xFFB39656),
+              border: isActive
+                  ? Border.all(color: isEditable ? _primaryColor : statusCol, width: 1.5)
+                  : null,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Visa ${index + 1}',
+                  style: TextStyle(
+                    color: isActive ? (isEditable ? _primaryColor : statusCol) : Colors.black87,
+                    fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+                    fontSize: 13,
+                  ),
                 ),
+                if (isSubmitted) ...[
+                  const SizedBox(width: 6),
+                  Icon(
+                    status == 'APPROVED' ? Icons.check_circle : Icons.schedule,
+                    size: 14,
+                    color: status == 'APPROVED' ? _greenColor : const Color(0xFFB39656),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
@@ -1173,6 +1321,72 @@ class _VisaApplicationFormPageState
                 fontSize: 14,
                 height: 1.4,
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusBanner() {
+    final isPending = _currentVisaStatus == 'PENDING';
+    final isApproved = _currentVisaStatus == 'APPROVED';
+    final statusCol = _statusColor(_currentVisaStatus);
+
+    final String title;
+    final String message;
+    final IconData icon;
+
+    if (isPending) {
+      title = 'Application Under Review';
+      message = 'This visa application has been submitted and is being reviewed. '
+          'You cannot edit it. To apply for another person, tap "+ Add" above.';
+      icon = Icons.schedule;
+    } else if (isApproved) {
+      title = 'Visa Approved';
+      message = 'This visa application has been approved. '
+          'To apply for another person, tap "+ Add" above.';
+      icon = Icons.check_circle;
+    } else {
+      title = 'Visa Declined';
+      message = 'This visa was declined. You can edit and resubmit it.';
+      icon = Icons.cancel;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: statusCol.withAlpha(15),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: statusCol.withAlpha(80), width: 1.5),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: statusCol, size: 24),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: statusCol,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  message,
+                  style: TextStyle(
+                    fontSize: 14,
+                    height: 1.4,
+                    color: statusCol.withAlpha(200),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -1344,10 +1558,59 @@ class _VisaApplicationFormPageState
 
   Widget _buildButtonRow() {
     final isMobile = MediaQuery.of(context).size.width < 600;
+
+    // Non-editable: show "Back" + "Add New Visa"
+    if (!_isVisaEditable) {
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          SizedBox(
+            width: isMobile ? null : 183,
+            height: 43,
+            child: OutlinedButton(
+              onPressed: () => context.pop(),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF666666),
+                side: const BorderSide(color: _borderColor),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(5),
+                ),
+                padding: EdgeInsets.symmetric(horizontal: isMobile ? 24 : 16),
+              ),
+              child: const Text(
+                'Back',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          SizedBox(
+            height: 43,
+            child: ElevatedButton.icon(
+              onPressed: _isCreatingVisa ? null : _addNewVisa,
+              icon: const Icon(Icons.add, size: 20),
+              label: const Text(
+                'Add New Visa',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _primaryColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(5),
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    // Editable: show "Cancel" + "Submit"
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        // Cancel button
         SizedBox(
           width: isMobile ? null : 183,
           height: 43,
@@ -1368,7 +1631,6 @@ class _VisaApplicationFormPageState
           ),
         ),
         const SizedBox(width: 16),
-        // Submit button
         SizedBox(
           width: isMobile ? null : 183,
           height: 43,
@@ -1431,6 +1693,7 @@ class _VisaApplicationFormPageState
                 children: [
                   _buildTextField('Name:', _nameController, 'John', true),
                   _buildTextField('Surname:', _surnameController, 'Smith', true),
+                  _buildTextField('Middle name:', _fatherNameController, 'Middle name', true),
                 ],
               ),
             ),
@@ -1447,12 +1710,15 @@ class _VisaApplicationFormPageState
           }, '1990-05-20'),
         ),
         _buildFieldRow(
-          left: _buildTextField('Surname at birth:', _surnameAtBirthController, 'Maiden name (if different)', false, true),
+          left: _buildTextField('Surname at birth:', _surnameAtBirthController, 'Maiden name (if different)', false, true, _gender != null),
           right: _buildCountryPickerField('Citizenship:', _citizenshipController, true),
         ),
         _buildFieldRow(
-          left: _buildCountryPickerField('Country of birth:', _countryOfBirthController, true),
-          right: _buildTextField('Place of birth (City):', _placeOfBirthController, 'New York', true),
+          left: _buildCountryPickerField('Country of birth:', _countryOfBirthController, true, () {
+            _placeOfBirthController.clear();
+            _loadCitiesForCountry(_countryOfBirthController.text);
+          }),
+          right: _buildCityPickerField(),
         ),
 
         // Passport section – paired rows
@@ -1514,6 +1780,7 @@ class _VisaApplicationFormPageState
         _buildPhotoUploadSection(),
         _buildTextField('Name:', _nameController, 'John', true),
         _buildTextField('Surname:', _surnameController, 'Smith', true),
+        _buildTextField('Middle name:', _fatherNameController, 'Middle name', true),
         _buildGenderDropdown(),
         _buildTextField(
           'Surname at birth:',
@@ -1521,18 +1788,18 @@ class _VisaApplicationFormPageState
           'Maiden name (if different)',
           false,
           true,
+          _gender != null,
         ),
         _buildCountryPickerField(
           'Country of birth:',
           _countryOfBirthController,
           true,
+          () {
+            _placeOfBirthController.clear();
+            _loadCitiesForCountry(_countryOfBirthController.text);
+          },
         ),
-        _buildTextField(
-          'Place of birth (City):',
-          _placeOfBirthController,
-          'New York',
-          true,
-        ),
+        _buildCityPickerField(),
         _buildDateField('Date of birth:', null, _dateOfBirth, (date) {
           setState(() => _dateOfBirth = date);
         }, '1990-05-20'),
@@ -1628,38 +1895,43 @@ class _VisaApplicationFormPageState
     String? hintText,
     bool isRequired = false,
     bool isOptional = false,
+    bool enabled = true,
   ]) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w500,
-              fontFamily: 'Inter',
-              color: isOptional ? _optionalLabelColor : const Color(0xFF1E1E1E),
+      child: Opacity(
+        opacity: enabled ? 1.0 : 0.5,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w500,
+                fontFamily: 'Inter',
+                color: isOptional ? _optionalLabelColor : const Color(0xFF1E1E1E),
+              ),
             ),
-          ),
-          const SizedBox(height: 6),
-          SizedBox(
-            height: 50,
-            child: TextFormField(
-              controller: controller,
-              validator: isRequired
-                  ? (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'This field is required';
+            const SizedBox(height: 6),
+            SizedBox(
+              height: 50,
+              child: TextFormField(
+                controller: controller,
+                enabled: enabled,
+                validator: isRequired
+                    ? (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'This field is required';
+                        }
+                        return null;
                       }
-                      return null;
-                    }
-                  : null,
-              decoration: _inputDecoration(hintText: hintText),
+                    : null,
+                decoration: _inputDecoration(hintText: hintText),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1832,7 +2104,7 @@ class _VisaApplicationFormPageState
     );
   }
 
-  void _showCountryPickerDialog(TextEditingController controller) {
+  void _showCountryPickerDialog(TextEditingController controller, [VoidCallback? onChanged]) {
     String searchQuery = '';
     showDialog(
       context: context,
@@ -1900,6 +2172,7 @@ class _VisaApplicationFormPageState
                                     controller.text = country;
                                     Navigator.of(ctx).pop();
                                     setState(() {});
+                                    onChanged?.call();
                                   },
                                 );
                               },
@@ -1925,6 +2198,7 @@ class _VisaApplicationFormPageState
     String label,
     TextEditingController controller, [
     bool isRequired = false,
+    VoidCallback? onChanged,
   ]) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
@@ -1946,7 +2220,7 @@ class _VisaApplicationFormPageState
             child: TextFormField(
               controller: controller,
               readOnly: true,
-              onTap: () => _showCountryPickerDialog(controller),
+              onTap: () => _showCountryPickerDialog(controller, onChanged),
               validator: isRequired
                   ? (value) {
                       if (value == null || value.trim().isEmpty) {
@@ -1965,6 +2239,174 @@ class _VisaApplicationFormPageState
                     height: 18,
                   ),
                 ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // CITY PICKER
+  // ---------------------------------------------------------------------------
+
+  void _showCityPickerDialog() {
+    String searchQuery = '';
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            final filtered = searchQuery.isEmpty
+                ? _availableCities
+                : _availableCities
+                    .where((c) => c.toLowerCase().contains(searchQuery.toLowerCase()))
+                    .toList();
+            return AlertDialog(
+              title: const Text('Select City'),
+              content: SizedBox(
+                width: MediaQuery.of(context).size.width < 600 ? 280 : 340,
+                height: 450,
+                child: Column(
+                  children: [
+                    TextField(
+                      autofocus: true,
+                      decoration: InputDecoration(
+                        hintText: 'Search city...',
+                        prefixIcon: const Icon(Icons.search),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                      ),
+                      onChanged: (value) =>
+                          setDialogState(() => searchQuery = value),
+                    ),
+                    const SizedBox(height: 8),
+                    Expanded(
+                      child: filtered.isEmpty
+                          ? Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Text('No cities found'),
+                                  if (searchQuery.isNotEmpty) ...[
+                                    const SizedBox(height: 12),
+                                    TextButton(
+                                      onPressed: () {
+                                        _placeOfBirthController.text =
+                                            searchQuery;
+                                        Navigator.of(ctx).pop();
+                                        setState(() {});
+                                      },
+                                      child: Text('Use "$searchQuery"'),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            )
+                          : ListView.builder(
+                              itemCount: filtered.length,
+                              itemBuilder: (ctx, index) {
+                                final city = filtered[index];
+                                final isSelected =
+                                    _placeOfBirthController.text == city;
+                                return ListTile(
+                                  dense: true,
+                                  title: Text(
+                                    city,
+                                    style: TextStyle(
+                                      fontWeight: isSelected
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                      color:
+                                          isSelected ? _primaryColor : null,
+                                    ),
+                                  ),
+                                  trailing: isSelected
+                                      ? const Icon(Icons.check,
+                                          color: _primaryColor, size: 20)
+                                      : null,
+                                  onTap: () {
+                                    _placeOfBirthController.text = city;
+                                    Navigator.of(ctx).pop();
+                                    setState(() {});
+                                  },
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: const Text('Cancel'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildCityPickerField() {
+    final hasCities = _availableCities.isNotEmpty;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Place of birth (City):',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w500,
+              fontFamily: 'Inter',
+              color: Color(0xFF1E1E1E),
+            ),
+          ),
+          const SizedBox(height: 6),
+          SizedBox(
+            height: 50,
+            child: TextFormField(
+              controller: _placeOfBirthController,
+              readOnly: hasCities || _isLoadingCities,
+              onTap: hasCities ? () => _showCityPickerDialog() : null,
+              validator: (v) =>
+                  (v == null || v.trim().isEmpty) ? 'This field is required' : null,
+              decoration: _inputDecoration(
+                hintText: _isLoadingCities
+                    ? 'Loading cities...'
+                    : (hasCities ? 'Select city' : 'Enter city'),
+                suffixIcon: _isLoadingCities
+                    ? const Padding(
+                        padding: EdgeInsets.all(14),
+                        child: SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: _primaryColor,
+                          ),
+                        ),
+                      )
+                    : hasCities
+                        ? Padding(
+                            padding: const EdgeInsets.all(14),
+                            child: SvgPicture.asset(
+                              'assets/visa_application/icons/chevron-down.svg',
+                              width: 18,
+                              height: 18,
+                            ),
+                          )
+                        : null,
               ),
             ),
           ),
