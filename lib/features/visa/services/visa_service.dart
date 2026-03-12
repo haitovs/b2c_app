@@ -14,11 +14,16 @@ class VisaService {
 
   String get _baseUrl => '${AppConfig.b2cApiBaseUrl}/api/v1/visas';
 
-  Future<String?> _getToken() async {
+  Future<String> _getToken() async {
     final token = await authService.getToken();
     if (token == null) throw Exception('Not authenticated');
     return token;
   }
+
+  Map<String, String> _authHeaders(String token) => {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      };
 
   /// Build query parameters from optional participantId and eventId
   String _buildQueryParams({String? participantId, int? eventId}) {
@@ -29,14 +34,47 @@ class VisaService {
     return '?${params.entries.map((e) => '${e.key}=${e.value}').join('&')}';
   }
 
+  /// Parse error from response body, handling CORS-blocked empty bodies
+  String _parseError(http.Response response, String fallback) {
+    try {
+      if (response.body.isEmpty) return fallback;
+      final error = jsonDecode(response.body);
+      if (error is Map<String, dynamic>) {
+        return error['message'] ?? error['detail'] ?? fallback;
+      }
+      return fallback;
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  /// Execute request with automatic token refresh on 401/403
+  Future<http.Response> _withRetry(
+    Future<http.Response> Function(String token) request,
+  ) async {
+    var token = await _getToken();
+    var response = await request(token);
+
+    if (response.statusCode == 401 || response.statusCode == 403) {
+      final refreshed = await authService.tryRefreshToken();
+      if (refreshed) {
+        token = await _getToken();
+        response = await request(token);
+      }
+    }
+
+    return response;
+  }
+
   /// List all visa applications for the current user and event.
   Future<List<Map<String, dynamic>>> listMyVisas({int? eventId}) async {
-    final token = await _getToken();
     final query = _buildQueryParams(eventId: eventId);
 
-    final response = await http.get(
-      Uri.parse('$_baseUrl/my-visas$query'),
-      headers: {'Authorization': 'Bearer $token'},
+    final response = await _withRetry(
+      (token) => http.get(
+        Uri.parse('$_baseUrl/my-visas$query'),
+        headers: _authHeaders(token),
+      ),
     );
 
     if (response.statusCode == 200) {
@@ -44,43 +82,41 @@ class VisaService {
       return list.cast<Map<String, dynamic>>();
     }
 
-    final error = jsonDecode(response.body);
-    throw Exception(error['message'] ?? error['detail'] ?? 'Failed to list visa applications');
+    throw Exception(_parseError(response, 'Failed to list visa applications'));
   }
 
   /// Create a new blank visa application.
   Future<Map<String, dynamic>> createMyVisa({int? eventId}) async {
-    final token = await _getToken();
     final query = _buildQueryParams(eventId: eventId);
 
-    final response = await http.post(
-      Uri.parse('$_baseUrl/my-visa/create$query'),
-      headers: {'Authorization': 'Bearer $token'},
+    final response = await _withRetry(
+      (token) => http.post(
+        Uri.parse('$_baseUrl/my-visa/create$query'),
+        headers: _authHeaders(token),
+      ),
     );
 
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }
 
-    final error = jsonDecode(response.body);
-    throw Exception(error['message'] ?? error['detail'] ?? 'Failed to create visa application');
+    throw Exception(_parseError(response, 'Failed to create visa application'));
   }
 
   /// Get a specific visa application by ID.
   Future<Map<String, dynamic>> getMyVisaById(String visaId) async {
-    final token = await _getToken();
-
-    final response = await http.get(
-      Uri.parse('$_baseUrl/my-visa/$visaId'),
-      headers: {'Authorization': 'Bearer $token'},
+    final response = await _withRetry(
+      (token) => http.get(
+        Uri.parse('$_baseUrl/my-visa/$visaId'),
+        headers: _authHeaders(token),
+      ),
     );
 
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }
 
-    final error = jsonDecode(response.body);
-    throw Exception(error['message'] ?? error['detail'] ?? 'Failed to load visa application');
+    throw Exception(_parseError(response, 'Failed to load visa application'));
   }
 
   /// Get or create visa application for the current user (backward compat).
@@ -88,20 +124,21 @@ class VisaService {
     String? participantId,
     int? eventId,
   }) async {
-    final token = await _getToken();
-    final query = _buildQueryParams(participantId: participantId, eventId: eventId);
+    final query =
+        _buildQueryParams(participantId: participantId, eventId: eventId);
 
-    final response = await http.get(
-      Uri.parse('$_baseUrl/my-visa$query'),
-      headers: {'Authorization': 'Bearer $token'},
+    final response = await _withRetry(
+      (token) => http.get(
+        Uri.parse('$_baseUrl/my-visa$query'),
+        headers: _authHeaders(token),
+      ),
     );
 
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }
 
-    final error = jsonDecode(response.body);
-    throw Exception(error['message'] ?? error['detail'] ?? 'Failed to load visa application');
+    throw Exception(_parseError(response, 'Failed to load visa application'));
   }
 
   /// Update a specific visa application by ID.
@@ -109,23 +146,20 @@ class VisaService {
     required String visaId,
     required Map<String, dynamic> data,
   }) async {
-    final token = await _getToken();
-
-    final response = await http.put(
-      Uri.parse('$_baseUrl/my-visa/$visaId'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode(data),
+    final response = await _withRetry(
+      (token) => http.put(
+        Uri.parse('$_baseUrl/my-visa/$visaId'),
+        headers: _authHeaders(token),
+        body: jsonEncode(data),
+      ),
     );
 
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }
 
-    final error = jsonDecode(response.body);
-    throw Exception(error['message'] ?? error['detail'] ?? 'Failed to update visa application');
+    throw Exception(
+        _parseError(response, 'Failed to update visa application'));
   }
 
   /// Update visa application with form data (backward compat).
@@ -134,41 +168,40 @@ class VisaService {
     int? eventId,
     required Map<String, dynamic> data,
   }) async {
-    final token = await _getToken();
-    final query = _buildQueryParams(participantId: participantId, eventId: eventId);
+    final query =
+        _buildQueryParams(participantId: participantId, eventId: eventId);
 
-    final response = await http.put(
-      Uri.parse('$_baseUrl/my-visa$query'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode(data),
+    final response = await _withRetry(
+      (token) => http.put(
+        Uri.parse('$_baseUrl/my-visa$query'),
+        headers: _authHeaders(token),
+        body: jsonEncode(data),
+      ),
     );
 
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }
 
-    final error = jsonDecode(response.body);
-    throw Exception(error['message'] ?? error['detail'] ?? 'Failed to update visa application');
+    throw Exception(
+        _parseError(response, 'Failed to update visa application'));
   }
 
   /// Submit a specific visa application by ID for review.
   Future<Map<String, dynamic>> submitMyVisaById(String visaId) async {
-    final token = await _getToken();
-
-    final response = await http.post(
-      Uri.parse('$_baseUrl/my-visa/$visaId/submit'),
-      headers: {'Authorization': 'Bearer $token'},
+    final response = await _withRetry(
+      (token) => http.post(
+        Uri.parse('$_baseUrl/my-visa/$visaId/submit'),
+        headers: _authHeaders(token),
+      ),
     );
 
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }
 
-    final error = jsonDecode(response.body);
-    throw Exception(error['message'] ?? error['detail'] ?? 'Failed to submit visa application');
+    throw Exception(
+        _parseError(response, 'Failed to submit visa application'));
   }
 
   /// Submit visa application for review (backward compat).
@@ -176,20 +209,22 @@ class VisaService {
     String? participantId,
     int? eventId,
   }) async {
-    final token = await _getToken();
-    final query = _buildQueryParams(participantId: participantId, eventId: eventId);
+    final query =
+        _buildQueryParams(participantId: participantId, eventId: eventId);
 
-    final response = await http.post(
-      Uri.parse('$_baseUrl/my-visa/submit$query'),
-      headers: {'Authorization': 'Bearer $token'},
+    final response = await _withRetry(
+      (token) => http.post(
+        Uri.parse('$_baseUrl/my-visa/submit$query'),
+        headers: _authHeaders(token),
+      ),
     );
 
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }
 
-    final error = jsonDecode(response.body);
-    throw Exception(error['message'] ?? error['detail'] ?? 'Failed to submit visa application');
+    throw Exception(
+        _parseError(response, 'Failed to submit visa application'));
   }
 
   /// Validate visa application without submitting
@@ -197,20 +232,22 @@ class VisaService {
     String? participantId,
     int? eventId,
   }) async {
-    final token = await _getToken();
-    final query = _buildQueryParams(participantId: participantId, eventId: eventId);
+    final query =
+        _buildQueryParams(participantId: participantId, eventId: eventId);
 
-    final response = await http.get(
-      Uri.parse('$_baseUrl/my-visa/validate$query'),
-      headers: {'Authorization': 'Bearer $token'},
+    final response = await _withRetry(
+      (token) => http.get(
+        Uri.parse('$_baseUrl/my-visa/validate$query'),
+        headers: _authHeaders(token),
+      ),
     );
 
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }
 
-    final error = jsonDecode(response.body);
-    throw Exception(error['message'] ?? error['detail'] ?? 'Failed to validate visa application');
+    throw Exception(
+        _parseError(response, 'Failed to validate visa application'));
   }
 
   /// Upload visa photo to server
@@ -257,6 +294,6 @@ class VisaService {
       return data['url'] as String;
     }
 
-    throw Exception('Failed to upload photo: $responseData');
+    throw Exception('Failed to upload photo');
   }
 }

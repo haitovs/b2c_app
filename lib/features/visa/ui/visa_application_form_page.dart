@@ -634,23 +634,31 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
   }
 
   Future<void> _pickImage() async {
-    final XFile? image = await _imagePicker.pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 800,
-      maxHeight: 800,
-      imageQuality: 85,
-    );
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
 
-    if (image != null) {
-      if (kIsWeb) {
-        final bytes = await image.readAsBytes();
-        setState(() {
-          _photoBytes = bytes;
-        });
-      } else {
-        setState(() {
-          _photoFile = File(image.path);
-        });
+      if (image != null && mounted) {
+        if (kIsWeb) {
+          final bytes = await image.readAsBytes();
+          if (mounted) setState(() => _photoBytes = bytes);
+        } else {
+          setState(() => _photoFile = File(image.path));
+        }
+      }
+    } catch (e) {
+      debugPrint('Image picker error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to pick image. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }
@@ -663,23 +671,31 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
   }
 
   Future<void> _pickPassportScan() async {
-    final XFile? image = await _imagePicker.pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 1200,
-      maxHeight: 1200,
-      imageQuality: 85,
-    );
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        imageQuality: 85,
+      );
 
-    if (image != null) {
-      if (kIsWeb) {
-        final bytes = await image.readAsBytes();
-        setState(() {
-          _passportScanBytes = bytes;
-        });
-      } else {
-        setState(() {
-          _passportScanFile = File(image.path);
-        });
+      if (image != null && mounted) {
+        if (kIsWeb) {
+          final bytes = await image.readAsBytes();
+          if (mounted) setState(() => _passportScanBytes = bytes);
+        } else {
+          setState(() => _passportScanFile = File(image.path));
+        }
+      }
+    } catch (e) {
+      debugPrint('Passport scan picker error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to pick image. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }
@@ -1095,15 +1111,25 @@ class _VisaApplicationFormPageState extends State<VisaApplicationFormPage> {
       final visaId = _allVisas[_selectedVisaIndex]['id'] as String;
       final visaService = context.read<VisaService>();
 
-      // Delete via API — use the update endpoint to mark as deleted,
-      // or call the service. For now we use a DELETE-like approach:
-      // The backend should support deletion. Use a raw HTTP delete.
+      // Delete via API
       final authService = context.read<AuthService>();
-      final token = await authService.getToken();
-      final response = await http.delete(
-        Uri.parse('${AppConfig.b2cApiBaseUrl}/api/v1/visas/my-visa/$visaId'),
-        headers: {'Authorization': 'Bearer $token'},
-      );
+      Future<http.Response> doDelete() async {
+        final token = await authService.getToken();
+        return http.delete(
+          Uri.parse('${AppConfig.b2cApiBaseUrl}/api/v1/visas/my-visa/$visaId'),
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        );
+      }
+
+      var response = await doDelete();
+      // Retry on auth error
+      if (response.statusCode == 401 || response.statusCode == 403) {
+        final refreshed = await authService.tryRefreshToken();
+        if (refreshed) response = await doDelete();
+      }
 
       if (response.statusCode != 200 && response.statusCode != 204) {
         throw Exception('Failed to delete visa application');
