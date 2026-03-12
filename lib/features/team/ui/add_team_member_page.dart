@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
@@ -9,7 +8,6 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_snackbar.dart';
 import '../../../core/providers/upload_provider.dart';
 
-import '../../../shared/widgets/step_wizard.dart';
 import '../../../shared/widgets/country_city_picker.dart';
 import '../../../core/providers/reference_data_provider.dart';
 import '../../company/models/user_limits.dart';
@@ -59,7 +57,6 @@ class AddTeamMemberPage extends ConsumerStatefulWidget {
 }
 
 class _AddTeamMemberPageState extends ConsumerState<AddTeamMemberPage> {
-  int _currentStep = 0;
   bool _isSubmitting = false;
   bool _didPopulate = false;
 
@@ -67,7 +64,6 @@ class _AddTeamMemberPageState extends ConsumerState<AddTeamMemberPage> {
   int _selectedMemberTabIndex = -1;
 
   final _step1Key = GlobalKey<FormState>();
-  final _step2Key = GlobalKey<FormState>();
 
   // --- Step 1: Personal Info ---
   final _firstNameController = TextEditingController();
@@ -86,6 +82,8 @@ class _AddTeamMemberPageState extends ConsumerState<AddTeamMemberPage> {
   // --- Step 2: Role & Attendance ---
   String _selectedRole = 'USER';
   bool _willAttend = true;
+  bool _allowMeetingRequests = false;
+  bool _showContactDetails = false;
 
   /// ID of the member being edited (from tab selection or route param).
   String? _editingMemberId;
@@ -149,6 +147,8 @@ class _AddTeamMemberPageState extends ConsumerState<AddTeamMemberPage> {
         ? 'ADMINISTRATOR'
         : 'USER';
     _willAttend = member.willAttend;
+    _allowMeetingRequests = member.allowMeetingRequests;
+    _showContactDetails = member.showContactDetails;
     _profilePhotoUrl = member.profilePhotoUrl;
 
     if (member.socialLinks != null && member.socialLinks!.isNotEmpty) {
@@ -174,6 +174,8 @@ class _AddTeamMemberPageState extends ConsumerState<AddTeamMemberPage> {
     _profilePhotoUrl = null;
     _selectedRole = 'USER';
     _willAttend = true;
+    _allowMeetingRequests = false;
+    _showContactDetails = false;
     for (final link in _socialLinks) {
       link.urlController.dispose();
     }
@@ -249,8 +251,8 @@ class _AddTeamMemberPageState extends ConsumerState<AddTeamMemberPage> {
             return Text(
               _isEditing ? 'Edit Team Member' : 'Add Team Member',
               style: GoogleFonts.montserrat(
-                fontSize: isMobile ? 22 : 30,
-                fontWeight: FontWeight.w600,
+                fontSize: isMobile ? 18 : 22,
+                fontWeight: FontWeight.w700,
                 color: AppTheme.primaryColor,
               ),
             );
@@ -259,61 +261,34 @@ class _AddTeamMemberPageState extends ConsumerState<AddTeamMemberPage> {
           Divider(color: Colors.grey.shade300, height: 1),
           const SizedBox(height: 20),
 
-          // Step wizard in bordered container
-          Container(
-            width: double.infinity,
-            padding:
-                const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-            decoration: BoxDecoration(
-              border: Border.all(color: _kInputBorderColor),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: StepWizard(
-              currentStep: _currentStep,
-              stepLabels: const ['Personal Info', 'Role in Event'],
-            ),
-          ),
+          // Hint banner
+          _buildHintBanner(),
           const SizedBox(height: 16),
 
-          // Hint banner (Step 1 only)
-          if (_currentStep == 0) ...[
-            _buildHintBanner(),
-            const SizedBox(height: 16),
-          ],
+          // Member tabs
+          _buildMemberTabs(existingMembers, maxTeamMembers),
+          const SizedBox(height: 0),
 
-          // Member tabs (Step 1 only)
-          if (_currentStep == 0) ...[
-            _buildMemberTabs(existingMembers, maxTeamMembers),
-            const SizedBox(height: 0),
-          ],
-
-          // Step content card
+          // Form card
           Container(
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: _currentStep == 0
-                  ? const BorderRadius.only(
-                      topRight: Radius.circular(12),
-                      bottomLeft: Radius.circular(12),
-                      bottomRight: Radius.circular(12),
-                    )
-                  : BorderRadius.circular(12),
+              borderRadius: const BorderRadius.only(
+                topRight: Radius.circular(12),
+                bottomLeft: Radius.circular(12),
+                bottomRight: Radius.circular(12),
+              ),
               boxShadow: const [_kCardShadow],
             ),
             child: Padding(
               padding: const EdgeInsets.all(20),
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 250),
-                child: _currentStep == 0
-                    ? _buildStep1(eventId)
-                    : _buildStep2(),
-              ),
+              child: _buildStep1(eventId),
             ),
           ),
           const SizedBox(height: 24),
 
           // Navigation buttons
-          _buildNavigationButtons(eventIdStr, eventId),
+          _buildSaveButtons(eventIdStr, eventId),
           const SizedBox(height: 40),
         ],
       ),
@@ -485,10 +460,6 @@ class _AddTeamMemberPageState extends ConsumerState<AddTeamMemberPage> {
           _buildSectionHeader('Basic Info'),
           const SizedBox(height: 24),
 
-          // Profile photo
-          _buildProfilePhotoSection(),
-          const SizedBox(height: 24),
-
           // Name / Surname
           _ResponsiveRow(
             left: _buildLabeledField(
@@ -593,42 +564,69 @@ class _AddTeamMemberPageState extends ConsumerState<AddTeamMemberPage> {
           ),
           const SizedBox(height: 20),
 
-          // Will Attend toggle
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.grey.shade50,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.grey.shade200),
+          // Role & Attendance
+          _buildSectionHeader('Role & Attendance'),
+          const SizedBox(height: 16),
+
+          // Role selection
+          _ResponsiveRow(
+            left: _buildLabeledField(
+              label: 'Role:',
+              required: true,
+              child: TeamRoleDropdown(
+                currentRole: _selectedRole,
+                onRoleChanged: (role) =>
+                    setState(() => _selectedRole = role),
+              ),
             ),
-            child: SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(
-                'Will Attend Event',
-                style: GoogleFonts.inter(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: AppTheme.primaryColor,
+            right: _buildLabeledField(
+              label: 'Will Attend:',
+              child: Container(
+                height: 48,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(_kInputBorderRadius),
+                  border: Border.all(color: _kInputBorderColor),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _willAttend ? 'Yes — will attend' : 'No — remote only',
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ),
+                    Switch(
+                      value: _willAttend,
+                      activeTrackColor: AppTheme.primaryColor,
+                      onChanged: (v) => setState(() => _willAttend = v),
+                    ),
+                  ],
                 ),
               ),
-              subtitle: Text(
-                _willAttend
-                    ? 'This member will physically attend the event'
-                    : 'This member will not attend in person',
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  color: Colors.grey.shade600,
-                ),
-              ),
-              value: _willAttend,
-              activeTrackColor: AppTheme.primaryColor,
-              onChanged: (value) => setState(() => _willAttend = value),
             ),
           ),
           const SizedBox(height: 28),
 
           // Follow Me — Social Links
           _buildFollowMeSection(),
+          const SizedBox(height: 28),
+
+          // Profile photo
+          _buildSectionHeader('Profile Photo'),
+          const SizedBox(height: 16),
+          _buildProfilePhotoSection(),
+          const SizedBox(height: 28),
+
+          // Meeting Requests
+          _buildMeetingRequestsSection(),
+          const SizedBox(height: 24),
+
+          // Contact Visibility
+          _buildContactVisibilitySection(),
         ],
       ),
     );
@@ -1015,431 +1013,107 @@ class _AddTeamMemberPageState extends ConsumerState<AddTeamMemberPage> {
     );
   }
 
+
   // ===========================================================================
-  // Step 2 — Role in Event (Team Members Table)
+  // Meeting Requests
   // ===========================================================================
 
-  Widget _buildStep2() {
-    if (_selectedCompanyId == null || _selectedCompanyId!.isEmpty) {
-      return Form(
-        key: _step2Key,
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(32),
-            child: Text(
-              'Please select a company in Step 1 first.',
-              style: GoogleFonts.inter(
-                  fontSize: 14, color: Colors.grey.shade600),
-            ),
+  Widget _buildMeetingRequestsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Meeting Requests',
+          style: GoogleFonts.montserrat(
+            fontSize: _kLabelFontSize,
+            fontWeight: FontWeight.w700,
+            color: Colors.black87,
+            decoration: TextDecoration.underline,
           ),
         ),
-      );
-    }
-
-    final membersAsync = ref.watch(teamMembersProvider(_selectedCompanyId!));
-
-    return Form(
-      key: _step2Key,
-      child: membersAsync.when(
-        loading: () => const Padding(
-          padding: EdgeInsets.all(40),
-          child: Center(
-            child:
-                CircularProgressIndicator(color: AppTheme.primaryColor),
+        const SizedBox(height: 8),
+        Text(
+          'Allow other participants to send meeting requests to this member.',
+          style: GoogleFonts.inter(
+            fontSize: 14,
+            color: Colors.grey.shade600,
           ),
         ),
-        error: (error, _) => Padding(
-          padding: const EdgeInsets.all(32),
-          child: Center(
-            child: Text(
-              'Failed to load team members: $error',
-              style: GoogleFonts.inter(
-                  fontSize: 14, color: AppTheme.errorColor),
-            ),
-          ),
-        ),
-        data: (members) => _buildMembersTable(members),
-      ),
-    );
-  }
-
-  Widget _buildMembersTable(List<TeamMember> members) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        if (members.isEmpty) {
-          return Container(
-            padding: const EdgeInsets.all(32),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.grey.shade200),
-            ),
-            child: Center(
-              child: Text(
-                'No team members yet. Add your first member in Step 1.',
-                style: GoogleFonts.inter(
-                    fontSize: 14, color: Colors.grey.shade500),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            SizedBox(
+              width: 24,
+              height: 24,
+              child: Checkbox(
+                value: _allowMeetingRequests,
+                onChanged: (v) =>
+                    setState(() => _allowMeetingRequests = v ?? false),
+                activeColor: AppTheme.primaryColor,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(4),
+                ),
               ),
             ),
-          );
-        }
-
-        if (constraints.maxWidth >= 600) {
-          return _buildWideTable(members);
-        }
-        return _buildMobileCards(members);
-      },
-    );
-  }
-
-  Widget _buildWideTable(List<TeamMember> members) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // Header
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: AppTheme.primaryColor.withValues(alpha: 0.06),
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(8),
-              topRight: Radius.circular(8),
+            const SizedBox(width: 12),
+            Text(
+              'Allow meeting requests',
+              style: GoogleFonts.inter(fontSize: 14, color: Colors.black87),
             ),
-            border: Border.all(
-                color: AppTheme.primaryColor.withValues(alpha: 0.15)),
-          ),
-          child: Row(
-            children: [
-              SizedBox(
-                  width: 280,
-                  child: Text('Name', style: _tableHeaderStyle)),
-              Expanded(child: Text('Email', style: _tableHeaderStyle)),
-              SizedBox(
-                  width: 200,
-                  child: Text('Role', style: _tableHeaderStyle)),
-            ],
-          ),
+          ],
         ),
-        // Rows
-        for (int i = 0; i < members.length; i++)
-          _buildMemberRow(members[i], i == members.length - 1),
       ],
     );
   }
 
-  Widget _buildMobileCards(List<TeamMember> members) {
+  // ===========================================================================
+  // Contact Visibility
+  // ===========================================================================
+
+  Widget _buildContactVisibilitySection() {
     return Column(
-      children: members.map((member) {
-        final initials =
-            '${member.firstName.isNotEmpty ? member.firstName[0] : ''}'
-            '${member.lastName.isNotEmpty ? member.lastName[0] : ''}'
-            .toUpperCase();
-
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.grey.shade200),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Contact Visibility',
+          style: GoogleFonts.montserrat(
+            fontSize: _kLabelFontSize,
+            fontWeight: FontWeight.w700,
+            color: Colors.black87,
           ),
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  _buildMemberAvatar(member, initials, 20),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          member.fullName,
-                          style: GoogleFonts.inter(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.black87,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          member.email,
-                          style: GoogleFonts.inter(
-                            fontSize: 13,
-                            color: Colors.grey.shade600,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: TeamRoleDropdown(
-                      currentRole:
-                          member.isAdmin ? 'ADMINISTRATOR' : 'USER',
-                      onRoleChanged: (newRole) =>
-                          _onRoleChanged(member, newRole),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  _buildDeleteButton(member),
-                ],
-              ),
-            ],
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildMemberRow(TeamMember member, bool isLast) {
-    final initials =
-        '${member.firstName.isNotEmpty ? member.firstName[0] : ''}'
-        '${member.lastName.isNotEmpty ? member.lastName[0] : ''}'
-        .toUpperCase();
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(
-          left: BorderSide(color: Colors.grey.shade200),
-          right: BorderSide(color: Colors.grey.shade200),
-          bottom: BorderSide(color: Colors.grey.shade200),
         ),
-        borderRadius: isLast
-            ? const BorderRadius.only(
-                bottomLeft: Radius.circular(8),
-                bottomRight: Radius.circular(8),
-              )
-            : null,
-      ),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 280,
-            child: Row(
-              children: [
-                _buildMemberAvatar(member, initials, 20),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    member.fullName,
-                    style: GoogleFonts.inter(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.black87,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
+        const SizedBox(height: 8),
+        Text(
+          'Allow other participants to view this member\'s contact information.',
+          style: GoogleFonts.inter(
+            fontSize: 14,
+            color: Colors.grey.shade600,
           ),
-          Expanded(
-            child: Text(
-              member.email,
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            SizedBox(
+              width: 24,
+              height: 24,
+              child: Checkbox(
+                value: _showContactDetails,
+                onChanged: (v) =>
+                    setState(() => _showContactDetails = v ?? false),
+                activeColor: AppTheme.primaryColor,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'Show contact details to other participants',
               style: GoogleFonts.inter(fontSize: 14, color: Colors.black87),
-              overflow: TextOverflow.ellipsis,
             ),
-          ),
-          SizedBox(
-            width: 200,
-            child: Row(
-              children: [
-                Expanded(
-                  child: TeamRoleDropdown(
-                    currentRole:
-                        member.isAdmin ? 'ADMINISTRATOR' : 'USER',
-                    onRoleChanged: (newRole) =>
-                        _onRoleChanged(member, newRole),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                _buildDeleteButton(member),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMemberAvatar(
-      TeamMember member, String initials, double radius) {
-    if (member.profilePhotoUrl != null &&
-        member.profilePhotoUrl!.isNotEmpty) {
-      return CircleAvatar(
-        radius: radius,
-        backgroundImage: NetworkImage(member.profilePhotoUrl!),
-        backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
-      );
-    }
-    return CircleAvatar(
-      radius: radius,
-      backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
-      child: Text(
-        initials,
-        style: GoogleFonts.montserrat(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-          color: AppTheme.primaryColor,
+          ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildDeleteButton(TeamMember member) {
-    return InkWell(
-      onTap: () => _onDeleteMember(member),
-      borderRadius: BorderRadius.circular(4),
-      child: Padding(
-        padding: const EdgeInsets.all(4),
-        child: SvgPicture.asset(
-          'assets/team/trash.svg',
-          width: 20,
-          height: 20,
-        ),
-      ),
-    );
-  }
-
-  // ===========================================================================
-  // Role & Delete Actions
-  // ===========================================================================
-
-  Future<void> _onRoleChanged(TeamMember member, String newRole) async {
-    try {
-      final service = ref.read(teamServiceProvider);
-      await service.changeRole(member.id, newRole);
-      if (_selectedCompanyId != null) {
-        ref.invalidate(teamMembersProvider(_selectedCompanyId!));
-      }
-      if (!mounted) return;
-      AppSnackBar.showSuccess(context, '${member.fullName} is now ${newRole == 'ADMINISTRATOR' ? 'an Administrator' : 'a User'}');
-    } catch (e) {
-      if (!mounted) return;
-      AppSnackBar.showError(context, 'Failed to change role: $e');
-    }
-  }
-
-  Future<void> _onDeleteMember(TeamMember member) async {
-    final confirmed = await _showDeleteMemberDialog(member);
-    if (confirmed != true || !mounted) return;
-
-    try {
-      final service = ref.read(teamServiceProvider);
-      await service.deleteTeamMember(member.id);
-      if (_selectedCompanyId != null) {
-        ref.invalidate(teamMembersProvider(_selectedCompanyId!));
-      }
-      if (!mounted) return;
-      AppSnackBar.showSuccess(context, '${member.fullName} has been removed');
-    } catch (e) {
-      if (!mounted) return;
-      AppSnackBar.showError(context, 'Failed to remove member: $e');
-    }
-  }
-
-  Future<bool?> _showDeleteMemberDialog(TeamMember member) {
-    return showDialog<bool>(
-      context: context,
-      barrierDismissible: true,
-      builder: (dialogContext) {
-        return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 400),
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Align(
-                    alignment: Alignment.topRight,
-                    child: InkWell(
-                      onTap: () => Navigator.of(dialogContext).pop(false),
-                      borderRadius: BorderRadius.circular(4),
-                      child: Icon(Icons.close,
-                          size: 20, color: Colors.grey.shade600),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  SvgPicture.asset(
-                    'assets/team/circle_x.svg',
-                    width: 60,
-                    height: 60,
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    'Are you sure you want to remove ${member.fullName} from your company profile?',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.inter(
-                      fontSize: 14,
-                      color: AppTheme.primaryColor,
-                      height: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () =>
-                              Navigator.of(dialogContext).pop(false),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.grey.shade700,
-                            side: BorderSide(color: Colors.grey.shade300),
-                            padding:
-                                const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            textStyle: GoogleFonts.inter(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          child: const Text('Cancel'),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () =>
-                              Navigator.of(dialogContext).pop(true),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.errorColor,
-                            foregroundColor: Colors.white,
-                            padding:
-                                const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            textStyle: GoogleFonts.inter(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          child: const Text('Delete'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
+      ],
     );
   }
 
@@ -1447,7 +1121,7 @@ class _AddTeamMemberPageState extends ConsumerState<AddTeamMemberPage> {
   // Navigation Buttons — aligned right per Figma
   // ===========================================================================
 
-  Widget _buildNavigationButtons(String eventIdStr, int eventId) {
+  Widget _buildSaveButtons(String eventIdStr, int eventId) {
     final outlinedStyle = OutlinedButton.styleFrom(
       foregroundColor: Colors.grey.shade700,
       side: BorderSide(color: Colors.grey.shade300),
@@ -1470,45 +1144,26 @@ class _AddTeamMemberPageState extends ConsumerState<AddTeamMemberPage> {
       textStyle: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w600),
     );
 
-    if (_currentStep == 0) {
-      return Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          OutlinedButton(
-            onPressed: () => _confirmDiscard(eventIdStr),
-            style: outlinedStyle,
-            child: const Text('Cancel'),
-          ),
-          const SizedBox(width: 16),
-          ElevatedButton(
-            onPressed: _isSubmitting ? null : _goToStep2,
-            style: primaryStyle,
-            child: _isSubmitting
-                ? const SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2, color: Colors.white),
-                  )
-                : const Text('Continue'),
-          ),
-        ],
-      );
-    }
-
-    // Step 2: Back | Cancel + Done
     return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
       children: [
         OutlinedButton(
-          onPressed: () => setState(() => _currentStep = 0),
+          onPressed: () => _confirmDiscard(eventIdStr),
           style: outlinedStyle,
-          child: const Text('Back'),
+          child: const Text('Cancel'),
         ),
-        const Spacer(),
+        const SizedBox(width: 16),
         ElevatedButton(
-          onPressed: () => context.go('/events/$eventIdStr/team'),
+          onPressed: _isSubmitting ? null : () => _saveAndReturn(eventIdStr, eventId),
           style: primaryStyle,
-          child: const Text('Done'),
+          child: _isSubmitting
+              ? const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white),
+                )
+              : Text(_isEditing ? 'Save Changes' : 'Add Member'),
         ),
       ],
     );
@@ -1567,7 +1222,7 @@ class _AddTeamMemberPageState extends ConsumerState<AddTeamMemberPage> {
   // Save / Upload Actions
   // ===========================================================================
 
-  Future<void> _goToStep2() async {
+  Future<void> _saveAndReturn(String eventIdStr, int eventId) async {
     if (!(_step1Key.currentState?.validate() ?? false)) return;
 
     if (_selectedCompanyId == null || _selectedCompanyId!.isEmpty) {
@@ -1587,6 +1242,8 @@ class _AddTeamMemberPageState extends ConsumerState<AddTeamMemberPage> {
         'email': _emailController.text.trim(),
         'role': _selectedRole,
         'will_attend': _willAttend,
+        'allow_meeting_requests': _allowMeetingRequests,
+        'show_contact_details': _showContactDetails,
       };
 
       if (_mobileController.text.trim().isNotEmpty) {
@@ -1620,6 +1277,7 @@ class _AddTeamMemberPageState extends ConsumerState<AddTeamMemberPage> {
       }
 
       ref.invalidate(teamMembersProvider(_selectedCompanyId!));
+      ref.invalidate(allTeamMembersProvider(eventId));
 
       if (!mounted) return;
 
@@ -1627,10 +1285,7 @@ class _AddTeamMemberPageState extends ConsumerState<AddTeamMemberPage> {
           ? 'Team member updated!'
           : 'Team member added! Invitation email sent.');
 
-      setState(() {
-        _isSubmitting = false;
-        _currentStep = 1;
-      });
+      context.go('/events/$eventIdStr/team');
     } catch (e) {
       if (!mounted) return;
       setState(() => _isSubmitting = false);
@@ -1794,11 +1449,6 @@ class _AddTeamMemberPageState extends ConsumerState<AddTeamMemberPage> {
     );
   }
 
-  TextStyle get _tableHeaderStyle => GoogleFonts.inter(
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
-        color: Colors.black87,
-      );
 }
 
 // =============================================================================

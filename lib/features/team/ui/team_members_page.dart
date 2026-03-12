@@ -105,7 +105,7 @@ class _TeamMembersPageState extends ConsumerState<TeamMembersPage> {
           // Title row + Add button
           Row(
             children: [
-              Flexible(
+              Expanded(
                 child: Text(
                   isMobile ? 'Team Members' : 'My Team Members',
                   style: GoogleFonts.montserrat(
@@ -113,9 +113,10 @@ class _TeamMembersPageState extends ConsumerState<TeamMembersPage> {
                     fontWeight: FontWeight.w700,
                     color: AppTheme.primaryColor,
                   ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const Spacer(),
+              const SizedBox(width: 16),
               OutlinedButton.icon(
                 onPressed: () =>
                     context.go('/events/$eventIdStr/team/add'),
@@ -139,63 +140,65 @@ class _TeamMembersPageState extends ConsumerState<TeamMembersPage> {
           ),
           const SizedBox(height: 20),
 
-          // Search bar + Sort
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _searchController,
-                  onChanged: (v) => setState(() => _searchQuery = v),
-                  style: GoogleFonts.inter(fontSize: 14),
-                  decoration: InputDecoration(
-                    hintText: 'Search team members...',
-                    hintStyle:
-                        GoogleFonts.inter(fontSize: 14, color: Colors.grey),
-                    prefixIcon: const Icon(Icons.search, size: 20),
-                    filled: true,
-                    fillColor: Colors.white,
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: Colors.grey.shade300),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: Colors.grey.shade300),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide:
-                          const BorderSide(color: AppTheme.primaryColor, width: 2),
+          // Search bar + Sort (only show when there are members)
+          if (members.isNotEmpty) ...[
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: (v) => setState(() => _searchQuery = v),
+                    style: GoogleFonts.inter(fontSize: 14),
+                    decoration: InputDecoration(
+                      hintText: 'Search team members...',
+                      hintStyle:
+                          GoogleFonts.inter(fontSize: 14, color: Colors.grey),
+                      prefixIcon: const Icon(Icons.search, size: 20),
+                      filled: true,
+                      fillColor: Colors.white,
+                      contentPadding:
+                          const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide:
+                            const BorderSide(color: AppTheme.primaryColor, width: 2),
+                      ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey.shade300),
-                  borderRadius: BorderRadius.circular(8),
+                const SizedBox(width: 12),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Text(
+                        'Sort by: All',
+                        style: GoogleFonts.inter(
+                            fontSize: 14, color: Colors.grey.shade600),
+                      ),
+                      const SizedBox(width: 8),
+                      Icon(Icons.expand_more,
+                          size: 18, color: Colors.grey.shade600),
+                    ],
+                  ),
                 ),
-                child: Row(
-                  children: [
-                    Text(
-                      'Sort by: All',
-                      style: GoogleFonts.inter(
-                          fontSize: 14, color: Colors.grey.shade600),
-                    ),
-                    const SizedBox(width: 8),
-                    Icon(Icons.expand_more,
-                        size: 18, color: Colors.grey.shade600),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
+              ],
+            ),
+            const SizedBox(height: 16),
+          ],
 
           // Table or mobile list
           Expanded(

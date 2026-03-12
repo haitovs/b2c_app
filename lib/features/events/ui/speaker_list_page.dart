@@ -125,8 +125,8 @@ class _SpeakerListPageState extends ConsumerState<SpeakerListPage> {
                   Text(
                     'Speakers',
                     style: GoogleFonts.montserrat(
-                      fontSize: isMobile ? 22 : 30,
-                      fontWeight: FontWeight.w600,
+                      fontSize: isMobile ? 18 : 22,
+                      fontWeight: FontWeight.w700,
                       color: AppTheme.primaryColor,
                     ),
                   ),
@@ -249,7 +249,7 @@ class _SpeakerListPageState extends ConsumerState<SpeakerListPage> {
 }
 
 // ---------------------------------------------------------------------------
-// Search bar — #E6E7F2 bg, 5px radius, 1px #CBCBCB border, 38px height
+// Search bar — standard style: white bg, grey border, 8px radius
 // ---------------------------------------------------------------------------
 class _SearchBar extends StatelessWidget {
   final TextEditingController controller;
@@ -259,36 +259,29 @@ class _SearchBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 38,
-      decoration: BoxDecoration(
-        color: const Color(0xFFE6E7F2),
-        borderRadius: BorderRadius.circular(5),
-        border: Border.all(color: const Color(0xFFCBCBCB)),
-      ),
-      child: TextField(
-        controller: controller,
-        onChanged: onChanged,
-        style: GoogleFonts.roboto(fontSize: 14, fontWeight: FontWeight.w400),
-        textAlignVertical: TextAlignVertical.center,
-        decoration: InputDecoration(
-          isDense: true,
-          prefixIcon: Icon(
-            Icons.search,
-            size: 20,
-            color: Colors.grey.shade600,
-          ),
-          prefixIconConstraints: const BoxConstraints(minWidth: 40),
-          hintText: 'Search speakers...',
-          hintStyle: GoogleFonts.roboto(
-            fontSize: 14,
-            fontWeight: FontWeight.w400,
-            color: Colors.grey.shade500,
-          ),
-          border: InputBorder.none,
-          enabledBorder: InputBorder.none,
-          focusedBorder: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 10),
+    return TextField(
+      controller: controller,
+      onChanged: onChanged,
+      style: GoogleFonts.inter(fontSize: 14),
+      decoration: InputDecoration(
+        hintText: 'Search speakers...',
+        hintStyle: GoogleFonts.inter(fontSize: 14, color: Colors.grey),
+        prefixIcon: const Icon(Icons.search, size: 20),
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: AppTheme.primaryColor, width: 2),
         ),
       ),
     );

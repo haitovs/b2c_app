@@ -102,7 +102,7 @@ class _CompanyListPageState extends ConsumerState<CompanyListPage> {
           // Title row + Add button
           Row(
             children: [
-              Flexible(
+              Expanded(
                 child: Text(
                   isMobile ? 'My Companies' : 'My Companies Profiles',
                   style: GoogleFonts.montserrat(
@@ -113,7 +113,7 @@ class _CompanyListPageState extends ConsumerState<CompanyListPage> {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const Spacer(),
+              const SizedBox(width: 16),
               if (companies.length < maxCompanies)
                 OutlinedButton.icon(
                   onPressed: () =>

@@ -236,35 +236,32 @@ class _ParticipantListPageState extends ConsumerState<ParticipantListPage> {
   // ---------------------------------------------------------------------------
 
   Widget _buildSearchBar(bool isMobile) {
-    return Container(
-      height: isMobile ? 44 : 52,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: TextField(
-        controller: _searchController,
-        onChanged: (q) {
-          _searchQuery = q;
-          _applyFilters();
-        },
-        style: GoogleFonts.inter(fontSize: 14, color: Colors.black87),
-        textAlignVertical: TextAlignVertical.center,
-        decoration: InputDecoration(
-          isDense: true,
-          filled: false,
-          prefixIcon: Icon(Icons.search, color: Colors.grey.shade500, size: 22),
-          hintText: 'Search companies...',
-          hintStyle: GoogleFonts.inter(fontSize: 14, color: Colors.grey),
-          border: InputBorder.none,
-          contentPadding: EdgeInsets.zero,
+    return TextField(
+      controller: _searchController,
+      onChanged: (q) {
+        _searchQuery = q;
+        _applyFilters();
+      },
+      style: GoogleFonts.inter(fontSize: 14),
+      decoration: InputDecoration(
+        hintText: 'Search companies...',
+        hintStyle: GoogleFonts.inter(fontSize: 14, color: Colors.grey),
+        prefixIcon: const Icon(Icons.search, size: 20),
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: AppTheme.primaryColor, width: 2),
         ),
       ),
     );

@@ -206,6 +206,16 @@ class VisaService {
       return data['url'] as String;
     }
 
-    throw Exception('Failed to upload photo: $responseData');
+    // Safe error parsing — responseData may be empty if CORS blocked the body
+    String errorMsg = 'Failed to upload photo';
+    try {
+      if (responseData.isNotEmpty) {
+        final error = jsonDecode(responseData);
+        if (error is Map<String, dynamic>) {
+          errorMsg = error['message'] ?? error['detail'] ?? errorMsg;
+        }
+      }
+    } catch (_) {}
+    throw Exception(errorMsg);
   }
 }

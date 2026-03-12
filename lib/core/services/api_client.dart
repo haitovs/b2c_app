@@ -55,20 +55,23 @@ class ApiClient {
     Map<String, String>? queryParams,
     T Function(dynamic json)? parser,
   }) async {
-    try {
-      var uri = Uri.parse('$baseUrl$path');
-      if (queryParams != null && queryParams.isNotEmpty) {
-        uri = uri.replace(queryParameters: queryParams);
+    return _withTokenRefresh(() async {
+      try {
+        var uri = Uri.parse('$baseUrl$path');
+        if (queryParams != null && queryParams.isNotEmpty) {
+          uri = uri.replace(queryParameters: queryParams);
+        }
+
+        final response =
+            await http.get(uri, headers: await _headers(auth: auth));
+
+        return _handleResponse(response, parser);
+      } catch (e) {
+        return ApiResult.failure(
+          ApiException(statusCode: 0, message: 'Network error: $e'),
+        );
       }
-
-      final response = await http.get(uri, headers: await _headers(auth: auth));
-
-      return _handleResponse(response, parser);
-    } catch (e) {
-      return ApiResult.failure(
-        ApiException(statusCode: 0, message: 'Network error: $e'),
-      );
-    }
+    }, auth: auth);
   }
 
   /// POST request
@@ -226,6 +229,33 @@ class ApiClient {
       return ApiResult.failure(
         ApiException.fromResponse(response.statusCode, response.body),
       );
+    }
+  }
+
+  bool _isRefreshing = false;
+
+  /// Wrapper that retries a request once after refreshing the token on 401/403.
+  Future<ApiResult<T>> _withTokenRefresh<T>(
+    Future<ApiResult<T>> Function() request, {
+    required bool auth,
+  }) async {
+    final result = await request();
+
+    // Only attempt refresh for authenticated requests that got 401/403
+    if (!auth || _isRefreshing) return result;
+    if (result.isSuccess) return result;
+    final code = result.error?.statusCode;
+    if (code != 401 && code != 403) return result;
+
+    // Try refreshing the token
+    _isRefreshing = true;
+    try {
+      final newToken = await _tokenProvider.refreshAccessToken();
+      if (newToken == null) return result; // refresh failed, return original error
+      // Retry the request with the new token
+      return await request();
+    } finally {
+      _isRefreshing = false;
     }
   }
 }

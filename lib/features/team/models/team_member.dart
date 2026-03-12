@@ -19,6 +19,8 @@ class TeamMember {
   final TeamMemberRole role;
   final bool isActive;
   final bool willAttend;
+  final bool allowMeetingRequests;
+  final bool showContactDetails;
   final bool passwordTokenUsed;
   final String? createdAt;
   final String? updatedAt;
@@ -40,6 +42,8 @@ class TeamMember {
     required this.role,
     required this.isActive,
     this.willAttend = true,
+    this.allowMeetingRequests = false,
+    this.showContactDetails = false,
     required this.passwordTokenUsed,
     this.createdAt,
     this.updatedAt,
@@ -90,6 +94,8 @@ class TeamMember {
       role: _parseRole(json['role'] as String?),
       isActive: json['is_active'] as bool? ?? true,
       willAttend: json['will_attend'] as bool? ?? true,
+      allowMeetingRequests: json['allow_meeting_requests'] as bool? ?? false,
+      showContactDetails: json['show_contact_details'] as bool? ?? false,
       passwordTokenUsed: json['password_token_used'] as bool? ?? false,
       createdAt: json['created_at'] as String?,
       updatedAt: json['updated_at'] as String?,
@@ -114,6 +120,8 @@ class TeamMember {
       'role': _roleToString(role),
       'is_active': isActive,
       'will_attend': willAttend,
+      'allow_meeting_requests': allowMeetingRequests,
+      'show_contact_details': showContactDetails,
       'password_token_used': passwordTokenUsed,
       'created_at': createdAt,
       'updated_at': updatedAt,

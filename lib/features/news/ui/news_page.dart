@@ -8,7 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/providers/event_context_provider.dart';
-import '../../events/ui/widgets/profile_dropdown.dart';
+import '../../../core/theme/app_theme.dart';
 
 /// News Page - displays news from Tourism backend with search and infinite scroll
 class NewsPage extends ConsumerStatefulWidget {
@@ -22,7 +22,6 @@ class NewsPage extends ConsumerStatefulWidget {
 
 class _NewsPageState extends ConsumerState<NewsPage> {
   final ScrollController _scrollController = ScrollController();
-  bool _isProfileOpen = false;
 
   List<Map<String, dynamic>> _news = [];
   List<Map<String, dynamic>> _filteredNews = [];
@@ -147,10 +146,6 @@ class _NewsPageState extends ConsumerState<NewsPage> {
     });
   }
 
-  void _closeProfile() {
-    if (_isProfileOpen) setState(() => _isProfileOpen = false);
-  }
-
   String _buildImageUrl(String? path) {
     if (path == null || path.isEmpty) return '';
     if (path.startsWith('http')) return path;
@@ -171,95 +166,63 @@ class _NewsPageState extends ConsumerState<NewsPage> {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
-    final horizontalPadding = isMobile ? 16.0 : 50.0;
 
-    return GestureDetector(
-        onTap: _closeProfile,
-        behavior: HitTestBehavior.translucent,
-        child: Stack(
-          children: [
-            SafeArea(
-              child: Column(
-                children: [
-                  // Search Bar
-                  Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: horizontalPadding,
-                      vertical: isMobile ? 12 : 20,
-                    ),
-                    child: _buildSearchBar(isMobile),
-                  ),
+    return Padding(
+      padding: EdgeInsets.all(isMobile ? 16 : 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Text(
+            'News',
+            style: GoogleFonts.montserrat(
+              fontSize: isMobile ? 18 : 22,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.primaryColor,
+            ),
+          ),
+          const SizedBox(height: 16),
 
-                  // Content Container
-                  Expanded(
-                    child: Container(
-                      margin: EdgeInsets.symmetric(
-                        horizontal: horizontalPadding,
-                      ),
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.vertical(
-                          top: Radius.circular(20),
-                        ),
-                      ),
-                      child: _isLoading
-                          ? const Center(child: CircularProgressIndicator())
-                          : _buildNewsGrid(isMobile, screenWidth),
-                    ),
-                  ),
-                ],
+          // Search bar
+          TextField(
+            controller: _searchController,
+            onChanged: _filterNews,
+            style: GoogleFonts.inter(fontSize: 14),
+            decoration: InputDecoration(
+              hintText: 'Search news...',
+              hintStyle: GoogleFonts.inter(fontSize: 14, color: Colors.grey),
+              prefixIcon: const Icon(Icons.search, size: 20),
+              filled: true,
+              fillColor: Colors.white,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: Colors.grey.shade300),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: Colors.grey.shade300),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide:
+                    const BorderSide(color: AppTheme.primaryColor, width: 2),
               ),
             ),
-            // Profile dropdown overlay
-            if (_isProfileOpen)
-              Positioned(
-                top: isMobile ? 60 : 80,
-                right: horizontalPadding,
-                child: ProfileDropdown(onClose: _closeProfile),
-              ),
-          ],
-        ),
-      );
-  }
+          ),
+          const SizedBox(height: 20),
 
-  Widget _buildSearchBar(bool isMobile) {
-    return Container(
-      height: isMobile ? 46 : 56,
-      decoration: BoxDecoration(
-        color: const Color(0xFFF1F1F6).withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      alignment: Alignment.center,
-      child: TextField(
-        controller: _searchController,
-        cursorColor: const Color(0xFFF1F1F6),
-        style: GoogleFonts.roboto(
-          fontSize: isMobile ? 16 : 18,
-          color: const Color(0xFFF1F1F6),
-          fontWeight: FontWeight.w500,
-        ),
-        textAlignVertical: TextAlignVertical.center,
-        decoration: InputDecoration(
-          isDense: true,
-          filled: false,
-          prefixIcon: Icon(
-            Icons.search,
-            color: const Color(0xFFF1F1F6),
-            size: isMobile ? 24 : 28,
+          // Content
+          Expanded(
+            child: _isLoading
+                ? const Center(
+                    child: CircularProgressIndicator(
+                        color: AppTheme.primaryColor),
+                  )
+                : _buildNewsGrid(isMobile, screenWidth),
           ),
-          hintText: 'Search news...',
-          hintStyle: GoogleFonts.roboto(
-            fontWeight: FontWeight.w500,
-            fontSize: isMobile ? 16 : 18,
-            color: const Color(0xFFF1F1F6),
-          ),
-          border: InputBorder.none,
-          focusedBorder: InputBorder.none,
-          enabledBorder: InputBorder.none,
-          disabledBorder: InputBorder.none,
-          contentPadding: EdgeInsets.zero,
-        ),
-        onChanged: _filterNews,
+        ],
       ),
     );
   }
@@ -274,7 +237,7 @@ class _NewsPageState extends ConsumerState<NewsPage> {
             const SizedBox(height: 16),
             Text(
               'No news found',
-              style: GoogleFonts.roboto(fontSize: 18, color: Colors.grey[600]),
+              style: GoogleFonts.inter(fontSize: 16, color: Colors.grey.shade500),
             ),
           ],
         ),

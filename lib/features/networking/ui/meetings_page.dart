@@ -222,9 +222,9 @@ class _MeetingsPageState extends ConsumerState<MeetingsPage> {
               Text(
                 'Meetings',
                 style: GoogleFonts.montserrat(
-                  fontSize: isMobile ? 20 : 30,
-                  fontWeight: FontWeight.w600,
-                  color: const Color(0xFF1A1A2E),
+                  fontSize: isMobile ? 18 : 22,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.primaryColor,
                 ),
               ),
               const Spacer(),
@@ -368,26 +368,30 @@ class _MeetingsPageState extends ConsumerState<MeetingsPage> {
   }
 
   Widget _buildSearchBar() {
-    return Container(
-      height: 38,
-      decoration: BoxDecoration(
-        color: const Color(0xFFE5E6F2),
-        borderRadius: BorderRadius.circular(5),
-      ),
-      child: TextField(
-        controller: _searchController,
-        cursorColor: AppTheme.primaryColor,
-        style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF1A1A2E)),
-        textAlignVertical: TextAlignVertical.center,
-        decoration: InputDecoration(
-          isDense: true,
-          prefixIcon: Icon(Icons.search, color: Colors.grey.shade500, size: 20),
-          hintText: 'Search meetings...',
-          hintStyle: GoogleFonts.inter(fontSize: 14, color: Colors.grey.shade400),
-          border: InputBorder.none,
-          contentPadding: EdgeInsets.zero,
+    return TextField(
+      controller: _searchController,
+      onChanged: _onSearchChanged,
+      style: GoogleFonts.inter(fontSize: 14),
+      decoration: InputDecoration(
+        hintText: 'Search meetings...',
+        hintStyle: GoogleFonts.inter(fontSize: 14, color: Colors.grey),
+        prefixIcon: const Icon(Icons.search, size: 20),
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: Colors.grey.shade300),
         ),
-        onChanged: _onSearchChanged,
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: AppTheme.primaryColor, width: 2),
+        ),
       ),
     );
   }

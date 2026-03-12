@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_snackbar.dart';
 import '../providers/feedback_providers.dart';
 import '../services/feedback_service.dart';
@@ -117,263 +117,162 @@ class _FeedbackPageState extends ConsumerState<FeedbackPage> {
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 600;
-    final horizontalPadding = isMobile ? 20.0 : 50.0;
+    final isMobile = MediaQuery.of(context).size.width < 600;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF3C4494),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Header
-            Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: horizontalPadding,
-                vertical: 20,
-              ),
-              child: Row(
-                children: [
-                  // Back button
-                  IconButton(
-                    onPressed: () {
-                      context.go('/events/${widget.eventId}/menu');
-                    },
-                    icon: const Icon(
-                      Icons.arrow_back,
-                      color: Color(0xFFF1F1F6),
-                      size: 28,
-                    ),
-                  ),
-                  const SizedBox(width: 15),
-                  // Title
-                  Text(
-                    'Feedback',
-                    style: GoogleFonts.montserrat(
-                      fontWeight: FontWeight.w600,
-                      fontSize: isMobile ? 28 : 40,
-                      color: const Color(0xFFF1F1F6),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: AppTheme.primaryColor),
+      );
+    }
 
-            // Search bar
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-              child: Container(
-                height: 64,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF1F1F6).withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  children: [
-                    const SizedBox(width: 24),
-                    const Icon(
-                      Icons.search,
-                      color: Color(0xFFF1F1F6),
-                      size: 28,
-                    ),
-                    const SizedBox(width: 20),
-                    Expanded(
-                      child: TextField(
-                        controller: _searchController,
-                        onChanged: _filterFeedbacks,
-                        style: GoogleFonts.roboto(
-                          color: const Color(0xFFF1F1F6),
-                          fontSize: 18,
-                        ),
-                        decoration: InputDecoration(
-                          hintText: 'Search feedback...',
-                          hintStyle: GoogleFonts.roboto(
-                            color: const Color(
-                              0xFFF1F1F6,
-                            ).withValues(alpha: 0.6),
-                            fontSize: 18,
-                          ),
-                          border: InputBorder.none,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 24),
-                  ],
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 30),
-
-            // Content area
-            Expanded(
-              child: Container(
-                margin: EdgeInsets.symmetric(horizontal: horizontalPadding),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: _isLoading
-                    ? const Center(
-                        child: CircularProgressIndicator(
-                          color: Color(0xFF3C4494),
-                        ),
-                      )
-                    : !_isOpen
-                    ? _buildLockedState(isMobile)
-                    : _buildOpenState(isMobile),
-              ),
-            ),
-
-            const SizedBox(height: 20),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Build locked state UI
-  Widget _buildLockedState(bool isMobile) {
-    return Center(
+    return Padding(
+      padding: EdgeInsets.all(isMobile ? 16 : 24),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            margin: const EdgeInsets.all(20),
-            padding: const EdgeInsets.symmetric(vertical: 60, horizontal: 40),
-            decoration: BoxDecoration(
-              color: const Color(0xFFDFE1ED),
-              borderRadius: BorderRadius.circular(10),
+          // Header
+          Text(
+            'Feedback',
+            style: GoogleFonts.montserrat(
+              fontSize: isMobile ? 18 : 22,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.primaryColor,
             ),
-            child: Column(
-              children: [
-                Icon(
-                  Icons.lock_outline,
-                  size: isMobile ? 60 : 80,
-                  color: const Color(0xFF3C4494),
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  'LOCKED',
-                  style: GoogleFonts.montserrat(
-                    fontWeight: FontWeight.w500,
-                    fontSize: isMobile ? 36 : 50,
-                    color: Colors.black,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  'Feedback is currently closed for this event',
-                  style: GoogleFonts.roboto(
-                    fontSize: isMobile ? 14 : 18,
-                    color: Colors.black54,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
+          ),
+          const SizedBox(height: 20),
+
+          // Search bar
+          TextField(
+            controller: _searchController,
+            onChanged: _filterFeedbacks,
+            style: GoogleFonts.inter(fontSize: 14),
+            decoration: InputDecoration(
+              hintText: 'Search feedback...',
+              hintStyle: GoogleFonts.inter(fontSize: 14, color: Colors.grey),
+              prefixIcon: const Icon(Icons.search, size: 20),
+              filled: true,
+              fillColor: Colors.white,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: Colors.grey.shade300),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: Colors.grey.shade300),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide:
+                    const BorderSide(color: AppTheme.primaryColor, width: 2),
+              ),
             ),
+          ),
+          const SizedBox(height: 20),
+
+          // Content
+          Expanded(
+            child: !_isOpen
+                ? _buildLockedState(isMobile)
+                : _buildOpenState(isMobile),
           ),
         ],
       ),
     );
   }
 
-  /// Build open state UI with feedback list and submit form
+  Widget _buildLockedState(bool isMobile) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.lock_outline,
+            size: isMobile ? 48 : 64,
+            color: Colors.grey.shade400,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Feedback Closed',
+            style: GoogleFonts.montserrat(
+              fontWeight: FontWeight.w600,
+              fontSize: isMobile ? 18 : 22,
+              color: Colors.grey.shade500,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Feedback is currently closed for this event',
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              color: Colors.grey,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildOpenState(bool isMobile) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header section
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 20),
-            decoration: BoxDecoration(
-              color: const Color(0xFFDFE1ED),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Column(
-              children: [
-                Text(
-                  'Share Your Feedback',
-                  style: GoogleFonts.montserrat(
-                    fontWeight: FontWeight.w500,
-                    fontSize: isMobile ? 24 : 36,
-                    color: Colors.black,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  'Your feedback helps us improve future events',
-                  style: GoogleFonts.roboto(
-                    fontWeight: FontWeight.w400,
-                    fontSize: isMobile ? 14 : 18,
-                    color: Colors.black87,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 20),
-
           // Submit feedback form
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              border: Border.all(color: const Color(0xFFB7B7B7)),
-              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.grey.shade300),
+              borderRadius: BorderRadius.circular(8),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Write your feedback:',
-                  style: GoogleFonts.roboto(
-                    fontSize: isMobile ? 16 : 18,
-                    fontWeight: FontWeight.w500,
-                    color: const Color(0xFF151938),
+                  'Share your feedback',
+                  style: GoogleFonts.montserrat(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.primaryColor,
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 4),
+                Text(
+                  'Your feedback helps us improve future events',
+                  style: GoogleFonts.inter(fontSize: 13, color: Colors.grey),
+                ),
+                const SizedBox(height: 12),
                 TextField(
                   controller: _feedbackController,
                   maxLines: 4,
+                  style: GoogleFonts.inter(fontSize: 14),
                   decoration: InputDecoration(
                     hintText: 'Share your thoughts about the event...',
-                    hintStyle: GoogleFonts.roboto(
+                    hintStyle: GoogleFonts.inter(
                       color: Colors.grey,
-                      fontSize: 16,
+                      fontSize: 14,
                     ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: Color(0xFFB7B7B7)),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                       borderSide: const BorderSide(
-                        color: Color(0xFF3C4494),
+                        color: AppTheme.primaryColor,
                         width: 2,
                       ),
                     ),
                   ),
                 ),
                 const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
+                Align(
+                  alignment: Alignment.centerRight,
                   child: ElevatedButton(
                     onPressed: _isSubmitting ? null : _submitFeedback,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF3C4494),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
+                    style: AppTheme.primaryButtonStyle,
                     child: _isSubmitting
                         ? const SizedBox(
                             height: 20,
@@ -385,9 +284,9 @@ class _FeedbackPageState extends ConsumerState<FeedbackPage> {
                           )
                         : Text(
                             'Submit Feedback',
-                            style: GoogleFonts.roboto(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
+                            style: GoogleFonts.inter(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                   ),
@@ -396,19 +295,18 @@ class _FeedbackPageState extends ConsumerState<FeedbackPage> {
             ),
           ),
 
-          const SizedBox(height: 30),
+          const SizedBox(height: 24),
 
           // Feedback list header
           Text(
             'What others are saying',
             style: GoogleFonts.montserrat(
               fontWeight: FontWeight.w600,
-              fontSize: isMobile ? 20 : 24,
-              color: const Color(0xFF151938),
+              fontSize: 16,
+              color: AppTheme.primaryColor,
             ),
           ),
-
-          const SizedBox(height: 15),
+          const SizedBox(height: 12),
 
           // Feedback list
           if (_filteredFeedbacks.isEmpty)
@@ -417,27 +315,25 @@ class _FeedbackPageState extends ConsumerState<FeedbackPage> {
               child: Center(
                 child: Text(
                   'No feedback yet. Be the first to share!',
-                  style: GoogleFonts.roboto(fontSize: 16, color: Colors.grey),
+                  style: GoogleFonts.inter(fontSize: 14, color: Colors.grey),
                 ),
               ),
             )
           else
             ..._filteredFeedbacks.map((fb) => _buildFeedbackCard(fb, isMobile)),
-
-          const SizedBox(height: 20),
         ],
       ),
     );
   }
 
-  /// Build a single feedback card
   Widget _buildFeedbackCard(FeedbackItem feedback, bool isMobile) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: EdgeInsets.all(isMobile ? 16 : 20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFDCDEEB).withValues(alpha: 0.6),
-        borderRadius: BorderRadius.circular(10),
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade200),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -445,16 +341,16 @@ class _FeedbackPageState extends ConsumerState<FeedbackPage> {
           Row(
             children: [
               CircleAvatar(
-                radius: isMobile ? 18 : 22,
-                backgroundColor: const Color(0xFF3C4494),
+                radius: 18,
+                backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
                 child: Text(
                   feedback.userName.isNotEmpty
                       ? feedback.userName[0].toUpperCase()
                       : 'A',
-                  style: GoogleFonts.roboto(
-                    color: Colors.white,
+                  style: GoogleFonts.montserrat(
+                    color: AppTheme.primaryColor,
                     fontWeight: FontWeight.w600,
-                    fontSize: isMobile ? 14 : 16,
+                    fontSize: 12,
                   ),
                 ),
               ),
@@ -465,17 +361,17 @@ class _FeedbackPageState extends ConsumerState<FeedbackPage> {
                   children: [
                     Text(
                       feedback.userName,
-                      style: GoogleFonts.roboto(
-                        fontWeight: FontWeight.w600,
-                        fontSize: isMobile ? 14 : 16,
-                        color: const Color(0xFF151938),
+                      style: GoogleFonts.inter(
+                        fontWeight: FontWeight.w500,
+                        fontSize: 14,
+                        color: Colors.black87,
                       ),
                     ),
                     Text(
                       _formatDate(feedback.createdAt),
-                      style: GoogleFonts.roboto(
-                        fontSize: isMobile ? 12 : 14,
-                        color: Colors.grey[600],
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
                       ),
                     ),
                   ],
@@ -486,10 +382,10 @@ class _FeedbackPageState extends ConsumerState<FeedbackPage> {
           const SizedBox(height: 12),
           Text(
             feedback.content,
-            style: GoogleFonts.roboto(
-              fontSize: isMobile ? 14 : 16,
+            style: GoogleFonts.inter(
+              fontSize: 14,
               height: 1.5,
-              color: const Color(0xFF151938),
+              color: Colors.black87,
             ),
           ),
         ],

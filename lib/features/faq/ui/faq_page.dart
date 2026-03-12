@@ -95,9 +95,9 @@ class _FAQPageState extends ConsumerState<FAQPage> {
                 Text(
                   'FAQ',
                   style: GoogleFonts.montserrat(
-                    fontSize: isMobile ? 24 : 32,
+                    fontSize: isMobile ? 18 : 22,
                     fontWeight: FontWeight.w700,
-                    color: Colors.black87,
+                    color: AppTheme.primaryColor,
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -105,37 +105,25 @@ class _FAQPageState extends ConsumerState<FAQPage> {
                 TextField(
                   controller: _searchController,
                   onChanged: _filterFAQs,
-                  style: GoogleFonts.inter(
-                    fontSize: 15,
-                    color: Colors.black87,
-                  ),
+                  style: GoogleFonts.inter(fontSize: 14),
                   decoration: InputDecoration(
                     hintText: 'Search questions...',
-                    hintStyle: GoogleFonts.inter(
-                      fontSize: 15,
-                      color: Colors.grey.shade500,
-                    ),
-                    prefixIcon: Icon(
-                      Icons.search,
-                      color: Colors.grey.shade500,
-                      size: 22,
-                    ),
+                    hintStyle: GoogleFonts.inter(fontSize: 14, color: Colors.grey),
+                    prefixIcon: const Icon(Icons.search, size: 20),
                     filled: true,
-                    fillColor: AppTheme.backgroundColor,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 14,
-                    ),
+                    fillColor: Colors.white,
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(8),
                       borderSide: BorderSide(color: Colors.grey.shade300),
                     ),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(8),
                       borderSide: BorderSide(color: Colors.grey.shade300),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(8),
                       borderSide:
                           const BorderSide(color: AppTheme.primaryColor, width: 2),
                     ),

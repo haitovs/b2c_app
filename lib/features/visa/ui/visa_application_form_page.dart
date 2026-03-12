@@ -714,23 +714,31 @@ class _VisaApplicationFormPageState
   }
 
   Future<void> _pickImage() async {
-    final XFile? image = await _imagePicker.pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 800,
-      maxHeight: 800,
-      imageQuality: 85,
-    );
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
 
-    if (image != null) {
-      if (kIsWeb) {
-        final bytes = await image.readAsBytes();
-        setState(() {
-          _photoBytes = bytes;
-        });
-      } else {
-        setState(() {
-          _photoFile = File(image.path);
-        });
+      if (image != null && mounted) {
+        if (kIsWeb) {
+          final bytes = await image.readAsBytes();
+          if (mounted) setState(() => _photoBytes = bytes);
+        } else {
+          setState(() => _photoFile = File(image.path));
+        }
+      }
+    } catch (e) {
+      debugPrint('Image picker error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to pick image. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }
@@ -743,23 +751,31 @@ class _VisaApplicationFormPageState
   }
 
   Future<void> _pickPassportScan() async {
-    final XFile? image = await _imagePicker.pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 1200,
-      maxHeight: 1200,
-      imageQuality: 85,
-    );
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        imageQuality: 85,
+      );
 
-    if (image != null) {
-      if (kIsWeb) {
-        final bytes = await image.readAsBytes();
-        setState(() {
-          _passportScanBytes = bytes;
-        });
-      } else {
-        setState(() {
-          _passportScanFile = File(image.path);
-        });
+      if (image != null && mounted) {
+        if (kIsWeb) {
+          final bytes = await image.readAsBytes();
+          if (mounted) setState(() => _passportScanBytes = bytes);
+        } else {
+          setState(() => _passportScanFile = File(image.path));
+        }
+      }
+    } catch (e) {
+      debugPrint('Passport scan picker error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to pick image. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }

@@ -30,6 +30,36 @@ class AuthNotifier extends Notifier<AuthState> implements TokenProvider {
     return _prefs.getString('auth_token');
   }
 
+  /// Returns the stored refresh token.
+  String? get refreshToken => _prefs.getString('refresh_token');
+
+  /// Attempt to refresh the access token using the stored refresh token.
+  /// Returns the new access token on success, or null on failure.
+  @override
+  Future<String?> refreshAccessToken() async {
+    final rt = _prefs.getString('refresh_token');
+    if (rt == null) return null;
+
+    final result = await _api.post<Map<String, dynamic>>(
+      '/api/v1/auth/refresh',
+      body: {'refresh_token': rt},
+      auth: false,
+    );
+
+    if (result.isSuccess && result.data != null) {
+      final newToken = result.data!['access_token'] as String;
+      final newRefresh = result.data!['refresh_token'] as String;
+      await _prefs.setString('auth_token', newToken);
+      await _prefs.setString('refresh_token', newRefresh);
+      state = state.copyWith(token: newToken);
+      return newToken;
+    }
+
+    // Refresh failed — force logout
+    await logout();
+    return null;
+  }
+
   /// The ApiClient instance for this auth session.
   ApiClient get apiClient => _api;
 
@@ -72,7 +102,11 @@ class AuthNotifier extends Notifier<AuthState> implements TokenProvider {
 
     if (result.isSuccess && result.data != null) {
       final token = result.data!['access_token'] as String;
+      final refresh = result.data!['refresh_token'] as String?;
       await _prefs.setString('auth_token', token);
+      if (refresh != null) {
+        await _prefs.setString('refresh_token', refresh);
+      }
       await _prefs.setBool('remember_me', rememberMe);
 
       state = state.copyWith(token: token, isLoading: false);
@@ -93,6 +127,7 @@ class AuthNotifier extends Notifier<AuthState> implements TokenProvider {
 
   Future<void> logout() async {
     await _prefs.remove('auth_token');
+    await _prefs.remove('refresh_token');
     state = const AuthState(isInitialized: true);
   }
 

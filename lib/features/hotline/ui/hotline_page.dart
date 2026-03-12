@@ -4,13 +4,14 @@ import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-import '../../../core/app_theme.dart';
+import 'package:google_fonts/google_fonts.dart';
+
 import '../../../core/config/app_config.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../providers/hotline_providers.dart';
 import '../services/hotline_service.dart';
@@ -309,216 +310,203 @@ class _HotlinePageState extends ConsumerState<HotlinePage> {
   @override
   Widget build(BuildContext context) {
     final isMobile = MediaQuery.of(context).size.width < 600;
-    return Scaffold(
-      backgroundColor: AppColors.gradientEnd,
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [AppColors.gradientStart, AppColors.gradientEnd],
-          ),
-        ),
-        child: SafeArea(
-          child: Column(
+
+    return Padding(
+      padding: EdgeInsets.all(isMobile ? 16 : 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header row
+          Row(
             children: [
-              // Header
-              _buildHeader(),
-
-              // Chat Container
-              Expanded(
-                child: Container(
-                  margin: EdgeInsets.all(isMobile ? 12 : 20),
-                  decoration: BoxDecoration(
-                    color: AppColors.cardBackground,
-                    borderRadius: BorderRadius.circular(20),
+              Text(
+                'Hotline',
+                style: GoogleFonts.montserrat(
+                  fontSize: isMobile ? 18 : 22,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.primaryColor,
+                ),
+              ),
+              const Spacer(),
+              // Connection status
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: _isConnected
+                      ? Colors.green.withValues(alpha: 0.1)
+                      : Colors.red.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: _isConnected
+                        ? Colors.green.withValues(alpha: 0.3)
+                        : Colors.red.withValues(alpha: 0.3),
                   ),
-                  child: Column(
-                    children: [
-                      // Chat Header
-                      _buildChatHeader(),
-
-                      // Messages
-                      Expanded(
-                        child: _isLoading
-                            ? const Center(child: CircularProgressIndicator())
-                            : _error != null
-                            ? Center(
-                                child: Text(
-                                  _error!,
-                                  style: const TextStyle(color: Colors.red),
-                                ),
-                              )
-                            : _buildMessagesList(),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: _isConnected ? Colors.green : Colors.red,
+                        shape: BoxShape.circle,
                       ),
-
-                      // Emoji Picker
-                      if (_showEmojiPicker) _buildEmojiPicker(),
-
-                      // File sending indicator
-                      if (_isSendingFile)
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 8),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              SizedBox(
-                                width: 16,
-                                height: 16,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2),
-                              ),
-                              SizedBox(width: 8),
-                              Text('Sending file...'),
-                            ],
-                          ),
-                        ),
-
-                      // Input Area
-                      _buildInputArea(),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _isConnected ? 'Online' : 'Offline',
+                      style: GoogleFonts.inter(
+                        color: _isConnected ? Colors.green : Colors.red,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
+          const SizedBox(height: 16),
 
-  Widget _buildHeader() {
-    final isMobile = MediaQuery.of(context).size.width < 600;
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 20, vertical: 15),
-      child: Row(
-        children: [
-          // Menu/Back Button
-          IconButton(
-            onPressed: () {
-              final uri = GoRouterState.of(context).uri;
-              final pathSegments = uri.pathSegments;
-              if (pathSegments.length >= 2 && pathSegments[0] == 'events') {
-                final eventId = pathSegments[1];
-                context.go('/events/$eventId/menu');
-              } else {
-                context.go('/');
-              }
-            },
-            icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
-          ),
-          const SizedBox(width: 10),
-
-          // Title
-          Text(
-            'Hotline',
-            style: TextStyle(
-              fontFamily: 'Montserrat',
-              fontWeight: FontWeight.w600,
-              fontSize: isMobile ? 24 : 32,
-              color: Colors.white,
-            ),
-          ),
-
-          const Spacer(),
-
-          // Connection Status
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: _isConnected
-                  ? Colors.green.withValues(alpha: 0.2)
-                  : Colors.red.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: _isConnected ? Colors.green : Colors.red,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  _isConnected ? 'Online' : 'Offline',
-                  style: TextStyle(
-                    color: _isConnected ? Colors.green : Colors.red,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          if (!isMobile) ...[
-            const SizedBox(width: 10),
-            IconButton(
-              onPressed: () {},
-              icon: const Icon(
-                Icons.notifications_outlined,
+          // Chat container
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
                 color: Colors.white,
-                size: 28,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: Column(
+                children: [
+                  // Chat header
+                  _buildChatHeader(isMobile),
+
+                  // Messages
+                  Expanded(
+                    child: _isLoading
+                        ? const Center(
+                            child: CircularProgressIndicator(
+                                color: AppTheme.primaryColor),
+                          )
+                        : _error != null
+                            ? Center(
+                                child: Text(
+                                  _error!,
+                                  style: GoogleFonts.inter(
+                                    color: Colors.red,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              )
+                            : _buildMessagesList(),
+                  ),
+
+                  // Emoji picker
+                  if (_showEmojiPicker) _buildEmojiPicker(),
+
+                  // File sending indicator
+                  if (_isSendingFile)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppTheme.primaryColor,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Sending file...',
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                  // Input area
+                  _buildInputArea(),
+                ],
               ),
             ),
-            IconButton(
-              onPressed: () {},
-              icon: const Icon(
-                Icons.person_outline,
-                color: Colors.white,
-                size: 28,
-              ),
-            ),
-          ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildChatHeader() {
-    final isMobile = MediaQuery.of(context).size.width < 600;
+  Widget _buildChatHeader(bool isMobile) {
     return Container(
-      padding: EdgeInsets.all(isMobile ? 12 : 20),
-      decoration: const BoxDecoration(
-        color: Color(0xFFCDD1E5),
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(20),
-          topRight: Radius.circular(20),
+      padding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 16 : 20,
+        vertical: isMobile ? 12 : 16,
+      ),
+      decoration: BoxDecoration(
+        color: AppTheme.primaryColor.withValues(alpha: 0.05),
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(12),
+          topRight: Radius.circular(12),
+        ),
+        border: Border(
+          bottom: BorderSide(color: Colors.grey.shade200),
         ),
       ),
       child: Row(
         children: [
-          Flexible(
-            child: Text(
-              'Chat with Organizers',
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontWeight: FontWeight.w600,
-                fontSize: isMobile ? 18 : 24,
-                color: Colors.black,
-              ),
+          CircleAvatar(
+            radius: 18,
+            backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
+            child: const Icon(
+              Icons.support_agent,
+              color: AppTheme.primaryColor,
+              size: 20,
             ),
           ),
-          const Spacer(),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Chat with Organizers',
+                  style: GoogleFonts.montserrat(
+                    fontWeight: FontWeight.w600,
+                    fontSize: isMobile ? 14 : 16,
+                    color: AppTheme.primaryColor,
+                  ),
+                ),
+                Text(
+                  _isConnected ? 'Available now' : 'Connecting...',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ],
+            ),
+          ),
           IconButton(
             onPressed: () {},
-            icon: const Icon(
+            icon: Icon(
               Icons.videocam_outlined,
-              color: Colors.black54,
-              size: 28,
+              color: Colors.grey.shade600,
+              size: 24,
             ),
           ),
           IconButton(
             onPressed: () {},
-            icon: const Icon(
+            icon: Icon(
               Icons.phone_outlined,
-              color: Colors.black54,
-              size: 28,
+              color: Colors.grey.shade600,
+              size: 24,
             ),
           ),
         ],
@@ -528,16 +516,25 @@ class _HotlinePageState extends ConsumerState<HotlinePage> {
 
   Widget _buildMessagesList() {
     if (_messages.isEmpty) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.chat_bubble_outline, size: 64, color: Colors.black26),
-            SizedBox(height: 16),
+            Icon(Icons.chat_bubble_outline,
+                size: 48, color: Colors.grey.shade400),
+            const SizedBox(height: 16),
             Text(
-              'No messages yet.\nStart a conversation!',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.black54, fontSize: 16),
+              'No messages yet',
+              style: GoogleFonts.montserrat(
+                fontWeight: FontWeight.w600,
+                fontSize: 16,
+                color: Colors.grey.shade500,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Start a conversation with the organizers',
+              style: GoogleFonts.inter(fontSize: 14, color: Colors.grey),
             ),
           ],
         ),
@@ -547,10 +544,9 @@ class _HotlinePageState extends ConsumerState<HotlinePage> {
     return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.all(20),
-      itemCount: _messages.length + 1, // +1 for date header
+      itemCount: _messages.length + 1,
       itemBuilder: (context, index) {
         if (index == 0) {
-          // Date header
           return Center(
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 16),
@@ -558,11 +554,10 @@ class _HotlinePageState extends ConsumerState<HotlinePage> {
                 _messages.isNotEmpty
                     ? _formatDate(_messages.first.createdAt)
                     : '',
-                style: const TextStyle(
-                  fontFamily: 'Inter',
+                style: GoogleFonts.inter(
                   fontWeight: FontWeight.w600,
-                  fontSize: 16,
-                  color: Color(0xD4000000),
+                  fontSize: 13,
+                  color: Colors.grey.shade500,
                 ),
               ),
             ),
@@ -579,12 +574,12 @@ class _HotlinePageState extends ConsumerState<HotlinePage> {
     final isUser = message.isFromUser;
 
     final bubbleBg = isUser
-        ? AppColors.gradientStart
-        : const Color(0xFFE8E8F0);
-    final textColor = isUser ? Colors.white : AppColors.textPrimary;
+        ? AppTheme.primaryColor
+        : Colors.grey.shade100;
+    final textColor = isUser ? Colors.white : Colors.black87;
     final timeColor = isUser
-        ? Colors.white.withValues(alpha: 0.6)
-        : AppColors.textSecondary;
+        ? Colors.white.withValues(alpha: 0.7)
+        : Colors.grey.shade500;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
@@ -595,23 +590,23 @@ class _HotlinePageState extends ConsumerState<HotlinePage> {
         children: [
           if (!isUser) ...[
             CircleAvatar(
-              radius: 24,
-              backgroundColor: AppColors.gradientStart,
+              radius: 18,
+              backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
               child: const Icon(
                 Icons.support_agent,
-                color: Colors.white,
-                size: 24,
+                color: AppTheme.primaryColor,
+                size: 18,
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
           ],
           Flexible(
             child: Container(
               padding:
-                  const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
                 color: bubbleBg,
-                borderRadius: BorderRadius.circular(25),
+                borderRadius: BorderRadius.circular(16),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -620,7 +615,7 @@ class _HotlinePageState extends ConsumerState<HotlinePage> {
                       message.mediaUrl!.isNotEmpty) ...[
                     if (_isImageUrl(message.mediaUrl!))
                       ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(8),
                         child: Image.network(
                           message.mediaUrl!,
                           width: 200,
@@ -643,8 +638,7 @@ class _HotlinePageState extends ConsumerState<HotlinePage> {
                           Flexible(
                             child: Text(
                               message.content,
-                              style: TextStyle(
-                                fontFamily: 'Inter',
+                              style: GoogleFonts.inter(
                                 fontWeight: FontWeight.w500,
                                 fontSize: 14,
                                 color: textColor,
@@ -660,28 +654,28 @@ class _HotlinePageState extends ConsumerState<HotlinePage> {
                       !_isImageUrl(message.mediaUrl ?? ''))
                     Text(
                       message.content,
-                      style: TextStyle(
-                        fontFamily: 'Inter',
-                        fontWeight: FontWeight.w500,
-                        fontSize: 16,
+                      style: GoogleFonts.inter(
+                        fontWeight: FontWeight.w400,
+                        fontSize: 14,
                         color: textColor,
                       ),
                     ),
                   const SizedBox(height: 4),
                   Text(
                     _formatTime(message.createdAt),
-                    style: TextStyle(fontSize: 11, color: timeColor),
+                    style: GoogleFonts.inter(fontSize: 11, color: timeColor),
                   ),
                 ],
               ),
             ),
           ),
           if (isUser) ...[
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
             CircleAvatar(
-              radius: 24,
-              backgroundColor: AppColors.gradientEnd,
-              child: const Icon(Icons.person, color: Colors.white, size: 24),
+              radius: 18,
+              backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.2),
+              child: const Icon(Icons.person,
+                  color: AppTheme.primaryColor, size: 18),
             ),
           ],
         ],
@@ -708,8 +702,8 @@ class _HotlinePageState extends ConsumerState<HotlinePage> {
       height: isMobile ? 160 : 200,
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: AppColors.cardBackground,
-        border: Border(top: BorderSide(color: AppColors.inputBorder, width: 0.5)),
+        color: Colors.grey.shade50,
+        border: Border(top: BorderSide(color: Colors.grey.shade200)),
       ),
       child: GridView.builder(
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -732,22 +726,23 @@ class _HotlinePageState extends ConsumerState<HotlinePage> {
 
   Widget _buildInputArea() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.cardBackground,
+        color: Colors.grey.shade50,
         borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(20),
-          bottomRight: Radius.circular(20),
+          bottomLeft: Radius.circular(12),
+          bottomRight: Radius.circular(12),
         ),
+        border: Border(top: BorderSide(color: Colors.grey.shade200)),
       ),
       child: Row(
         children: [
           Expanded(
             child: Container(
               decoration: BoxDecoration(
-                color: const Color(0xFFE0E0EA),
-                borderRadius: BorderRadius.circular(30),
-                border: Border.all(color: AppColors.inputBorder, width: 0.5),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: Colors.grey.shade300),
               ),
               child: Row(
                 children: [
@@ -757,24 +752,22 @@ class _HotlinePageState extends ConsumerState<HotlinePage> {
                       _showEmojiPicker
                           ? Icons.keyboard
                           : Icons.emoji_emotions_outlined,
-                      color: AppColors.textSecondary,
-                      size: 24,
+                      color: Colors.grey.shade500,
+                      size: 22,
                     ),
                   ),
                   Expanded(
                     child: TextField(
                       controller: _messageController,
-                      style: TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 16,
-                        fontFamily: 'Inter',
+                      style: GoogleFonts.inter(
+                        color: Colors.black87,
+                        fontSize: 14,
                       ),
                       decoration: InputDecoration(
                         hintText: 'Message...',
-                        hintStyle: TextStyle(
-                          color: AppColors.textSecondary,
-                          fontFamily: 'Inter',
-                          fontSize: 16,
+                        hintStyle: GoogleFonts.inter(
+                          color: Colors.grey,
+                          fontSize: 14,
                         ),
                         border: InputBorder.none,
                         contentPadding:
@@ -788,22 +781,22 @@ class _HotlinePageState extends ConsumerState<HotlinePage> {
                     onPressed: _pickAndSendFile,
                     icon: Icon(
                       Icons.attach_file,
-                      color: AppColors.textSecondary,
-                      size: 24,
+                      color: Colors.grey.shade500,
+                      size: 22,
                     ),
                   ),
                 ],
               ),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 8),
           GestureDetector(
             onTap: _sendMessage,
             child: Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: AppColors.gradientStart,
+              width: 44,
+              height: 44,
+              decoration: const BoxDecoration(
+                color: AppTheme.primaryColor,
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -811,7 +804,7 @@ class _HotlinePageState extends ConsumerState<HotlinePage> {
                     ? Icons.mic
                     : Icons.send,
                 color: Colors.white,
-                size: 24,
+                size: 20,
               ),
             ),
           ),

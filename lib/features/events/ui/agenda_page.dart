@@ -269,39 +269,62 @@ class _AgendaPageState extends ConsumerState<AgendaPage> {
               ),
             ),
 
-            // Title
+            // Title + Toggle Row
             SliverToBoxAdapter(
               child: Padding(
                 padding: EdgeInsets.fromLTRB(hPad, 24, hPad, 0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Event Agenda',
-                      style: GoogleFonts.montserrat(
-                        fontSize: isMobile ? 20 : 30,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.primaryColor,
+                    if (isMobile) ...[
+                      Text(
+                        'Event Agenda',
+                        style: GoogleFonts.montserrat(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.primaryColor,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    const Divider(color: Color(0xFFCACACA), height: 1),
+                      const SizedBox(height: 12),
+                      const Divider(color: Color(0xFFCACACA), height: 1),
+                      const SizedBox(height: 16),
+                      _ProgramToggle(
+                        isProgramSelected: _isProgramSelected,
+                        isMobile: isMobile,
+                        onProgramTap: () =>
+                            setState(() => _isProgramSelected = true),
+                        onFavouriteTap: () =>
+                            setState(() => _isProgramSelected = false),
+                      ),
+                    ] else ...[
+                      Row(
+                        children: [
+                          Text(
+                            'Event Agenda',
+                            style: GoogleFonts.montserrat(
+                              fontSize: 30,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.primaryColor,
+                            ),
+                          ),
+                          const Spacer(),
+                          SizedBox(
+                            width: 430,
+                            child: _ProgramToggle(
+                              isProgramSelected: _isProgramSelected,
+                              isMobile: isMobile,
+                              onProgramTap: () =>
+                                  setState(() => _isProgramSelected = true),
+                              onFavouriteTap: () =>
+                                  setState(() => _isProgramSelected = false),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      const Divider(color: Color(0xFFCACACA), height: 1),
+                    ],
                   ],
-                ),
-              ),
-            ),
-
-            // Toggle Row
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(hPad, 16, hPad, 0),
-                child: _ProgramToggle(
-                  isProgramSelected: _isProgramSelected,
-                  isMobile: isMobile,
-                  onProgramTap: () =>
-                      setState(() => _isProgramSelected = true),
-                  onFavouriteTap: () =>
-                      setState(() => _isProgramSelected = false),
                 ),
               ),
             ),
@@ -440,8 +463,7 @@ class _ProgramToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final height = isMobile ? 44.0 : 52.0;
-    final radius = isMobile ? 22.0 : 26.0;
+    final height = isMobile ? 40.0 : 43.0;
 
     return SizedBox(
       height: height,
@@ -451,14 +473,14 @@ class _ProgramToggle extends StatelessWidget {
             label: 'Event Program',
             isActive: isProgramSelected,
             onTap: onProgramTap,
-            borderRadius: BorderRadius.horizontal(left: Radius.circular(radius)),
+            borderRadius: const BorderRadius.horizontal(left: Radius.circular(5)),
           ),
           _toggleButton(
             label: 'My Program',
             isActive: !isProgramSelected,
             onTap: onFavouriteTap,
             borderRadius:
-                BorderRadius.horizontal(right: Radius.circular(radius)),
+                const BorderRadius.horizontal(right: Radius.circular(5)),
           ),
         ],
       ),
@@ -520,51 +542,36 @@ class _SearchSortRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
+    return Stack(
+      clipBehavior: Clip.none,
       children: [
         Row(
           children: [
             // Search bar
             Expanded(
-              child: Container(
-                height: isMobile ? 38 : 48,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE5E6F2),
-                  borderRadius: BorderRadius.circular(5),
-                  border: Border.all(color: const Color(0xFFCACACA)),
-                ),
-                padding:
-                    EdgeInsets.symmetric(horizontal: isMobile ? 12 : 16),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.search,
-                      color: const Color(0xFF757A8A),
-                      size: isMobile ? 18 : 22,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextField(
-                        onChanged: onSearchChanged,
-                        style: GoogleFonts.roboto(
-                          fontSize: isMobile ? 14 : 16,
-                          color: Colors.black87,
-                        ),
-                        decoration: InputDecoration(
-                          hintText: 'Search by event name or ID',
-                          hintStyle: GoogleFonts.roboto(
-                            fontSize: isMobile ? 14 : 16,
-                            fontWeight: FontWeight.w400,
-                            color: const Color(0xFF757A8A),
-                          ),
-                          border: InputBorder.none,
-                          isDense: true,
-                          contentPadding: EdgeInsets.zero,
-                        ),
-                      ),
-                    ),
-                  ],
+              child: TextField(
+                onChanged: onSearchChanged,
+                style: GoogleFonts.inter(fontSize: 14),
+                decoration: InputDecoration(
+                  hintText: 'Search by event name or ID',
+                  hintStyle: GoogleFonts.inter(fontSize: 14, color: Colors.grey),
+                  prefixIcon: const Icon(Icons.search, size: 20),
+                  filled: true,
+                  fillColor: Colors.white,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(5),
+                    borderSide: const BorderSide(color: Color(0xFFCBCBCB)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(5),
+                    borderSide: const BorderSide(color: Color(0xFFCBCBCB)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(5),
+                    borderSide: const BorderSide(color: AppTheme.primaryColor, width: 2),
+                  ),
                 ),
               ),
             ),
@@ -622,10 +629,11 @@ class _SearchSortRow extends StatelessWidget {
               ),
           ],
         ),
-        // Dropdown
+        // Dropdown overlay
         if (showDropdown)
-          Padding(
-            padding: const EdgeInsets.only(top: 4),
+          Positioned(
+            top: 52,
+            right: 0,
             child: Container(
               width: isMobile ? 200 : 240,
               decoration: BoxDecoration(
@@ -633,8 +641,8 @@ class _SearchSortRow extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.12),
-                    blurRadius: 12,
+                    color: const Color(0xFFB5B5B5).withValues(alpha: 0.5),
+                    blurRadius: 20,
                     offset: const Offset(0, 4),
                   ),
                 ],
@@ -663,13 +671,12 @@ class _SearchSortRow extends StatelessWidget {
                           Expanded(
                             child: Text(
                               loc,
-                              style: GoogleFonts.roboto(
-                                fontSize: 14,
-                                fontWeight:
-                                    isSelected ? FontWeight.w600 : FontWeight.w400,
+                              style: GoogleFonts.inter(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
                                 color: isSelected
                                     ? AppTheme.primaryColor
-                                    : Colors.black87,
+                                    : const Color(0xFF292D32),
                               ),
                             ),
                           ),
@@ -717,60 +724,61 @@ class _MobileDaySelector extends StatelessWidget {
       child: Row(
         children: List.generate(days.length, (index) {
           final isSelected = selectedIndex == index;
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: GestureDetector(
-              onTap: () => onDaySelected(index),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: isSelected
+          final isLast = index == days.length - 1;
+          return GestureDetector(
+            onTap: () => onDaySelected(index),
+            child: SizedBox(
+              width: 110,
+              height: 36,
+              child: CustomPaint(
+                painter: _ArrowTabPainter(
+                  isSelected: isSelected,
+                  isLast: isLast,
+                  fillColor: isSelected
                       ? AppTheme.primaryColor
                       : Colors.transparent,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: isSelected
-                        ? AppTheme.primaryColor
-                        : const Color(0xFFD3D3D3),
-                  ),
+                  arrowColor: isSelected
+                      ? AppTheme.primaryColor
+                      : const Color(0xFFD4D4D4),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 20,
-                      height: 20,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: isSelected
-                            ? Colors.white
-                            : const Color(0xFFCED4E3),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        '${index + 1}',
-                        style: GoogleFonts.roboto(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
+                child: Center(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 18,
+                        height: 18,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
                           color: isSelected
-                              ? AppTheme.primaryColor
+                              ? Colors.white
+                              : const Color(0xFFCED4E3),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          '${index + 1}',
+                          style: GoogleFonts.roboto(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: isSelected
+                                ? AppTheme.primaryColor
+                                : const Color(0xFF345790),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Day ${index + 1}',
+                        style: GoogleFonts.roboto(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w400,
+                          color: isSelected
+                              ? Colors.white
                               : const Color(0xFF345790),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Day ${index + 1}',
-                      style: GoogleFonts.roboto(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w400,
-                        color:
-                            isSelected ? Colors.white : const Color(0xFF345790),
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -811,75 +819,66 @@ class _StepperDaySelector extends StatelessWidget {
       height: 43,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(5),
-        border: Border.all(color: const Color(0xFFD3D3D3)),
+        border: Border.all(color: const Color(0xFFD4D4D4)),
       ),
+      clipBehavior: Clip.antiAlias,
       child: Row(
         children: List.generate(days.length, (index) {
           final isSelected = selectedIndex == index;
-          final isFirst = index == 0;
           final isLast = index == days.length - 1;
 
           return Expanded(
             child: GestureDetector(
               onTap: () => onDaySelected(index),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: isSelected
+              child: CustomPaint(
+                painter: _ArrowTabPainter(
+                  isSelected: isSelected,
+                  isLast: isLast,
+                  fillColor: isSelected
                       ? AppTheme.primaryColor
                       : Colors.transparent,
-                  borderRadius: isFirst
-                      ? const BorderRadius.horizontal(
-                          left: Radius.circular(4))
-                      : isLast
-                          ? const BorderRadius.horizontal(
-                              right: Radius.circular(4))
-                          : null,
+                  arrowColor: isSelected
+                      ? AppTheme.primaryColor
+                      : const Color(0xFFD4D4D4),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 21,
-                      height: 21,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: isSelected
-                            ? Colors.white
-                            : const Color(0xFFCED4E3),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        '${index + 1}',
-                        style: GoogleFonts.roboto(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
+                child: Center(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 21,
+                        height: 21,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
                           color: isSelected
-                              ? AppTheme.primaryColor
+                              ? Colors.white
+                              : const Color(0xFFCED4E3),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          '${index + 1}',
+                          style: GoogleFonts.roboto(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: isSelected
+                                ? AppTheme.primaryColor
+                                : const Color(0xFF345790),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Day ${index + 1}',
+                        style: GoogleFonts.roboto(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w400,
+                          color: isSelected
+                              ? Colors.white
                               : const Color(0xFF345790),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Day ${index + 1}',
-                      style: GoogleFonts.roboto(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w400,
-                        color: isSelected
-                            ? Colors.white
-                            : const Color(0xFF345790),
-                      ),
-                    ),
-                    if (!isLast && !isSelected && selectedIndex != index + 1)
-                      Padding(
-                        padding: const EdgeInsets.only(left: 12),
-                        child: Container(
-                          width: 1,
-                          height: 24,
-                          color: const Color(0xFFCED4E3),
-                        ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -887,6 +886,69 @@ class _StepperDaySelector extends StatelessWidget {
         }),
       ),
     );
+  }
+}
+
+/// Custom painter that draws an arrow/chevron tab shape
+class _ArrowTabPainter extends CustomPainter {
+  final bool isSelected;
+  final bool isLast;
+  final Color fillColor;
+  final Color arrowColor;
+
+  _ArrowTabPainter({
+    required this.isSelected,
+    required this.isLast,
+    required this.fillColor,
+    required this.arrowColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final arrowWidth = 12.0;
+    final h = size.height;
+    final w = size.width;
+
+    // Fill background
+    final fillPaint = Paint()
+      ..color = fillColor
+      ..style = PaintingStyle.fill;
+
+    final fillPath = Path();
+    fillPath.moveTo(0, 0);
+    if (isLast) {
+      fillPath.lineTo(w, 0);
+      fillPath.lineTo(w, h);
+    } else {
+      fillPath.lineTo(w - arrowWidth, 0);
+      fillPath.lineTo(w, h / 2);
+      fillPath.lineTo(w - arrowWidth, h);
+    }
+    fillPath.lineTo(0, h);
+    fillPath.close();
+
+    canvas.drawPath(fillPath, fillPaint);
+
+    // Draw arrow divider line on the right
+    if (!isLast) {
+      final linePaint = Paint()
+        ..color = arrowColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.0;
+
+      final linePath = Path();
+      linePath.moveTo(w - arrowWidth, 0);
+      linePath.lineTo(w, h / 2);
+      linePath.lineTo(w - arrowWidth, h);
+
+      canvas.drawPath(linePath, linePaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ArrowTabPainter oldDelegate) {
+    return oldDelegate.isSelected != isSelected ||
+        oldDelegate.fillColor != fillColor;
   }
 }
 
@@ -950,19 +1012,38 @@ class _DesktopEpisodeRow extends StatelessWidget {
                     ),
                   ],
                 ),
-                child: isExpanded
-                    ? _ExpandedCardContent(
-                        item: item,
-                        isMobile: false,
-                        onToggleFavorite: onToggleFavorite,
-                        eventId: eventId,
-                      )
-                    : _CollapsedCardContent(
-                        item: item,
-                        isMobile: false,
-                        onToggleFavorite: onToggleFavorite,
-                        eventId: eventId,
+                child: Stack(
+                children: [
+                  isExpanded
+                      ? _ExpandedCardContent(
+                          item: item,
+                          isMobile: false,
+                          onToggleFavorite: onToggleFavorite,
+                          eventId: eventId,
+                        )
+                      : _CollapsedCardContent(
+                          item: item,
+                          isMobile: false,
+                          onToggleFavorite: onToggleFavorite,
+                          eventId: eventId,
+                        ),
+                  if (isExpanded)
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      bottom: 0,
+                      child: Container(
+                        width: 6,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF9CA4CC),
+                          borderRadius: BorderRadius.horizontal(
+                            left: Radius.circular(100),
+                          ),
+                        ),
                       ),
+                    ),
+                ],
+              ),
               ),
             ),
           ),
@@ -1017,28 +1098,46 @@ class _MobileEpisodeCard extends StatelessWidget {
               width: double.infinity,
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(5),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.06),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
+                    color: AppTheme.primaryColor.withValues(alpha: 0.5),
+                    blurRadius: 3.4,
                   ),
                 ],
               ),
-              child: isExpanded
-                  ? _ExpandedCardContent(
-                      item: item,
-                      isMobile: true,
-                      onToggleFavorite: onToggleFavorite,
-                      eventId: eventId,
-                    )
-                  : _CollapsedCardContent(
-                      item: item,
-                      isMobile: true,
-                      onToggleFavorite: onToggleFavorite,
-                      eventId: eventId,
+              child: Stack(
+                children: [
+                  isExpanded
+                      ? _ExpandedCardContent(
+                          item: item,
+                          isMobile: true,
+                          onToggleFavorite: onToggleFavorite,
+                          eventId: eventId,
+                        )
+                      : _CollapsedCardContent(
+                          item: item,
+                          isMobile: true,
+                          onToggleFavorite: onToggleFavorite,
+                          eventId: eventId,
+                        ),
+                  if (isExpanded)
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      bottom: 0,
+                      child: Container(
+                        width: 4,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF9CA4CC),
+                          borderRadius: BorderRadius.horizontal(
+                            left: Radius.circular(100),
+                          ),
+                        ),
+                      ),
                     ),
+                ],
+              ),
             ),
           ),
         ),
@@ -1202,95 +1301,232 @@ class _ExpandedCardContent extends StatelessWidget {
     final sponsor = item['sponsor'] as Map<String, dynamic>?;
     final speechTheme = item['speech_theme'] as String? ?? '';
 
+    if (isMobile) {
+      return _buildMobileLayout(speakers, moderator, sponsor, speechTheme);
+    }
+    return _buildDesktopLayout(
+        context, speakers, moderator, sponsor, speechTheme);
+  }
+
+  Widget _buildDesktopLayout(
+    BuildContext context,
+    List<Map<String, dynamic>> speakers,
+    Map<String, dynamic>? moderator,
+    Map<String, dynamic>? sponsor,
+    String speechTheme,
+  ) {
     return Padding(
-      padding: EdgeInsets.all(isMobile ? 12 : 20),
+      padding: const EdgeInsets.all(20),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Left: main content
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Badges
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: [
+                    if ((item['date'] as String?)?.isNotEmpty == true)
+                      _MetaBadge(
+                        icon: Icons.calendar_today_outlined,
+                        text: item['date'],
+                        isMobile: false,
+                      ),
+                    if ((item['location'] as String?)?.isNotEmpty == true)
+                      _MetaBadge(
+                        icon: Icons.location_on_outlined,
+                        text: item['location'],
+                        isMobile: false,
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // Title
+                Text(
+                  item['title'] ?? '',
+                  style: GoogleFonts.montserrat(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF151938),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Description
+                Text(
+                  item['description'] ?? '',
+                  style: GoogleFonts.roboto(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w400,
+                    color: Colors.black,
+                    height: 1.6,
+                  ),
+                ),
+
+                // Topic
+                if (speechTheme.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Text(
+                    'Topic: $speechTheme',
+                    style: GoogleFonts.montserrat(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF151938),
+                    ),
+                  ),
+                ],
+
+                // Speakers
+                if (speakers.isNotEmpty) ...[
+                  const SizedBox(height: 20),
+                  Text(
+                    'Speakers:',
+                    style: GoogleFonts.montserrat(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF151938),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _SpeakerCarouselDesktop(
+                      speakers: speakers, eventId: eventId),
+                ],
+
+                // Collapse hint
+                const SizedBox(height: 16),
+                Center(
+                  child: Icon(
+                    Icons.keyboard_arrow_up,
+                    size: 32,
+                    color: AppTheme.primaryColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Right: star + sponsor + moderator column
+          const SizedBox(width: 20),
+          SizedBox(
+            width: 160,
+            child: Column(
+              children: [
+                // Star
+                Align(
+                  alignment: Alignment.topRight,
+                  child: GestureDetector(
+                    onTap: onToggleFavorite,
+                    child: Icon(
+                      item['isFavorite'] == true
+                          ? Icons.star
+                          : Icons.star_border,
+                      size: 28,
+                      color: item['isFavorite'] == true
+                          ? Colors.amber
+                          : const Color(0xFF939393),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Sponsor
+                if (sponsor != null) ...[
+                  _SponsorWidget(
+                      sponsor: sponsor, isMobile: false, eventId: eventId),
+                  const SizedBox(height: 20),
+                ],
+
+                // Moderator
+                if (moderator != null) ...[
+                  Text(
+                    'Moderator',
+                    style: GoogleFonts.montserrat(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF151938),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _ModeratorCardCompact(
+                      moderator: moderator, eventId: eventId),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMobileLayout(
+    List<Map<String, dynamic>> speakers,
+    Map<String, dynamic>? moderator,
+    Map<String, dynamic>? sponsor,
+    String speechTheme,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.all(12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Title + star + sponsor row
+          // Title with star
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Title with star
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            item['title'] ?? '',
-                            style: GoogleFonts.montserrat(
-                              fontSize: isMobile ? 16 : 20,
-                              fontWeight: FontWeight.w600,
-                              color: const Color(0xFF151838),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        GestureDetector(
-                          onTap: onToggleFavorite,
-                          child: Icon(
-                            item['isFavorite'] == true
-                                ? Icons.star
-                                : Icons.star_border,
-                            size: isMobile ? 22 : 28,
-                            color: item['isFavorite'] == true
-                                ? Colors.amber
-                                : const Color(0xFF939393),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-
-                    // Badges
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 6,
-                      children: [
-                        if ((item['date'] as String?)?.isNotEmpty == true)
-                          _MetaBadge(
-                            icon: Icons.calendar_today_outlined,
-                            text: item['date'],
-                            isMobile: isMobile,
-                          ),
-                        if ((item['location'] as String?)?.isNotEmpty == true)
-                          _MetaBadge(
-                            icon: Icons.location_on_outlined,
-                            text: item['location'],
-                            isMobile: isMobile,
-                          ),
-                      ],
-                    ),
-                  ],
+                child: Text(
+                  item['title'] ?? '',
+                  style: GoogleFonts.montserrat(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF151938),
+                  ),
                 ),
               ),
-              // Sponsor on the right (desktop)
-              if (sponsor != null && !isMobile) ...[
-                const SizedBox(width: 16),
-                _SponsorWidget(sponsor: sponsor, isMobile: false, eventId: eventId),
-              ],
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: onToggleFavorite,
+                child: Icon(
+                  item['isFavorite'] == true
+                      ? Icons.star
+                      : Icons.star_border,
+                  size: 22,
+                  color: item['isFavorite'] == true
+                      ? Colors.amber
+                      : const Color(0xFF939393),
+                ),
+              ),
             ],
           ),
+          const SizedBox(height: 8),
 
-          // Topic
-          if (speechTheme.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            Text(
-              'Topic: $speechTheme',
-              style: GoogleFonts.montserrat(
-                fontSize: isMobile ? 16 : 20,
-                fontWeight: FontWeight.w600,
-                color: const Color(0xFF151838),
-              ),
-            ),
-          ],
-
-          // Full description
+          // Badges
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: [
+              if ((item['date'] as String?)?.isNotEmpty == true)
+                _MetaBadge(
+                  icon: Icons.calendar_today_outlined,
+                  text: item['date'],
+                  isMobile: true,
+                ),
+              if ((item['location'] as String?)?.isNotEmpty == true)
+                _MetaBadge(
+                  icon: Icons.location_on_outlined,
+                  text: item['location'],
+                  isMobile: true,
+                ),
+            ],
+          ),
           const SizedBox(height: 12),
+
+          // Description
           Text(
             item['description'] ?? '',
             style: GoogleFonts.roboto(
@@ -1301,12 +1537,26 @@ class _ExpandedCardContent extends StatelessWidget {
             ),
           ),
 
-          // Sponsor (mobile -- below description)
-          if (sponsor != null && isMobile) ...[
+          // Topic
+          if (speechTheme.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Text(
+              'Topic: $speechTheme',
+              style: GoogleFonts.montserrat(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFF151938),
+              ),
+            ),
+          ],
+
+          // Sponsor
+          if (sponsor != null) ...[
             const SizedBox(height: 16),
             Align(
               alignment: Alignment.centerRight,
-              child: _SponsorWidget(sponsor: sponsor, isMobile: true, eventId: eventId),
+              child: _SponsorWidget(
+                  sponsor: sponsor, isMobile: true, eventId: eventId),
             ),
           ],
 
@@ -1316,15 +1566,13 @@ class _ExpandedCardContent extends StatelessWidget {
             Text(
               'Speakers:',
               style: GoogleFonts.montserrat(
-                fontSize: isMobile ? 16 : 20,
+                fontSize: 16,
                 fontWeight: FontWeight.w600,
-                color: const Color(0xFF151838),
+                color: const Color(0xFF151938),
               ),
             ),
             const SizedBox(height: 12),
-            isMobile
-                ? _SpeakerScrollMobile(speakers: speakers, eventId: eventId)
-                : _SpeakerCarouselDesktop(speakers: speakers, eventId: eventId),
+            _SpeakerScrollMobile(speakers: speakers, eventId: eventId),
           ],
 
           // Moderator
@@ -1333,13 +1581,14 @@ class _ExpandedCardContent extends StatelessWidget {
             Text(
               'Moderator',
               style: GoogleFonts.montserrat(
-                fontSize: isMobile ? 16 : 22,
+                fontSize: 16,
                 fontWeight: FontWeight.w600,
-                color: const Color(0xFF151838),
+                color: const Color(0xFF151938),
               ),
             ),
             const SizedBox(height: 12),
-            _ModeratorCard(moderator: moderator, isMobile: isMobile, eventId: eventId),
+            _ModeratorCard(
+                moderator: moderator, isMobile: true, eventId: eventId),
           ],
 
           // Collapse hint
@@ -1347,7 +1596,7 @@ class _ExpandedCardContent extends StatelessWidget {
           Center(
             child: Icon(
               Icons.keyboard_arrow_up,
-              size: isMobile ? 24 : 32,
+              size: 24,
               color: AppTheme.primaryColor,
             ),
           ),
@@ -1438,7 +1687,8 @@ class _SponsorWidget extends StatelessWidget {
           decoration: BoxDecoration(
             color: Colors.grey[200],
             borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(4)),
+                const BorderRadius.vertical(top: Radius.circular(5)),
+            border: Border.all(color: const Color(0xFFD9D9D9)),
           ),
           child: logoUrl.isNotEmpty
               ? ClipRRect(
@@ -1477,7 +1727,15 @@ class _SponsorWidget extends StatelessWidget {
           decoration: BoxDecoration(
             color: tierBg,
             borderRadius:
-                const BorderRadius.vertical(bottom: Radius.circular(4)),
+                const BorderRadius.vertical(bottom: Radius.circular(5)),
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.primaryColor.withValues(alpha: 0.5),
+                blurRadius: 5,
+                offset: const Offset(0, 1),
+                spreadRadius: -1,
+              ),
+            ],
           ),
           child: Text(
             tierLabel,
@@ -1579,11 +1837,11 @@ class _ModeratorCard extends StatelessWidget {
             height: isMobile ? 64 : 110,
             decoration: BoxDecoration(
               color: Colors.grey[300],
-              borderRadius: BorderRadius.circular(4),
+              borderRadius: BorderRadius.circular(3),
             ),
             child: photoUrl.isNotEmpty
                 ? ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius: BorderRadius.circular(3),
                     child: Image.network(
                       photoUrl,
                       fit: BoxFit.cover,
@@ -1625,6 +1883,78 @@ class _ModeratorCard extends StatelessWidget {
         ],
       ),
     ),
+    );
+  }
+}
+
+class _ModeratorCardCompact extends StatelessWidget {
+  final Map<String, dynamic> moderator;
+  final String eventId;
+
+  const _ModeratorCardCompact({required this.moderator, required this.eventId});
+
+  @override
+  Widget build(BuildContext context) {
+    final photoUrl = moderator['photo']?.toString() ?? '';
+
+    return GestureDetector(
+      onTap: () {
+        final id = moderator['id'];
+        if (id != null) context.push('/events/$eventId/speakers/$id');
+      },
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(5),
+          border: Border.all(color: const Color(0xFFD9D9D9)),
+        ),
+        child: Column(
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(3),
+              ),
+              child: photoUrl.isNotEmpty
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(3),
+                      child: Image.network(
+                        photoUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const Center(
+                          child: Icon(Icons.person, size: 32, color: Colors.grey),
+                        ),
+                      ),
+                    )
+                  : const Center(
+                      child: Icon(Icons.person, size: 32, color: Colors.grey),
+                    ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              moderator['position'] ?? '',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.roboto(
+                fontSize: 10,
+                fontWeight: FontWeight.w400,
+                color: AppTheme.primaryColor,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              moderator['name'] ?? '',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.roboto(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Colors.black,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -1770,9 +2100,9 @@ class _SpeakerMiniCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(5),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: Colors.black.withValues(alpha: 0.25),
+            blurRadius: 5,
+            offset: const Offset(0, 1),
           ),
         ],
       ),
