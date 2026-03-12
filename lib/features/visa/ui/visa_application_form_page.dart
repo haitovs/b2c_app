@@ -156,7 +156,7 @@ class _VisaApplicationFormPageState
   bool _isSubmitting = false;
 
   // Marital Status & Relatives
-  String _maritalStatus = 'single'; // 'single' or 'married'
+  String _maritalStatus = 'single'; // 'single', 'married', 'divorced', 'widowed'
   final List<Map<String, dynamic>> _relatives = [];
 
   bool _confirmationChecked = false;
@@ -351,20 +351,24 @@ class _VisaApplicationFormPageState
               : null,
         ));
       }
-    } else if (_maritalStatus == 'married') {
-      final spouseFirst = visa['spouse_first_name'] ?? '';
-      final spouseLast = visa['spouse_last_name'] ?? '';
-      if (spouseFirst.isNotEmpty || spouseLast.isNotEmpty) {
-        _relatives.add(_createRelativeEntry(
-          relationship: visa['spouse_relationship'] ?? 'Wife',
-          firstName: spouseFirst,
-          lastName: spouseLast,
-          citizenship: visa['spouse_citizenship'] ?? '',
-          dateOfBirth: visa['spouse_date_of_birth'] != null
-              ? DateTime.parse(visa['spouse_date_of_birth'])
-              : null,
-        ));
+    } else {
+      // Legacy fallback: load spouse fields only if married
+      if (_maritalStatus == 'married') {
+        final spouseFirst = visa['spouse_first_name'] ?? '';
+        final spouseLast = visa['spouse_last_name'] ?? '';
+        if (spouseFirst.isNotEmpty || spouseLast.isNotEmpty) {
+          _relatives.add(_createRelativeEntry(
+            relationship: visa['spouse_relationship'] ?? 'Wife',
+            firstName: spouseFirst,
+            lastName: spouseLast,
+            citizenship: visa['spouse_citizenship'] ?? '',
+            dateOfBirth: visa['spouse_date_of_birth'] != null
+                ? DateTime.parse(visa['spouse_date_of_birth'])
+                : null,
+          ));
+        }
       }
+      // Legacy children load for any marital status
       final childrenList = visa['children'] as List<dynamic>?;
       if (childrenList != null) {
         for (var child in childrenList) {
@@ -436,7 +440,7 @@ class _VisaApplicationFormPageState
           _plannedResidentialAddressController.text.trim(),
       if (photoUrl != null) 'photo_url': photoUrl,
       if (passportScanUrl != null) 'passport_scan_url': passportScanUrl,
-      'marital_status': _maritalStatus == 'single' ? 'Single' : 'Married',
+      'marital_status': _maritalStatus[0].toUpperCase() + _maritalStatus.substring(1),
       'relatives': _relatives.map((rel) {
         return {
           'relationship': rel['relationship'],
@@ -1447,80 +1451,81 @@ class _VisaApplicationFormPageState
             ),
           ),
           const SizedBox(height: 16),
-          _buildMaritalStatusToggle(),
+          _buildMaritalStatusDropdown(),
           const SizedBox(height: 16),
 
-          // Relatives section (shown when married)
-          if (_maritalStatus == 'married') ...[
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Relatives:',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                  ),
+          // Relatives section (always available — children possible for any status)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Relatives:',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
                 ),
-                TextButton.icon(
-                  onPressed: _addRelative,
-                  icon: const Icon(Icons.add, size: 18),
-                  label: const Text('Add'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: _primaryColor,
-                  ),
+              ),
+              TextButton.icon(
+                onPressed: _addRelative,
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Add'),
+                style: TextButton.styleFrom(
+                  foregroundColor: _primaryColor,
                 ),
-              ],
-            ),
-            ..._relatives.asMap().entries.map((entry) {
-              return _buildRelativeSection(entry.key, entry.value);
-            }),
-          ],
+              ),
+            ],
+          ),
+          ..._relatives.asMap().entries.map((entry) {
+            return _buildRelativeSection(entry.key, entry.value);
+          }),
         ],
       ),
     );
   }
 
-  Widget _buildMaritalStatusToggle() {
-    final isMarried = _maritalStatus == 'married';
-    return Row(
-      children: [
-        // Yes button
-        SizedBox(
-          width: 100,
+  Widget _buildMaritalStatusDropdown() {
+    const statuses = ['single', 'married', 'divorced', 'widowed'];
+    const labels = {
+      'single': 'Single',
+      'married': 'Married',
+      'divorced': 'Divorced',
+      'widowed': 'Widowed',
+    };
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: statuses.map((status) {
+        final isSelected = _maritalStatus == status;
+        final Color bgColor;
+        final Color borderColor;
+        if (isSelected) {
+          bgColor = _primaryColor;
+          borderColor = _primaryColor;
+        } else {
+          bgColor = Colors.white;
+          borderColor = _borderColor;
+        }
+        return SizedBox(
           height: 40,
           child: OutlinedButton(
-            onPressed: () => setState(() => _maritalStatus = 'married'),
+            onPressed: () => setState(() => _maritalStatus = status),
             style: OutlinedButton.styleFrom(
-              backgroundColor: isMarried ? _greenColor : Colors.white,
-              foregroundColor: isMarried ? Colors.white : _greenColor,
-              side: const BorderSide(color: _greenColor, width: 1.5),
+              backgroundColor: bgColor,
+              foregroundColor: isSelected ? Colors.white : const Color(0xFF333333),
+              side: BorderSide(color: borderColor, width: 1.5),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(5),
               ),
+              padding: const EdgeInsets.symmetric(horizontal: 20),
             ),
-            child: const Text('Yes', style: TextStyle(fontSize: 14)),
-          ),
-        ),
-        const SizedBox(width: 12),
-        // No button
-        SizedBox(
-          width: 100,
-          height: 40,
-          child: OutlinedButton(
-            onPressed: () => setState(() => _maritalStatus = 'single'),
-            style: OutlinedButton.styleFrom(
-              backgroundColor: !isMarried ? _redColor : Colors.white,
-              foregroundColor: !isMarried ? Colors.white : _redColor,
-              side: const BorderSide(color: _redColor, width: 1.5),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(5),
-              ),
+            child: Text(
+              labels[status]!,
+              style: const TextStyle(fontSize: 14),
             ),
-            child: const Text('No', style: TextStyle(fontSize: 14)),
           ),
-        ),
-      ],
+        );
+      }).toList(),
     );
   }
 
