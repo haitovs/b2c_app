@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/providers/auth_provider.dart';
+import '../../company/models/company.dart';
 import '../../company/providers/company_providers.dart';
 import '../models/team_member.dart';
 import '../services/team_service.dart';
@@ -27,6 +28,13 @@ final allTeamMembersProvider =
   );
 
   return results.expand((list) => list).toList();
+});
+
+/// Fetch the company the current user is a team member of for a given event.
+/// Returns null if the user is not a team member of any company.
+final myTeamCompanyProvider =
+    FutureProvider.family<Company?, int>((ref, eventId) {
+  return ref.watch(teamServiceProvider).getMyTeamCompany(eventId);
 });
 
 /// Fetch a single team member by ID (for edit form pre-population).

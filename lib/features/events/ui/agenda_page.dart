@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import '../../../../core/config/app_config.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/widgets/app_cached_image.dart';
 
 class AgendaPage extends ConsumerStatefulWidget {
   final String eventId;
@@ -724,7 +725,8 @@ class _MobileDaySelector extends StatelessWidget {
       child: Row(
         children: List.generate(days.length, (index) {
           final isSelected = selectedIndex == index;
-          final isLast = index == days.length - 1;
+          final prevSelected = index > 0 && selectedIndex == index - 1;
+          final isFirst = index == 0;
           return GestureDetector(
             onTap: () => onDaySelected(index),
             child: SizedBox(
@@ -733,13 +735,8 @@ class _MobileDaySelector extends StatelessWidget {
               child: CustomPaint(
                 painter: _ArrowTabPainter(
                   isSelected: isSelected,
-                  isLast: isLast,
-                  fillColor: isSelected
-                      ? AppTheme.primaryColor
-                      : Colors.transparent,
-                  arrowColor: isSelected
-                      ? AppTheme.primaryColor
-                      : const Color(0xFFD4D4D4),
+                  isFirst: isFirst,
+                  prevSelected: prevSelected,
                 ),
                 child: Center(
                   child: Row(
@@ -823,23 +820,21 @@ class _StepperDaySelector extends StatelessWidget {
       ),
       clipBehavior: Clip.antiAlias,
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: List.generate(days.length, (index) {
           final isSelected = selectedIndex == index;
-          final isLast = index == days.length - 1;
+          final prevSelected = index > 0 && selectedIndex == index - 1;
+          final isFirst = index == 0;
 
-          return Expanded(
-            child: GestureDetector(
-              onTap: () => onDaySelected(index),
+          return GestureDetector(
+            onTap: () => onDaySelected(index),
+            child: SizedBox(
+              width: 120,
               child: CustomPaint(
                 painter: _ArrowTabPainter(
                   isSelected: isSelected,
-                  isLast: isLast,
-                  fillColor: isSelected
-                      ? AppTheme.primaryColor
-                      : Colors.transparent,
-                  arrowColor: isSelected
-                      ? AppTheme.primaryColor
-                      : const Color(0xFFD4D4D4),
+                  isFirst: isFirst,
+                  prevSelected: prevSelected,
                 ),
                 child: Center(
                   child: Row(
@@ -889,66 +884,106 @@ class _StepperDaySelector extends StatelessWidget {
   }
 }
 
-/// Custom painter that draws an arrow/chevron tab shape
+/// Custom painter for arrow/chevron day tabs.
+///
+/// Selected tab: solid blue arrow shape (full rectangle + arrow tip on right,
+/// left side has inward notch if previous tab exists).
+///
+/// Unselected tab: transparent, only draws the chevron divider line on right
+/// (unless previous tab was selected — then left side gets a notch cutout).
 class _ArrowTabPainter extends CustomPainter {
   final bool isSelected;
-  final bool isLast;
-  final Color fillColor;
-  final Color arrowColor;
+  final bool isFirst;
+  final bool prevSelected;
+
+  static const _arrow = 12.0;
+  static const _primaryColor = AppTheme.primaryColor;
+  static const _dividerColor = Color(0xFFD4D4D4);
 
   _ArrowTabPainter({
     required this.isSelected,
-    required this.isLast,
-    required this.fillColor,
-    required this.arrowColor,
+    required this.isFirst,
+    required this.prevSelected,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    final arrowWidth = 12.0;
     final h = size.height;
     final w = size.width;
 
-    // Fill background
-    final fillPaint = Paint()
-      ..color = fillColor
-      ..style = PaintingStyle.fill;
+    if (isSelected) {
+      final paint = Paint()
+        ..color = _primaryColor
+        ..style = PaintingStyle.fill;
+      final whitePaint = Paint()
+        ..color = Colors.white
+        ..style = PaintingStyle.fill;
 
-    final fillPath = Path();
-    fillPath.moveTo(0, 0);
-    if (isLast) {
-      fillPath.lineTo(w, 0);
-      fillPath.lineTo(w, h);
+      // Fill entire rectangle blue
+      canvas.drawRect(Rect.fromLTWH(0, 0, w, h), paint);
+
+      // Cut out white notch on left (inward arrow) if not first tab
+      if (!isFirst) {
+        final leftNotch = Path()
+          ..moveTo(0, 0)
+          ..lineTo(_arrow, h / 2)
+          ..lineTo(0, h)
+          ..close();
+        canvas.drawPath(leftNotch, whitePaint);
+      }
+
+      // Cut out white triangles on right to form the arrow tip
+      // Top-right triangle
+      final topRight = Path()
+        ..moveTo(w - _arrow, 0)
+        ..lineTo(w, 0)
+        ..lineTo(w, h / 2)
+        ..close();
+      canvas.drawPath(topRight, whitePaint);
+
+      // Bottom-right triangle
+      final bottomRight = Path()
+        ..moveTo(w - _arrow, h)
+        ..lineTo(w, h)
+        ..lineTo(w, h / 2)
+        ..close();
+      canvas.drawPath(bottomRight, whitePaint);
     } else {
-      fillPath.lineTo(w - arrowWidth, 0);
-      fillPath.lineTo(w, h / 2);
-      fillPath.lineTo(w - arrowWidth, h);
-    }
-    fillPath.lineTo(0, h);
-    fillPath.close();
+      // --- UNSELECTED: transparent background ---
 
-    canvas.drawPath(fillPath, fillPaint);
+      // If previous tab was selected, paint white over the left notch area
+      // to cover the blue rectangle that bleeds from the previous tab
+      if (prevSelected) {
+        final whitePaint = Paint()
+          ..color = Colors.white
+          ..style = PaintingStyle.fill;
+        final notch = Path()
+          ..moveTo(0, 0)
+          ..lineTo(_arrow, h / 2)
+          ..lineTo(0, h)
+          ..close();
+        canvas.drawPath(notch, whitePaint);
+      }
 
-    // Draw arrow divider line on the right
-    if (!isLast) {
+      // Draw chevron divider line on the right
       final linePaint = Paint()
-        ..color = arrowColor
+        ..color = _dividerColor
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.0;
 
-      final linePath = Path();
-      linePath.moveTo(w - arrowWidth, 0);
-      linePath.lineTo(w, h / 2);
-      linePath.lineTo(w - arrowWidth, h);
-
-      canvas.drawPath(linePath, linePaint);
+      final line = Path()
+        ..moveTo(w - _arrow, 0)
+        ..lineTo(w, h / 2)
+        ..lineTo(w - _arrow, h);
+      canvas.drawPath(line, linePaint);
     }
   }
 
   @override
   bool shouldRepaint(covariant _ArrowTabPainter oldDelegate) {
     return oldDelegate.isSelected != isSelected ||
-        oldDelegate.fillColor != fillColor;
+        oldDelegate.isFirst != isFirst ||
+        oldDelegate.prevSelected != prevSelected;
   }
 }
 
@@ -976,17 +1011,22 @@ class _DesktopEpisodeRow extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Time column
+        // Time column — single line, no wrap
         SizedBox(
-          width: 130,
+          width: 160,
           child: Padding(
             padding: const EdgeInsets.only(top: 16),
-            child: Text(
-              '${item['startTime']} - ${item['endTime']}',
-              style: GoogleFonts.montserrat(
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-                color: AppTheme.primaryColor,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                '${item['startTime']} - ${item['endTime']}',
+                maxLines: 1,
+                style: GoogleFonts.montserrat(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.primaryColor,
+                ),
               ),
             ),
           ),
@@ -1177,37 +1217,6 @@ class _CollapsedCardContent extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Title row with star
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        item['title'] ?? '',
-                        style: GoogleFonts.montserrat(
-                          fontSize: isMobile ? 16 : 20,
-                          fontWeight: FontWeight.w600,
-                          color: const Color(0xFF151838),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    GestureDetector(
-                      onTap: onToggleFavorite,
-                      child: Icon(
-                        item['isFavorite'] == true
-                            ? Icons.star
-                            : Icons.star_border,
-                        size: isMobile ? 22 : 28,
-                        color: item['isFavorite'] == true
-                            ? Colors.amber
-                            : const Color(0xFF939393),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-
                 // Badges
                 Wrap(
                   spacing: 8,
@@ -1229,10 +1238,21 @@ class _CollapsedCardContent extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
 
-                // Description (truncated)
+                // Title
+                Text(
+                  item['title'] ?? '',
+                  style: GoogleFonts.montserrat(
+                    fontSize: isMobile ? 16 : 20,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF151838),
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                // Description (truncated to 3 lines)
                 Text(
                   item['description'] ?? '',
-                  maxLines: isMobile ? 3 : 3,
+                  maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.roboto(
                     fontSize: 14,
@@ -1266,11 +1286,33 @@ class _CollapsedCardContent extends StatelessWidget {
             ),
           ),
 
-          // Sponsor (right side) -- desktop only inline
-          if (sponsor != null && !isMobile) ...[
-            const SizedBox(width: 16),
-            _SponsorWidget(sponsor: sponsor, isMobile: false, eventId: eventId),
-          ],
+          const SizedBox(width: 12),
+
+          // Right column: star + sponsor
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              // Favorite star
+              GestureDetector(
+                onTap: onToggleFavorite,
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Icon(
+                    item['isFavorite'] == true
+                        ? Icons.star
+                        : Icons.star_border,
+                    size: isMobile ? 22 : 28,
+                    color: item['isFavorite'] == true
+                        ? Colors.amber
+                        : const Color(0xFF939393),
+                  ),
+                ),
+              ),
+              // Sponsor below star
+              if (sponsor != null)
+                _SponsorWidget(sponsor: sponsor, isMobile: isMobile, eventId: eventId),
+            ],
+          ),
         ],
       ),
     );
@@ -1315,151 +1357,158 @@ class _ExpandedCardContent extends StatelessWidget {
     Map<String, dynamic>? sponsor,
     String speechTheme,
   ) {
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Left: main content
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Badges
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 6,
+    return Stack(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(20),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Left: main content
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if ((item['date'] as String?)?.isNotEmpty == true)
-                      _MetaBadge(
-                        icon: Icons.calendar_today_outlined,
-                        text: item['date'],
-                        isMobile: false,
+                    // Badges
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: [
+                        if ((item['date'] as String?)?.isNotEmpty == true)
+                          _MetaBadge(
+                            icon: Icons.calendar_today_outlined,
+                            text: item['date'],
+                            isMobile: false,
+                          ),
+                        if ((item['location'] as String?)?.isNotEmpty == true)
+                          _MetaBadge(
+                            icon: Icons.location_on_outlined,
+                            text: item['location'],
+                            isMobile: false,
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Title
+                    Text(
+                      item['title'] ?? '',
+                      style: GoogleFonts.montserrat(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF151938),
                       ),
-                    if ((item['location'] as String?)?.isNotEmpty == true)
-                      _MetaBadge(
-                        icon: Icons.location_on_outlined,
-                        text: item['location'],
-                        isMobile: false,
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Description
+                    Text(
+                      item['description'] ?? '',
+                      style: GoogleFonts.roboto(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w400,
+                        color: Colors.black,
+                        height: 1.6,
                       ),
+                    ),
+
+                    // Topic
+                    if (speechTheme.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      Text(
+                        'Topic: $speechTheme',
+                        style: GoogleFonts.montserrat(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF151938),
+                        ),
+                      ),
+                    ],
+
+                    // Speakers
+                    if (speakers.isNotEmpty) ...[
+                      const SizedBox(height: 20),
+                      Text(
+                        'Speakers:',
+                        style: GoogleFonts.montserrat(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF151938),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _SpeakerCarouselDesktop(
+                          speakers: speakers, eventId: eventId),
+                    ],
+
+                    // Collapse hint
+                    const SizedBox(height: 16),
+                    Center(
+                      child: Icon(
+                        Icons.keyboard_arrow_up,
+                        size: 32,
+                        color: AppTheme.primaryColor,
+                      ),
+                    ),
                   ],
                 ),
-                const SizedBox(height: 12),
+              ),
 
-                // Title
-                Text(
-                  item['title'] ?? '',
-                  style: GoogleFonts.montserrat(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
-                    color: const Color(0xFF151938),
-                  ),
+              // Right: sponsor + moderator column
+              const SizedBox(width: 20),
+              SizedBox(
+                width: 160,
+                child: Column(
+                  children: [
+                    // Spacing to account for star in top-right
+                    const SizedBox(height: 40),
+
+                    // Sponsor
+                    if (sponsor != null) ...[
+                      _SponsorWidget(
+                          sponsor: sponsor, isMobile: false, eventId: eventId),
+                      const SizedBox(height: 20),
+                    ],
+
+                    // Moderator
+                    if (moderator != null) ...[
+                      Text(
+                        'Moderator',
+                        style: GoogleFonts.montserrat(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF151938),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _ModeratorCardCompact(
+                          moderator: moderator, eventId: eventId),
+                    ],
+                  ],
                 ),
-                const SizedBox(height: 12),
+              ),
+            ],
+          ),
+        ),
 
-                // Description
-                Text(
-                  item['description'] ?? '',
-                  style: GoogleFonts.roboto(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w400,
-                    color: Colors.black,
-                    height: 1.6,
-                  ),
-                ),
-
-                // Topic
-                if (speechTheme.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  Text(
-                    'Topic: $speechTheme',
-                    style: GoogleFonts.montserrat(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w600,
-                      color: const Color(0xFF151938),
-                    ),
-                  ),
-                ],
-
-                // Speakers
-                if (speakers.isNotEmpty) ...[
-                  const SizedBox(height: 20),
-                  Text(
-                    'Speakers:',
-                    style: GoogleFonts.montserrat(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w600,
-                      color: const Color(0xFF151938),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  _SpeakerCarouselDesktop(
-                      speakers: speakers, eventId: eventId),
-                ],
-
-                // Collapse hint
-                const SizedBox(height: 16),
-                Center(
-                  child: Icon(
-                    Icons.keyboard_arrow_up,
-                    size: 32,
-                    color: AppTheme.primaryColor,
-                  ),
-                ),
-              ],
+        // Favorite star — always top-right corner
+        Positioned(
+          top: 12,
+          right: 12,
+          child: GestureDetector(
+            onTap: onToggleFavorite,
+            child: Icon(
+              item['isFavorite'] == true
+                  ? Icons.star
+                  : Icons.star_border,
+              size: 28,
+              color: item['isFavorite'] == true
+                  ? Colors.amber
+                  : const Color(0xFF939393),
             ),
           ),
-
-          // Right: star + sponsor + moderator column
-          const SizedBox(width: 20),
-          SizedBox(
-            width: 160,
-            child: Column(
-              children: [
-                // Star
-                Align(
-                  alignment: Alignment.topRight,
-                  child: GestureDetector(
-                    onTap: onToggleFavorite,
-                    child: Icon(
-                      item['isFavorite'] == true
-                          ? Icons.star
-                          : Icons.star_border,
-                      size: 28,
-                      color: item['isFavorite'] == true
-                          ? Colors.amber
-                          : const Color(0xFF939393),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // Sponsor
-                if (sponsor != null) ...[
-                  _SponsorWidget(
-                      sponsor: sponsor, isMobile: false, eventId: eventId),
-                  const SizedBox(height: 20),
-                ],
-
-                // Moderator
-                if (moderator != null) ...[
-                  Text(
-                    'Moderator',
-                    style: GoogleFonts.montserrat(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w600,
-                      color: const Color(0xFF151938),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  _ModeratorCardCompact(
-                      moderator: moderator, eventId: eventId),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -1469,16 +1518,37 @@ class _ExpandedCardContent extends StatelessWidget {
     Map<String, dynamic>? sponsor,
     String speechTheme,
   ) {
-    return Padding(
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Title with star
-          Row(
+    return Stack(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
+              // Badges
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  if ((item['date'] as String?)?.isNotEmpty == true)
+                    _MetaBadge(
+                      icon: Icons.calendar_today_outlined,
+                      text: item['date'],
+                      isMobile: true,
+                    ),
+                  if ((item['location'] as String?)?.isNotEmpty == true)
+                    _MetaBadge(
+                      icon: Icons.location_on_outlined,
+                      text: item['location'],
+                      isMobile: true,
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+
+              // Title
+              Padding(
+                padding: const EdgeInsets.only(right: 32),
                 child: Text(
                   item['title'] ?? '',
                   style: GoogleFonts.montserrat(
@@ -1488,120 +1558,104 @@ class _ExpandedCardContent extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
-              GestureDetector(
-                onTap: onToggleFavorite,
+              const SizedBox(height: 12),
+
+              // Description
+              Text(
+                item['description'] ?? '',
+                style: GoogleFonts.roboto(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w400,
+                  color: Colors.black,
+                  height: 1.6,
+                ),
+              ),
+
+              // Topic
+              if (speechTheme.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Text(
+                  'Topic: $speechTheme',
+                  style: GoogleFonts.montserrat(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF151938),
+                  ),
+                ),
+              ],
+
+              // Sponsor
+              if (sponsor != null) ...[
+                const SizedBox(height: 16),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: _SponsorWidget(
+                      sponsor: sponsor, isMobile: true, eventId: eventId),
+                ),
+              ],
+
+              // Speakers
+              if (speakers.isNotEmpty) ...[
+                const SizedBox(height: 20),
+                Text(
+                  'Speakers:',
+                  style: GoogleFonts.montserrat(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF151938),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _SpeakerScrollMobile(speakers: speakers, eventId: eventId),
+              ],
+
+              // Moderator
+              if (moderator != null) ...[
+                const SizedBox(height: 20),
+                Text(
+                  'Moderator',
+                  style: GoogleFonts.montserrat(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF151938),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _ModeratorCard(
+                    moderator: moderator, isMobile: true, eventId: eventId),
+              ],
+
+              // Collapse hint
+              const SizedBox(height: 16),
+              Center(
                 child: Icon(
-                  item['isFavorite'] == true
-                      ? Icons.star
-                      : Icons.star_border,
-                  size: 22,
-                  color: item['isFavorite'] == true
-                      ? Colors.amber
-                      : const Color(0xFF939393),
+                  Icons.keyboard_arrow_up,
+                  size: 24,
+                  color: AppTheme.primaryColor,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+        ),
 
-          // Badges
-          Wrap(
-            spacing: 8,
-            runSpacing: 6,
-            children: [
-              if ((item['date'] as String?)?.isNotEmpty == true)
-                _MetaBadge(
-                  icon: Icons.calendar_today_outlined,
-                  text: item['date'],
-                  isMobile: true,
-                ),
-              if ((item['location'] as String?)?.isNotEmpty == true)
-                _MetaBadge(
-                  icon: Icons.location_on_outlined,
-                  text: item['location'],
-                  isMobile: true,
-                ),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          // Description
-          Text(
-            item['description'] ?? '',
-            style: GoogleFonts.roboto(
-              fontSize: 14,
-              fontWeight: FontWeight.w400,
-              color: Colors.black,
-              height: 1.6,
-            ),
-          ),
-
-          // Topic
-          if (speechTheme.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            Text(
-              'Topic: $speechTheme',
-              style: GoogleFonts.montserrat(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: const Color(0xFF151938),
-              ),
-            ),
-          ],
-
-          // Sponsor
-          if (sponsor != null) ...[
-            const SizedBox(height: 16),
-            Align(
-              alignment: Alignment.centerRight,
-              child: _SponsorWidget(
-                  sponsor: sponsor, isMobile: true, eventId: eventId),
-            ),
-          ],
-
-          // Speakers
-          if (speakers.isNotEmpty) ...[
-            const SizedBox(height: 20),
-            Text(
-              'Speakers:',
-              style: GoogleFonts.montserrat(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: const Color(0xFF151938),
-              ),
-            ),
-            const SizedBox(height: 12),
-            _SpeakerScrollMobile(speakers: speakers, eventId: eventId),
-          ],
-
-          // Moderator
-          if (moderator != null) ...[
-            const SizedBox(height: 20),
-            Text(
-              'Moderator',
-              style: GoogleFonts.montserrat(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: const Color(0xFF151938),
-              ),
-            ),
-            const SizedBox(height: 12),
-            _ModeratorCard(
-                moderator: moderator, isMobile: true, eventId: eventId),
-          ],
-
-          // Collapse hint
-          const SizedBox(height: 16),
-          Center(
+        // Favorite star — always top-right corner
+        Positioned(
+          top: 8,
+          right: 8,
+          child: GestureDetector(
+            onTap: onToggleFavorite,
             child: Icon(
-              Icons.keyboard_arrow_up,
-              size: 24,
-              color: AppTheme.primaryColor,
+              item['isFavorite'] == true
+                  ? Icons.star
+                  : Icons.star_border,
+              size: 22,
+              color: item['isFavorite'] == true
+                  ? Colors.amber
+                  : const Color(0xFF939393),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -1680,24 +1734,51 @@ class _SponsorWidget extends StatelessWidget {
       child: Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // Logo
+        // Tier badge on top
+        Container(
+          width: isMobile ? 80 : 120,
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          decoration: BoxDecoration(
+            color: tierBg,
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(5)),
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.primaryColor.withValues(alpha: 0.5),
+                blurRadius: 5,
+                offset: const Offset(0, -1),
+                spreadRadius: -1,
+              ),
+            ],
+          ),
+          child: Text(
+            tierLabel,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.montserrat(
+              fontSize: isMobile ? 10 : 12,
+              fontWeight: FontWeight.w500,
+              color: tierText,
+            ),
+          ),
+        ),
+        // Logo below tier
         Container(
           width: isMobile ? 80 : 120,
           height: isMobile ? 50 : 80,
           decoration: BoxDecoration(
             color: Colors.grey[200],
             borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(5)),
+                const BorderRadius.vertical(bottom: Radius.circular(5)),
             border: Border.all(color: const Color(0xFFD9D9D9)),
           ),
           child: logoUrl.isNotEmpty
               ? ClipRRect(
                   borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(4)),
-                  child: Image.network(
-                    logoUrl,
+                      const BorderRadius.vertical(bottom: Radius.circular(4)),
+                  child: AppCachedImage(
+                    imageUrl: logoUrl,
                     fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => Center(
+                    placeholder: Center(
                       child: Text(
                         sponsor['name'] ?? '',
                         textAlign: TextAlign.center,
@@ -1719,33 +1800,6 @@ class _SponsorWidget extends StatelessWidget {
                     ),
                   ),
                 ),
-        ),
-        // Tier badge
-        Container(
-          width: isMobile ? 80 : 120,
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          decoration: BoxDecoration(
-            color: tierBg,
-            borderRadius:
-                const BorderRadius.vertical(bottom: Radius.circular(5)),
-            boxShadow: [
-              BoxShadow(
-                color: AppTheme.primaryColor.withValues(alpha: 0.5),
-                blurRadius: 5,
-                offset: const Offset(0, 1),
-                spreadRadius: -1,
-              ),
-            ],
-          ),
-          child: Text(
-            tierLabel,
-            textAlign: TextAlign.center,
-            style: GoogleFonts.montserrat(
-              fontSize: isMobile ? 10 : 12,
-              fontWeight: FontWeight.w500,
-              color: tierText,
-            ),
-          ),
         ),
       ],
     ),
@@ -1842,13 +1896,11 @@ class _ModeratorCard extends StatelessWidget {
             child: photoUrl.isNotEmpty
                 ? ClipRRect(
                     borderRadius: BorderRadius.circular(3),
-                    child: Image.network(
-                      photoUrl,
+                    child: AppCachedImage(
+                      imageUrl: photoUrl,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const Center(
-                        child:
-                            Icon(Icons.person, size: 32, color: Colors.grey),
-                      ),
+                      placeholder: const Icon(
+                          Icons.person, size: 32, color: Colors.grey),
                     ),
                   )
                 : const Center(
@@ -1920,12 +1972,11 @@ class _ModeratorCardCompact extends StatelessWidget {
               child: photoUrl.isNotEmpty
                   ? ClipRRect(
                       borderRadius: BorderRadius.circular(3),
-                      child: Image.network(
-                        photoUrl,
+                      child: AppCachedImage(
+                        imageUrl: photoUrl,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const Center(
-                          child: Icon(Icons.person, size: 32, color: Colors.grey),
-                        ),
+                        placeholder: const Icon(
+                            Icons.person, size: 32, color: Colors.grey),
                       ),
                     )
                   : const Center(
@@ -2121,13 +2172,12 @@ class _SpeakerMiniCard extends StatelessWidget {
                 ? ClipRRect(
                     borderRadius:
                         const BorderRadius.vertical(top: Radius.circular(5)),
-                    child: Image.network(
-                      photoUrl,
-                      fit: BoxFit.cover,
-                      width: double.infinity,
-                      errorBuilder: (_, __, ___) => const Center(
-                        child:
-                            Icon(Icons.person, size: 40, color: Colors.grey),
+                    child: SizedBox.expand(
+                      child: AppCachedImage(
+                        imageUrl: photoUrl,
+                        fit: BoxFit.cover,
+                        placeholder: const Icon(
+                            Icons.person, size: 40, color: Colors.grey),
                       ),
                     ),
                   )

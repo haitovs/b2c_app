@@ -39,31 +39,7 @@ class BookingConfirmationPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF3C4494),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF3C4494),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.menu, color: Colors.white),
-          onPressed: () {},
-        ),
-        title: const Text(
-          'Transfer',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined, color: Colors.white),
-            onPressed: () {},
-          ),
-          IconButton(
-            icon: const Icon(Icons.person_outline, color: Colors.white),
-            onPressed: () {},
-          ),
-        ],
-      ),
-      body: LayoutBuilder(
+    return LayoutBuilder(
         builder: (context, outerConstraints) {
         final isMobile = outerConstraints.maxWidth < 600;
         return Container(
@@ -171,7 +147,6 @@ class BookingConfirmationPage extends StatelessWidget {
         ),
       );
         },
-      ),
     );
   }
 

@@ -9,11 +9,9 @@ import 'package:intl/intl.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/providers/event_context_provider.dart';
-import '../../../core/widgets/custom_app_bar.dart';
-import '../../events/ui/widgets/profile_dropdown.dart';
-import '../../notifications/ui/notification_drawer.dart';
+import '../../../core/theme/app_theme.dart';
 
-/// News Detail Page - displays full news article with gallery
+/// News Detail Page — displays a full news article inside the EventShellLayout.
 class NewsDetailPage extends ConsumerStatefulWidget {
   final String eventId;
   final String newsId;
@@ -31,8 +29,6 @@ class NewsDetailPage extends ConsumerStatefulWidget {
 }
 
 class _NewsDetailPageState extends ConsumerState<NewsDetailPage> {
-  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  bool _isProfileOpen = false;
   bool _isLoading = true;
   Map<String, dynamic>? _news;
 
@@ -64,22 +60,12 @@ class _NewsDetailPageState extends ConsumerState<NewsDetailPage> {
           _isLoading = false;
         });
       } else {
-        debugPrint('Failed to fetch news: ${response.statusCode}');
         setState(() => _isLoading = false);
       }
     } catch (e) {
-      debugPrint('Error fetching news: $e');
       if (!mounted) return;
       setState(() => _isLoading = false);
     }
-  }
-
-  void _toggleProfile() {
-    setState(() => _isProfileOpen = !_isProfileOpen);
-  }
-
-  void _closeProfile() {
-    if (_isProfileOpen) setState(() => _isProfileOpen = false);
   }
 
   String _buildImageUrl(String? path) {
@@ -92,177 +78,106 @@ class _NewsDetailPageState extends ConsumerState<NewsDetailPage> {
     if (dateStr == null || dateStr.isEmpty) return '';
     try {
       final date = DateTime.parse(dateStr);
-      return DateFormat('d MMM yy').format(date);
-    } catch (e) {
+      return DateFormat('d MMM yyyy').format(date);
+    } catch (_) {
       return dateStr;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 800;
-    final horizontalPadding = isMobile ? 16.0 : 50.0;
+    final isMobile = MediaQuery.of(context).size.width < 600;
 
-    return Scaffold(
-      key: _scaffoldKey,
-      backgroundColor: const Color(0xFF3C4494),
-      endDrawer: const NotificationDrawer(),
-      body: GestureDetector(
-        onTap: _closeProfile,
-        behavior: HitTestBehavior.translucent,
-        child: Stack(
-          children: [
-            SafeArea(
-              child: Column(
-                children: [
-                  // Header
-                  Padding(
-                    padding: EdgeInsets.only(
-                      left: horizontalPadding,
-                      right: horizontalPadding,
-                      top: isMobile ? 12 : 20,
-                    ),
-                    child: _buildHeader(isMobile),
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: AppTheme.primaryColor),
+      );
+    }
+
+    if (_news == null) {
+      return _buildErrorState();
+    }
+
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(isMobile ? 16 : 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Back + Title row
+          Row(
+            children: [
+              InkWell(
+                onTap: () => context.pop(),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  const SizedBox(height: 20),
-
-                  // Content Container
-                  Expanded(
-                    child: Container(
-                      margin: EdgeInsets.symmetric(
-                        horizontal: horizontalPadding,
-                      ),
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.vertical(
-                          top: Radius.circular(10),
-                        ),
-                      ),
-                      child: _isLoading
-                          ? const Center(child: CircularProgressIndicator())
-                          : _news == null
-                          ? _buildErrorState()
-                          : _buildContent(isMobile),
-                    ),
+                  child: Icon(
+                    Icons.arrow_back,
+                    size: 20,
+                    color: Colors.grey.shade600,
                   ),
-                ],
+                ),
               ),
-            ),
-            // Profile dropdown overlay
-            if (_isProfileOpen)
-              Positioned(
-                top: isMobile ? 60 : 80,
-                right: horizontalPadding,
-                child: ProfileDropdown(onClose: _closeProfile),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Text(
+                  'News',
+                  style: GoogleFonts.montserrat(
+                    fontSize: isMobile ? 18 : 22,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.primaryColor,
+                  ),
+                ),
               ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeader(bool isMobile) {
-    return Row(
-      children: [
-        // Back button
-        IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
-          onPressed: () => context.pop(),
-        ),
-        const SizedBox(width: 8),
-        // Title - smaller
-        Text(
-          'News',
-          style: GoogleFonts.montserrat(
-            fontSize: isMobile ? 24 : 32,
-            fontWeight: FontWeight.w600,
-            color: const Color(0xFFF1F1F6),
+            ],
           ),
-        ),
-        const Spacer(),
-        // Notification & Profile icons
-        CustomAppBar(
-          onNotificationTap: () {
-            _scaffoldKey.currentState?.openEndDrawer();
-          },
-          onProfileTap: _toggleProfile,
-        ),
-      ],
+          const SizedBox(height: 20),
+
+          // Article content
+          isMobile
+              ? _buildMobileLayout()
+              : _buildDesktopLayout(),
+        ],
+      ),
     );
   }
 
   Widget _buildErrorState() {
     return Center(
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.error_outline, size: 64, color: Colors.grey[400]),
+          Icon(Icons.error_outline, size: 48, color: Colors.grey.shade400),
           const SizedBox(height: 16),
           Text(
             'Failed to load news',
-            style: GoogleFonts.roboto(fontSize: 18, color: Colors.grey[600]),
+            style: GoogleFonts.montserrat(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const SizedBox(height: 16),
-          ElevatedButton(
+          ElevatedButton.icon(
             onPressed: () {
               setState(() => _isLoading = true);
               _fetchNewsDetail();
             },
-            child: const Text('Retry'),
+            icon: const Icon(Icons.refresh, size: 18),
+            label: const Text('Retry'),
+            style: AppTheme.primaryButtonStyle,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildContent(bool isMobile) {
-    return SingleChildScrollView(
-      padding: EdgeInsets.all(isMobile ? 20 : 50),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Breadcrumb
-          _buildBreadcrumb(),
-          const SizedBox(height: 16),
-          // Divider
-          Container(
-            height: 2,
-            color: const Color(0xFF20306C).withValues(alpha: 0.8),
-          ),
-          const SizedBox(height: 30),
-          // Main content - two column on desktop
-          isMobile ? _buildMobileLayout() : _buildDesktopLayout(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBreadcrumb() {
-    return Row(
-      children: [
-        Text(
-          'News',
-          style: GoogleFonts.roboto(
-            fontSize: 20,
-            fontWeight: FontWeight.w500,
-            color: const Color(0xFF6B6B6B),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Icon(Icons.chevron_right, size: 20, color: const Color(0xFF6B6B6B)),
-        const SizedBox(width: 8),
-        Text(
-          'Details',
-          style: GoogleFonts.roboto(
-            fontSize: 20,
-            fontWeight: FontWeight.w500,
-            color: const Color(0xFF6B6B6B),
-          ),
-        ),
-      ],
-    );
-  }
+  // ---------------------------------------------------------------------------
+  // Desktop layout — image left + excerpt right, then full description below
+  // ---------------------------------------------------------------------------
 
   Widget _buildDesktopLayout() {
     final imageUrl = _buildImageUrl(_news!['photo']);
@@ -271,152 +186,92 @@ class _NewsDetailPageState extends ConsumerState<NewsDetailPage> {
     final category = (_news!['category'] ?? 'News').toString();
     final createdAt = _formatDate(_news!['created_at']?.toString());
 
-    // Split description into paragraphs
-    final paragraphs = description
-        .split('\n')
-        .where((p) => p.trim().isNotEmpty)
-        .toList();
-    final leftParagraphs = paragraphs
-        .take((paragraphs.length / 2).ceil())
-        .toList();
-    final rightParagraphs = paragraphs
-        .skip((paragraphs.length / 2).ceil())
-        .toList();
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Title
+          Text(
+            header,
+            style: GoogleFonts.montserrat(
+              fontSize: 24,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.primaryColor,
+              height: 1.3,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Divider(color: Colors.grey.shade200),
+          const SizedBox(height: 16),
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Left column - image, title, partial description
-        Expanded(
-          flex: 45,
-          child: Column(
+          // Row: image left + excerpt right
+          Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Main image
+              // Image
               ClipRRect(
-                borderRadius: BorderRadius.circular(15),
-                child: AspectRatio(
-                  aspectRatio: 16 / 10,
+                borderRadius: BorderRadius.circular(8),
+                child: SizedBox(
+                  width: 400,
+                  height: 250,
                   child: imageUrl.isNotEmpty
                       ? Image.network(
                           imageUrl,
                           fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) =>
+                          errorBuilder: (_, __, ___) =>
                               _buildImagePlaceholder(),
                         )
                       : _buildImagePlaceholder(),
                 ),
               ),
-              const SizedBox(height: 16),
-              // Category badge and date row
-              Row(
-                children: [
-                  // Category badge
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF20306C),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      category,
-                      style: GoogleFonts.roboto(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFFF1F1F6),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  // Date
-                  Icon(
-                    Icons.access_time,
-                    size: 20,
-                    color: const Color(0xFF20306C),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    createdAt,
-                    style: GoogleFonts.inter(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: const Color(0xFF76777F).withValues(alpha: 0.47),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              // Title
-              Text(
-                header,
-                style: GoogleFonts.montserrat(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w600,
-                  color: const Color(0xFF13152E),
-                  height: 1.25,
-                ),
-              ),
-              const SizedBox(height: 20),
-              // Left paragraphs
-              ...leftParagraphs.map(
-                (p) => Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: Text(
-                    p,
-                    style: GoogleFonts.roboto(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w400,
-                      color: Colors.black.withValues(alpha: 0.7),
-                      height: 1.5,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 50),
-        // Right column - continuation of article
-        Expanded(
-          flex: 55,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // If not enough paragraphs, show full description
-              if (rightParagraphs.isEmpty)
-                Text(
+              const SizedBox(width: 24),
+
+              // Excerpt text on right side of image
+              Expanded(
+                child: Text(
                   description,
-                  style: GoogleFonts.roboto(
-                    fontSize: 18,
+                  maxLines: 8,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.inter(
+                    fontSize: 15,
                     fontWeight: FontWeight.w400,
-                    color: Colors.black.withValues(alpha: 0.7),
-                    height: 1.5,
-                  ),
-                )
-              else
-                ...rightParagraphs.map(
-                  (p) => Padding(
-                    padding: const EdgeInsets.only(bottom: 16),
-                    child: Text(
-                      p,
-                      style: GoogleFonts.roboto(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w400,
-                        color: Colors.black.withValues(alpha: 0.7),
-                        height: 1.5,
-                      ),
-                    ),
+                    color: Colors.grey.shade700,
+                    height: 1.7,
                   ),
                 ),
+              ),
             ],
           ),
-        ),
-      ],
+          const SizedBox(height: 16),
+
+          // Category + date row
+          _buildMeta(category, createdAt),
+          const SizedBox(height: 20),
+
+          // Full description below — full width
+          Text(
+            description,
+            style: GoogleFonts.inter(
+              fontSize: 15,
+              fontWeight: FontWeight.w400,
+              color: Colors.grey.shade700,
+              height: 1.7,
+            ),
+          ),
+        ],
+      ),
     );
   }
+
+  // ---------------------------------------------------------------------------
+  // Mobile layout — stacked
+  // ---------------------------------------------------------------------------
 
   Widget _buildMobileLayout() {
     final imageUrl = _buildImageUrl(_news!['photo']);
@@ -425,100 +280,120 @@ class _NewsDetailPageState extends ConsumerState<NewsDetailPage> {
     final category = (_news!['category'] ?? 'News').toString();
     final createdAt = _formatDate(_news!['created_at']?.toString());
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Main image
-        ClipRRect(
-          borderRadius: BorderRadius.circular(15),
-          child: AspectRatio(
-            aspectRatio: 16 / 10,
-            child: imageUrl.isNotEmpty
-                ? Image.network(
-                    imageUrl,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) =>
-                        _buildImagePlaceholder(),
-                  )
-                : _buildImagePlaceholder(),
-          ),
-        ),
-        const SizedBox(height: 16),
-        // Category badge and date row
-        Wrap(
-          spacing: 12,
-          runSpacing: 8,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            // Category badge
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-              decoration: BoxDecoration(
-                color: const Color(0xFF20306C),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                category,
-                style: GoogleFonts.roboto(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: const Color(0xFFF1F1F6),
-                ),
-              ),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Image
+          ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+            child: AspectRatio(
+              aspectRatio: 16 / 9,
+              child: imageUrl.isNotEmpty
+                  ? Image.network(
+                      imageUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => _buildImagePlaceholder(),
+                    )
+                  : _buildImagePlaceholder(),
             ),
-            // Date
-            Row(
-              mainAxisSize: MainAxisSize.min,
+          ),
+
+          // Content below image
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
-                  Icons.access_time,
-                  size: 18,
-                  color: const Color(0xFF20306C),
-                ),
-                const SizedBox(width: 4),
+                // Category + date
+                _buildMeta(category, createdAt),
+                const SizedBox(height: 12),
+
+                // Title
                 Text(
-                  createdAt,
+                  header,
+                  style: GoogleFonts.montserrat(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black87,
+                    height: 1.3,
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Body
+                Text(
+                  description,
                   style: GoogleFonts.inter(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: const Color(0xFF76777F).withValues(alpha: 0.6),
+                    fontSize: 15,
+                    fontWeight: FontWeight.w400,
+                    color: Colors.grey.shade700,
+                    height: 1.7,
                   ),
                 ),
               ],
             ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        // Title
-        Text(
-          header,
-          style: GoogleFonts.montserrat(
-            fontSize: 22,
-            fontWeight: FontWeight.w600,
-            color: const Color(0xFF13152E),
-            height: 1.25,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Shared widgets
+  // ---------------------------------------------------------------------------
+
+  Widget _buildMeta(String category, String date) {
+    return Wrap(
+      spacing: 12,
+      runSpacing: 8,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          decoration: BoxDecoration(
+            color: AppTheme.primaryColor,
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Text(
+            category,
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
           ),
         ),
-        const SizedBox(height: 16),
-        // Description
-        Text(
-          description,
-          style: GoogleFonts.roboto(
-            fontSize: 16,
-            fontWeight: FontWeight.w400,
-            color: Colors.black.withValues(alpha: 0.7),
-            height: 1.5,
+        if (date.isNotEmpty)
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.calendar_today_outlined,
+                  size: 14, color: Colors.grey.shade500),
+              const SizedBox(width: 4),
+              Text(
+                date,
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  color: Colors.grey.shade500,
+                ),
+              ),
+            ],
           ),
-        ),
       ],
     );
   }
 
   Widget _buildImagePlaceholder() {
     return Container(
-      color: const Color(0xFFF0F2F5),
+      color: Colors.grey.shade100,
       child: Center(
-        child: Icon(Icons.image_outlined, size: 48, color: Colors.grey[400]),
+        child: Icon(Icons.image_outlined, size: 48, color: Colors.grey.shade300),
       ),
     );
   }

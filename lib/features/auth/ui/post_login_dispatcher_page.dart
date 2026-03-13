@@ -7,8 +7,6 @@ import '../../../core/providers/event_context_provider.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../events/providers/event_providers.dart';
-import '../../registration/providers/registration_providers.dart';
-import 'widgets/event_picker_dialog.dart';
 
 class PostLoginDispatcherPage extends ConsumerStatefulWidget {
   const PostLoginDispatcherPage({super.key});
@@ -23,7 +21,6 @@ class _PostLoginDispatcherPageState
   @override
   void initState() {
     super.initState();
-    // Defer navigation to avoid setState/markNeedsBuild during build
     WidgetsBinding.instance.addPostFrameCallback((_) => _dispatch());
   }
 
@@ -46,68 +43,25 @@ class _PostLoginDispatcherPageState
         return;
       }
 
-      // 2. No stored event — check registrations
-      final registrationService = ref.read(registrationServiceProvider);
-      final registrations = await registrationService.getMyRegistrations();
-
-      // Filter to active registrations (APPROVED or SUBMITTED)
-      final active = registrations.where((reg) {
-        final status = reg['status']?.toString().toUpperCase() ?? '';
-        return status == 'APPROVED' || status == 'SUBMITTED';
-      }).toList();
+      // 2. No stored event — fetch events and pick first one
+      final eventService = ref.read(eventServiceProvider);
+      final events = await eventService.fetchEvents();
 
       if (!mounted) return;
 
-      if (active.isEmpty) {
+      if (events.isEmpty) {
         context.go('/');
         return;
       }
 
-      if (active.length == 1) {
-        final eventId = active.first['event_id'];
+      if (events.length == 1) {
+        final eventId = events.first['id'];
         context.go('/events/$eventId/dashboard');
         return;
       }
 
-      // Multiple events — fetch details and show picker
-      final eventService = ref.read(eventServiceProvider);
-      final eventDetails = <Map<String, dynamic>>[];
-      for (final reg in active) {
-        final eventId = reg['event_id'] as int;
-        final detail = await eventService.fetchEvent(eventId);
-        if (detail != null) {
-          detail['registration_status'] = reg['status'];
-          eventDetails.add(detail);
-        }
-      }
-
-      if (!mounted) return;
-
-      if (eventDetails.isEmpty) {
-        context.go('/');
-        return;
-      }
-
-      if (eventDetails.length == 1) {
-        context.go('/events/${eventDetails.first['id']}/dashboard');
-        return;
-      }
-
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => EventPickerDialog(
-          events: eventDetails,
-          onEventSelected: (eventId) {
-            Navigator.of(context).pop();
-            context.go('/events/$eventId/dashboard');
-          },
-          onViewAll: () {
-            Navigator.of(context).pop();
-            context.go('/');
-          },
-        ),
-      );
+      // Multiple events — go to event calendar to pick
+      context.go('/');
     } catch (e) {
       debugPrint('[PostLoginDispatcher] Error: $e');
       if (mounted) context.go('/');

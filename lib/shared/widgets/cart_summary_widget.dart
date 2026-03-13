@@ -185,7 +185,7 @@ class CartSummaryWidget extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              child: const Text('Proceed to Checkout'),
+              child: const Text('Place Order'),
             ),
           ),
         ],

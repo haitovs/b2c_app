@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/theme/app_theme.dart';
+import 'app_checkbox.dart';
 
 /// A multi-select input that looks like a text field with chips inside.
 ///
@@ -269,21 +270,10 @@ class _SelectionSheetState extends State<_SelectionSheet> {
                 itemBuilder: (context, index) {
                   final option = _filteredOptions[index];
                   final isChecked = _selected.contains(option);
-                  return CheckboxListTile(
-                    value: isChecked,
-                    onChanged: (_) => _toggle(option),
-                    activeColor: AppTheme.primaryColor,
-                    title: Text(
-                      option,
-                      style: GoogleFonts.inter(
-                        fontSize: 14,
-                        fontWeight:
-                            isChecked ? FontWeight.w600 : FontWeight.w400,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    controlAffinity: ListTileControlAffinity.leading,
-                    dense: true,
+                  return AppCheckboxRow(
+                    label: option,
+                    isSelected: isChecked,
+                    onTap: () => _toggle(option),
                   );
                 },
               ),

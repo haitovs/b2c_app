@@ -12,39 +12,20 @@ class CarDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF3C4494),
-      body: CustomScrollView(
-        slivers: [
-          // App Bar with image
-          SliverAppBar(
-            expandedHeight: 280,
-            pinned: true,
-            backgroundColor: const Color(0xFF3C4494),
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
-              onPressed: () => Navigator.pop(context),
-            ),
-            flexibleSpace: FlexibleSpaceBar(
-              background: Stack(
-                fit: StackFit.expand,
-                children: [
-                  car.imageUrl != null
-                      ? Image.network(
-                          car.imageUrl!,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(
-                            color: const Color(0xFF3C4494),
-                            child: const Center(
-                              child: Icon(
-                                Icons.directions_car,
-                                size: 80,
-                                color: Colors.white54,
-                              ),
-                            ),
-                          ),
-                        )
-                      : Container(
+    return CustomScrollView(
+      slivers: [
+        // Image header
+        SliverToBoxAdapter(
+          child: SizedBox(
+            height: 280,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                car.imageUrl != null
+                    ? Image.network(
+                        car.imageUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
                           color: const Color(0xFF3C4494),
                           child: const Center(
                             child: Icon(
@@ -54,25 +35,36 @@ class CarDetailPage extends StatelessWidget {
                             ),
                           ),
                         ),
-                  // Gradient overlay
-                  Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          Colors.black.withValues(alpha: 0.5),
-                        ],
+                      )
+                    : Container(
+                        color: const Color(0xFF3C4494),
+                        child: const Center(
+                          child: Icon(
+                            Icons.directions_car,
+                            size: 80,
+                            color: Colors.white54,
+                          ),
+                        ),
                       ),
+                // Gradient overlay
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.transparent,
+                        Colors.black.withValues(alpha: 0.5),
+                      ],
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
-          // Content
-          SliverToBoxAdapter(
+        ),
+        // Content
+        SliverToBoxAdapter(
             child: Container(
               decoration: const BoxDecoration(
                 color: Colors.white,
@@ -263,7 +255,6 @@ class CarDetailPage extends StatelessWidget {
             ),
           ),
         ],
-      ),
     );
   }
 

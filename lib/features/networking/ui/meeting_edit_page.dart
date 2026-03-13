@@ -7,14 +7,12 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import '../../../core/config/app_config.dart';
 import '../../../core/providers/event_context_provider.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_snackbar.dart';
-import '../../../core/widgets/custom_app_bar.dart';
-import '../../events/ui/widgets/profile_dropdown.dart';
-import '../../notifications/ui/notification_drawer.dart';
 import '../providers/meeting_providers.dart';
 
-/// Meeting Edit Page - for editing an existing meeting (only if PENDING)
-/// Layout matches the MeetingRequestPage (image card + form card)
+/// Meeting Edit Page - for editing an existing meeting (only if PENDING).
+/// Renders inside EventShellLayout (no Scaffold needed).
 class MeetingEditPage extends ConsumerStatefulWidget {
   final String eventId;
   final String meetingId;
@@ -32,9 +30,7 @@ class MeetingEditPage extends ConsumerStatefulWidget {
 }
 
 class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
-  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-  bool _isProfileOpen = false;
 
   // Form fields
   final TextEditingController _subjectController = TextEditingController();
@@ -47,14 +43,7 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
   List<TextEditingController> _meetingWithControllers = [];
 
   // Language dropdown
-  final List<String> _languages = [
-    'English',
-    'German',
-    'French',
-    'Spanish',
-    'Russian',
-    'Chinese',
-  ];
+  final List<String> _languages = ['English', 'Russian', 'Turkmen'];
   String _selectedLanguage = 'English';
 
   // Agenda days dropdown
@@ -85,7 +74,6 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
     setState(() => _isLoading = true);
 
     try {
-      // Get meeting data - either from extra or fetch from API
       if (widget.meetingData != null) {
         _meeting = widget.meetingData;
       } else {
@@ -94,11 +82,9 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
       }
 
       if (_meeting != null) {
-        // Check if editable (only PENDING status)
         final status = _meeting!['status']?.toString().toUpperCase() ?? '';
         _canEdit = status == 'PENDING';
 
-        // Pre-fill form fields
         _subjectController.text = _meeting!['subject'] ?? '';
         _commentsController.text = _meeting!['message'] ?? '';
 
@@ -117,7 +103,6 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
                   .map((name) => TextEditingController(text: name))
                   .toList();
 
-        // Initialize meeting with
         _meetingWithControllers = [TextEditingController()];
 
         // Pre-fill language
@@ -126,10 +111,9 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
           _selectedLanguage = lang;
         }
 
-        // Fetch agenda days
         await _fetchAgendaDays();
 
-        // Try to match the selected day from meeting start_time
+        // Match selected day from meeting start_time
         final startTime = _meeting!['start_time'];
         if (startTime != null && _agendaDays.isNotEmpty) {
           try {
@@ -140,7 +124,7 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
               (d) => d['date'] == meetingDateStr,
               orElse: () => _agendaDays.first,
             );
-          } catch (e) {
+          } catch (_) {
             _selectedDay = _agendaDays.isNotEmpty ? _agendaDays.first : null;
           }
         } else if (_agendaDays.isNotEmpty) {
@@ -174,21 +158,18 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
       if (response.statusCode == 200) {
         final List data = jsonDecode(response.body);
         _agendaDays = data
-            .map((item) {
-              return {
-                'id': item['id'],
-                'date': item['date'],
-                'label': item['date'],
-              };
-            })
-            .toList()
-            .cast<Map<String, dynamic>>();
+            .map((item) => <String, dynamic>{
+                  'id': item['id'],
+                  'date': item['date'],
+                  'label': item['date'],
+                })
+            .toList();
       }
 
       if (_agendaDays.isEmpty) {
         _agendaDays = _getMockDays();
       }
-    } catch (e) {
+    } catch (_) {
       _agendaDays = _getMockDays();
     }
   }
@@ -220,20 +201,8 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
     super.dispose();
   }
 
-  void _toggleProfile() {
-    setState(() => _isProfileOpen = !_isProfileOpen);
-  }
-
-  void _closeProfile() {
-    if (_isProfileOpen) {
-      setState(() => _isProfileOpen = false);
-    }
-  }
-
   void _addAttendee() {
-    setState(() {
-      _attendeeControllers.add(TextEditingController());
-    });
+    setState(() => _attendeeControllers.add(TextEditingController()));
   }
 
   void _removeAttendee(int index) {
@@ -246,9 +215,7 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
   }
 
   void _addMeetingWith() {
-    setState(() {
-      _meetingWithControllers.add(TextEditingController());
-    });
+    setState(() => _meetingWithControllers.add(TextEditingController()));
   }
 
   void _removeMeetingWith(int index) {
@@ -272,16 +239,31 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
     try {
       final meetingService = ref.read(meetingServiceProvider);
 
-      // Collect attendees as comma-separated text
       final attendeesText = _attendeeControllers
           .map((c) => c.text.trim())
           .where((t) => t.isNotEmpty)
           .join(', ');
 
-      // Calculate start and end time from selected day
+      // Preserve original time-of-day, update only the date from selected day
       final dayDate = _selectedDay!['date'] as String;
-      final startTime = DateTime.parse('${dayDate}T09:00:00');
-      final endTime = DateTime.parse('${dayDate}T10:00:00');
+      final dayParts = dayDate.split('-');
+      final year = int.parse(dayParts[0]);
+      final month = int.parse(dayParts[1]);
+      final day = int.parse(dayParts[2]);
+
+      int startHour = 9, startMinute = 0, endHour = 10, endMinute = 0;
+      if (_meeting != null && _meeting!['start_time'] != null) {
+        try {
+          final origStart = DateTime.parse(_meeting!['start_time']).toLocal();
+          final origEnd = DateTime.parse(_meeting!['end_time']).toLocal();
+          startHour = origStart.hour;
+          startMinute = origStart.minute;
+          endHour = origEnd.hour;
+          endMinute = origEnd.minute;
+        } catch (_) {}
+      }
+      final startTime = DateTime(year, month, day, startHour, startMinute);
+      final endTime = DateTime(year, month, day, endHour, endMinute);
 
       await meetingService.updateMeeting(
         meetingId: widget.meetingId,
@@ -296,16 +278,14 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
 
       if (mounted) {
         AppSnackBar.showSuccess(context, 'Meeting updated successfully!');
-        context.pop(true); // Return true to indicate success
+        context.pop(true);
       }
     } catch (e) {
       if (mounted) {
         AppSnackBar.showError(context, 'Failed to update meeting: $e');
       }
     } finally {
-      if (mounted) {
-        setState(() => _isSaving = false);
-      }
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
@@ -315,138 +295,113 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
     return '${AppConfig.b2cApiBaseUrl}$path';
   }
 
+  // ---------------------------------------------------------------------------
+  // Build
+  // ---------------------------------------------------------------------------
+
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 600;
-    final horizontalMargin = isMobile ? 10.0 : 50.0;
-    final contentPadding = isMobile ? 20.0 : 50.0;
+    final isMobile = MediaQuery.of(context).size.width < 600;
 
-    return Scaffold(
-      key: _scaffoldKey,
-      backgroundColor: const Color(0xFF3C4494),
-      endDrawer: const NotificationDrawer(),
-      body: GestureDetector(
-        onTap: _closeProfile,
-        child: Stack(
-          children: [
-            SafeArea(
-              child: Column(
-                children: [
-                  _buildHeader(isMobile, horizontalMargin),
-                  SizedBox(height: isMobile ? 10 : 20),
-                  Expanded(
-                    child: Container(
-                      margin: EdgeInsets.symmetric(
-                        horizontal: horizontalMargin,
-                      ),
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFF1F1F6),
-                        borderRadius: BorderRadius.vertical(
-                          top: Radius.circular(20),
-                        ),
-                      ),
-                      child: _isLoading
-                          ? const Center(child: CircularProgressIndicator())
-                          : SingleChildScrollView(
-                              padding: EdgeInsets.all(contentPadding),
-                              child: _buildFormContent(),
-                            ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (_isProfileOpen)
-              Positioned(
-                top: 100,
-                right: 20,
-                child: ProfileDropdown(onClose: _closeProfile),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: AppTheme.primaryColor),
+      );
+    }
 
-  Widget _buildHeader(bool isMobile, double horizontalPadding) {
-    return Padding(
-      padding: EdgeInsets.only(
-        left: horizontalPadding,
-        right: horizontalPadding,
-        top: isMobile ? 12 : 20,
-      ),
-      child: Row(
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(isMobile ? 16 : 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
-            onPressed: () => context.pop(),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
-          ),
-          SizedBox(width: isMobile ? 4 : 8),
-          Flexible(
-            child: Text(
-              'Edit Meeting',
-              style: GoogleFonts.montserrat(
-                fontSize: isMobile ? 20 : 28,
-                fontWeight: FontWeight.w600,
-                color: const Color(0xFFF1F1F6),
+          // Back + Title row
+          Row(
+            children: [
+              InkWell(
+                onTap: () => context.pop(),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(Icons.arrow_back, size: 20, color: Colors.grey.shade600),
+                ),
               ),
-              overflow: TextOverflow.ellipsis,
-            ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Text(
+                  'Edit Meeting',
+                  style: GoogleFonts.montserrat(
+                    fontSize: isMobile ? 18 : 22,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.primaryColor,
+                  ),
+                ),
+              ),
+            ],
           ),
-          const Spacer(),
-          CustomAppBar(
-            onNotificationTap: () {
-              _scaffoldKey.currentState?.openEndDrawer();
-            },
-            onProfileTap: _toggleProfile,
-            isMobile: isMobile,
-            showLogo: false,
-          ),
+          const SizedBox(height: 20),
+          _buildFormContent(),
         ],
       ),
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // Form content
+  // ---------------------------------------------------------------------------
+
   Widget _buildFormContent() {
     if (_meeting == null) {
-      return const Center(child: Text('Meeting not found'));
-    }
-
-    if (!_canEdit) {
       return Center(
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.lock_outline, size: 64, color: Colors.grey[400]),
+            Icon(Icons.error_outline, size: 48, color: Colors.grey.shade400),
             const SizedBox(height: 16),
             Text(
-              'This meeting cannot be edited',
-              style: GoogleFonts.inter(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey[600],
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Only pending meetings can be modified',
-              style: GoogleFonts.inter(fontSize: 14, color: Colors.grey[500]),
-            ),
-            const SizedBox(height: 24),
-            OutlinedButton.icon(
-              onPressed: () => context.pop(),
-              icon: const Icon(Icons.arrow_back),
-              label: const Text('Go Back'),
+              'Meeting not found',
+              style: GoogleFonts.montserrat(fontSize: 18, fontWeight: FontWeight.w600),
             ),
           ],
         ),
       );
     }
 
-    // Get target user info for display
+    if (!_canEdit) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.lock_outline, size: 64, color: Colors.grey.shade400),
+            const SizedBox(height: 16),
+            Text(
+              'This meeting cannot be edited',
+              style: GoogleFonts.inter(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Only pending meetings can be modified',
+              style: GoogleFonts.inter(fontSize: 14, color: Colors.grey.shade500),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () => context.pop(),
+              icon: const Icon(Icons.arrow_back, size: 18),
+              label: const Text('Go Back'),
+              style: AppTheme.primaryButtonStyle,
+            ),
+          ],
+        ),
+      );
+    }
+
     final targetUser = _meeting!['target_user'] as Map<String, dynamic>?;
     final firstName = targetUser?['first_name'] ?? '';
     final lastName = targetUser?['last_name'] ?? '';
@@ -460,26 +415,21 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final isWide = constraints.maxWidth > 700;
-
           if (isWide) {
-            // Desktop layout: image on left, form on right
             return Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Left side - Participant image in white card
                 _buildImageCard(photoUrl, displayName, companyName),
-                const SizedBox(width: 39),
-                // Right side - Form in white card
+                const SizedBox(width: 24),
                 Expanded(child: _buildFormCard()),
               ],
             );
           } else {
-            // Mobile layout: image on top, form below
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _buildImageCard(photoUrl, displayName, companyName),
-                const SizedBox(height: 30),
+                const SizedBox(height: 24),
                 _buildFormCard(),
               ],
             );
@@ -488,6 +438,10 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
       ),
     );
   }
+
+  // ---------------------------------------------------------------------------
+  // Image card (left side)
+  // ---------------------------------------------------------------------------
 
   Widget _buildImageCard(String imageUrl, String name, String company) {
     final isMobile = MediaQuery.of(context).size.width < 600;
@@ -498,35 +452,33 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
       width: isMobile ? double.infinity : 300,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Photo
           Container(
             width: 200,
             height: 200,
             decoration: BoxDecoration(
-              color: Colors.grey[200],
-              borderRadius: BorderRadius.circular(10),
+              color: Colors.grey.shade200,
+              borderRadius: BorderRadius.circular(8),
             ),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(8),
               child: imageUrl.isNotEmpty
                   ? Image.network(
                       imageUrl,
                       fit: BoxFit.cover,
                       width: 200,
                       height: 200,
-                      errorBuilder: (context, error, stackTrace) =>
-                          _buildImagePlaceholder(name),
+                      errorBuilder: (_, __, ___) => _buildImagePlaceholder(name),
                     )
                   : _buildImagePlaceholder(name),
             ),
           ),
           const SizedBox(height: 20),
-          // Name
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Text(
@@ -535,7 +487,7 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
               style: GoogleFonts.inter(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
-                color: Colors.black,
+                color: Colors.black87,
               ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
@@ -548,7 +500,7 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
               child: Text(
                 company,
                 textAlign: TextAlign.center,
-                style: GoogleFonts.inter(fontSize: 14, color: Colors.grey[600]),
+                style: GoogleFonts.inter(fontSize: 14, color: Colors.grey.shade600),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -559,41 +511,45 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // Form card (right side)
+  // ---------------------------------------------------------------------------
+
   Widget _buildFormCard() {
     final isMobile = MediaQuery.of(context).size.width < 600;
     return Container(
-      padding: EdgeInsets.all(isMobile ? 20 : 40),
+      padding: EdgeInsets.all(isMobile ? 20 : 32),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header row with title and save button
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
                 'Information',
-                style: GoogleFonts.inter(
+                style: GoogleFonts.montserrat(
                   fontSize: 20,
                   fontWeight: FontWeight.w600,
-                  color: Colors.black,
+                  color: AppTheme.primaryColor,
                 ),
               ),
               _buildSaveButton(),
             ],
           ),
-          const SizedBox(height: 25),
-          // Form fields in two columns
+          const SizedBox(height: 4),
+          Divider(color: Colors.grey.shade200),
+          const SizedBox(height: 16),
           LayoutBuilder(
             builder: (context, constraints) {
               if (constraints.maxWidth > 500) {
                 return Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Left column
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -606,8 +562,7 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
                         ],
                       ),
                     ),
-                    const SizedBox(width: 20),
-                    // Right column
+                    const SizedBox(width: 16),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -623,7 +578,6 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
                   ],
                 );
               } else {
-                // Single column for mobile
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -648,23 +602,19 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // Form field widgets
+  // ---------------------------------------------------------------------------
+
   Widget _buildAttendeeSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Attendee:',
-          style: GoogleFonts.inter(
-            fontSize: 18,
-            fontWeight: FontWeight.w500,
-            color: Colors.black,
-          ),
-        ),
-        const SizedBox(height: 15),
-        // Dynamic attendee fields
+        Text('Attendee:', style: AppTheme.labelText),
+        const SizedBox(height: 8),
         ...List.generate(_attendeeControllers.length, (index) {
           return Padding(
-            padding: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.only(bottom: 8),
             child: _buildDynamicField(
               controller: _attendeeControllers[index],
               hintText: 'Name & Surname',
@@ -682,19 +632,11 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Meeting with:',
-          style: GoogleFonts.inter(
-            fontSize: 18,
-            fontWeight: FontWeight.w500,
-            color: Colors.black,
-          ),
-        ),
-        const SizedBox(height: 15),
-        // Dynamic meeting with fields
+        Text('Meeting with:', style: AppTheme.labelText),
+        const SizedBox(height: 8),
         ...List.generate(_meetingWithControllers.length, (index) {
           return Padding(
-            padding: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.only(bottom: 8),
             child: _buildDynamicField(
               controller: _meetingWithControllers[index],
               hintText: 'Position',
@@ -719,40 +661,36 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
       children: [
         Expanded(
           child: Container(
-            height: 50,
+            height: 48,
             decoration: BoxDecoration(
-              border: Border.all(color: const Color(0xFFB7B7B7)),
-              borderRadius: BorderRadius.circular(5),
+              border: Border.all(color: Colors.grey.shade300),
+              borderRadius: BorderRadius.circular(8),
             ),
             child: TextField(
               controller: controller,
-              style: GoogleFonts.roboto(fontSize: 18),
+              style: GoogleFonts.inter(fontSize: 14),
               decoration: InputDecoration(
                 hintText: hintText,
-                hintStyle: GoogleFonts.roboto(
-                  fontSize: 18,
-                  color: Colors.black.withValues(alpha: 0.7),
-                ),
+                hintStyle: GoogleFonts.inter(fontSize: 14, color: Colors.grey.shade500),
                 border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 15),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12),
               ),
             ),
           ),
         ),
-        const SizedBox(width: 10),
-        // Add/Remove button
+        const SizedBox(width: 8),
         Container(
-          width: 50,
-          height: 50,
+          width: 48,
+          height: 48,
           decoration: BoxDecoration(
-            border: Border.all(color: const Color(0xFFB7B7B7)),
-            borderRadius: BorderRadius.circular(5),
+            border: Border.all(color: Colors.grey.shade300),
+            borderRadius: BorderRadius.circular(8),
           ),
           child: IconButton(
             onPressed: isFirst ? onAdd : onRemove,
             icon: Icon(
               isFirst ? Icons.add : Icons.remove,
-              color: const Color(0xFF808080),
+              color: Colors.grey.shade600,
             ),
           ),
         ),
@@ -764,32 +702,22 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Subjects:',
-          style: GoogleFonts.inter(
-            fontSize: 18,
-            fontWeight: FontWeight.w500,
-            color: Colors.black,
-          ),
-        ),
-        const SizedBox(height: 15),
+        Text('Subjects:', style: AppTheme.labelText),
+        const SizedBox(height: 8),
         Container(
-          height: 50,
+          height: 48,
           decoration: BoxDecoration(
-            border: Border.all(color: const Color(0xFFB7B7B7)),
-            borderRadius: BorderRadius.circular(5),
+            border: Border.all(color: Colors.grey.shade300),
+            borderRadius: BorderRadius.circular(8),
           ),
           child: TextField(
             controller: _subjectController,
-            style: GoogleFonts.roboto(fontSize: 18),
+            style: GoogleFonts.inter(fontSize: 14),
             decoration: InputDecoration(
               hintText: 'Enter subject...',
-              hintStyle: GoogleFonts.roboto(
-                fontSize: 18,
-                color: Colors.black.withValues(alpha: 0.7),
-              ),
+              hintStyle: GoogleFonts.inter(fontSize: 14, color: Colors.grey.shade500),
               border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 15),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12),
             ),
           ),
         ),
@@ -801,46 +729,31 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Language of meeting:',
-          style: GoogleFonts.inter(
-            fontSize: 18,
-            fontWeight: FontWeight.w500,
-            color: Colors.black,
-          ),
-        ),
-        const SizedBox(height: 15),
+        Text('Language of meeting:', style: AppTheme.labelText),
+        const SizedBox(height: 8),
         Container(
-          height: 50,
+          height: 48,
           decoration: BoxDecoration(
-            border: Border.all(color: const Color(0xFFB7B7B7)),
-            borderRadius: BorderRadius.circular(5),
+            border: Border.all(color: Colors.grey.shade300),
+            borderRadius: BorderRadius.circular(8),
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
               value: _selectedLanguage,
               isExpanded: true,
-              padding: const EdgeInsets.symmetric(horizontal: 15),
-              icon: Icon(
-                Icons.keyboard_arrow_down,
-                color: Colors.black.withValues(alpha: 0.4),
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              icon: Icon(Icons.keyboard_arrow_down, color: Colors.grey.shade500),
               items: _languages.map((lang) {
                 return DropdownMenuItem(
                   value: lang,
                   child: Text(
                     lang,
-                    style: GoogleFonts.roboto(
-                      fontSize: 18,
-                      color: Colors.black.withValues(alpha: 0.7),
-                    ),
+                    style: GoogleFonts.inter(fontSize: 14, color: Colors.grey.shade700),
                   ),
                 );
               }).toList(),
               onChanged: (value) {
-                if (value != null) {
-                  setState(() => _selectedLanguage = value);
-                }
+                if (value != null) setState(() => _selectedLanguage = value);
               },
             ),
           ),
@@ -853,78 +766,54 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Meeting day:',
-          style: GoogleFonts.inter(
-            fontSize: 18,
-            fontWeight: FontWeight.w500,
-            color: Colors.black,
-          ),
-        ),
-        const SizedBox(height: 15),
+        Text('Meeting day:', style: AppTheme.labelText),
+        const SizedBox(height: 8),
         Container(
-          height: 50,
+          height: 48,
           decoration: BoxDecoration(
-            border: Border.all(color: const Color(0xFFB7B7B7)),
-            borderRadius: BorderRadius.circular(5),
+            border: Border.all(color: Colors.grey.shade300),
+            borderRadius: BorderRadius.circular(8),
           ),
           child: _agendaDays.isEmpty
               ? Center(
                   child: Text(
                     'No days available',
-                    style: GoogleFonts.roboto(fontSize: 16, color: Colors.grey),
+                    style: GoogleFonts.inter(fontSize: 14, color: Colors.grey.shade500),
                   ),
                 )
               : DropdownButtonHideUnderline(
                   child: DropdownButton<Map<String, dynamic>>(
                     value: _selectedDay,
                     isExpanded: true,
-                    padding: const EdgeInsets.symmetric(horizontal: 15),
-                    icon: Icon(
-                      Icons.keyboard_arrow_down,
-                      color: Colors.black.withValues(alpha: 0.4),
-                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    icon: Icon(Icons.keyboard_arrow_down, color: Colors.grey.shade500),
                     items: _agendaDays.map((day) {
-                      // Format day label
                       String label;
                       final date = day['date'] as String?;
                       if (date != null) {
                         try {
                           final dt = DateTime.parse(date);
-                          final weekdays = [
-                            '',
-                            'Monday',
-                            'Tuesday',
-                            'Wednesday',
-                            'Thursday',
-                            'Friday',
-                            'Saturday',
-                            'Sunday',
+                          const weekdays = [
+                            '', 'Monday', 'Tuesday', 'Wednesday',
+                            'Thursday', 'Friday', 'Saturday', 'Sunday',
                           ];
                           label = '${dt.day} ${weekdays[dt.weekday]}';
-                        } catch (e) {
+                        } catch (_) {
                           label = date;
                         }
                       } else {
-                        label =
-                            day['name'] ??
-                            'Day ${_agendaDays.indexOf(day) + 1}';
+                        label = day['name'] ?? 'Day ${_agendaDays.indexOf(day) + 1}';
                       }
                       return DropdownMenuItem(
                         value: day,
                         child: Text(
                           label,
-                          style: GoogleFonts.roboto(
-                            fontSize: 18,
-                            color: Colors.black.withValues(alpha: 0.7),
-                          ),
+                          style: GoogleFonts.inter(fontSize: 14, color: Colors.grey.shade700),
                         ),
                       );
                     }).toList(),
                     onChanged: (value) {
-                      if (value != null) {
-                        setState(() => _selectedDay = value);
-                      }
+                      if (value != null) setState(() => _selectedDay = value);
                     },
                   ),
                 ),
@@ -937,33 +826,22 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Message:',
-          style: GoogleFonts.inter(
-            fontSize: 18,
-            fontWeight: FontWeight.w500,
-            color: Colors.black,
-          ),
-        ),
-        const SizedBox(height: 15),
+        Text('Message:', style: AppTheme.labelText),
+        const SizedBox(height: 8),
         Container(
-          height: 117,
           decoration: BoxDecoration(
-            border: Border.all(color: const Color(0xFFB7B7B7)),
-            borderRadius: BorderRadius.circular(5),
+            border: Border.all(color: Colors.grey.shade300),
+            borderRadius: BorderRadius.circular(8),
           ),
           child: TextField(
             controller: _commentsController,
             maxLines: 5,
-            style: GoogleFonts.roboto(fontSize: 18),
+            style: GoogleFonts.inter(fontSize: 14),
             decoration: InputDecoration(
               hintText: 'Enter message...',
-              hintStyle: GoogleFonts.roboto(
-                fontSize: 18,
-                color: Colors.black.withValues(alpha: 0.7),
-              ),
+              hintStyle: GoogleFonts.inter(fontSize: 14, color: Colors.grey.shade500),
               border: InputBorder.none,
-              contentPadding: const EdgeInsets.all(15),
+              contentPadding: const EdgeInsets.all(12),
             ),
           ),
         ),
@@ -971,34 +849,41 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // Save / Cancel buttons
+  // ---------------------------------------------------------------------------
+
   Widget _buildSaveButton() {
-    return OutlinedButton(
-      onPressed: _isSaving ? null : _saveMeeting,
-      style: OutlinedButton.styleFrom(
-        foregroundColor: const Color(0xFF008000),
-        side: const BorderSide(color: Color(0xFF008000)),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-      ),
-      child: _isSaving
-          ? const SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF008000)),
-              ),
-            )
-          : Text(
-              'Save',
-              style: GoogleFonts.inter(
-                fontSize: 16,
-                fontWeight: FontWeight.w400,
-                color: const Color(0xFF008000),
-              ),
-            ),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        OutlinedButton(
+          onPressed: () => context.pop(),
+          style: AppTheme.secondaryButtonStyle,
+          child: const Text('Cancel'),
+        ),
+        const SizedBox(width: 12),
+        ElevatedButton(
+          onPressed: _isSaving ? null : _saveMeeting,
+          style: AppTheme.primaryButtonStyle,
+          child: _isSaving
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                )
+              : const Text('Save'),
+        ),
+      ],
     );
   }
+
+  // ---------------------------------------------------------------------------
+  // Image placeholder
+  // ---------------------------------------------------------------------------
 
   Widget _buildImagePlaceholder(String name) {
     final initials = name
@@ -1010,7 +895,7 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
     return Container(
       width: 200,
       height: 200,
-      color: const Color(0xFF3C4494).withValues(alpha: 0.2),
+      color: AppTheme.primaryColor.withValues(alpha: 0.15),
       child: Center(
         child: initials.isNotEmpty
             ? Text(
@@ -1018,10 +903,10 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
                 style: GoogleFonts.inter(
                   fontSize: 48,
                   fontWeight: FontWeight.w600,
-                  color: const Color(0xFF3C4494),
+                  color: AppTheme.primaryColor,
                 ),
               )
-            : Icon(Icons.person, size: 60, color: Colors.grey[400]),
+            : Icon(Icons.person, size: 60, color: Colors.grey.shade400),
       ),
     );
   }

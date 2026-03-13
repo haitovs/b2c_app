@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/app_theme.dart';
+import '../../../../core/theme/app_theme.dart';
 import 'hover_text.dart';
 
 /// Shared footer for auth pages: "All rights reserved | Privacy Policy | Cookies | Powered by [logo]"

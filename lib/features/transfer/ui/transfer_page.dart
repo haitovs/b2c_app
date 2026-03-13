@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-
 import '../models/car.dart';
 import '../models/shuttle.dart';
 import '../providers/transfer_providers.dart';
@@ -112,48 +110,33 @@ class _TransferPageState extends ConsumerState<TransferPage>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF3C4494),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF3C4494),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => context.go('/events/${widget.eventId}/menu'),
-        ),
-        title: const Text(
-          'Transfer',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: Colors.white,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white60,
-          tabs: const [
-            Tab(icon: Icon(Icons.directions_bus), text: 'Free Shuttle'),
-            Tab(icon: Icon(Icons.directions_car), text: 'With Driver'),
-            Tab(icon: Icon(Icons.car_rental), text: 'Rent Car'),
-          ],
-        ),
-      ),
-      body: Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(24),
-            topRight: Radius.circular(24),
+    return Column(
+      children: [
+        Container(
+          color: const Color(0xFF3C4494),
+          child: TabBar(
+            controller: _tabController,
+            indicatorColor: Colors.white,
+            labelColor: Colors.white,
+            unselectedLabelColor: Colors.white60,
+            tabs: const [
+              Tab(icon: Icon(Icons.directions_bus), text: 'Free Shuttle'),
+              Tab(icon: Icon(Icons.directions_car), text: 'With Driver'),
+              Tab(icon: Icon(Icons.car_rental), text: 'Rent Car'),
+            ],
           ),
         ),
-        child: TabBarView(
-          controller: _tabController,
-          children: [
-            _buildShuttleTab(),
-            _buildIndividualTab(),
-            _buildRentalTab(),
-          ],
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              _buildShuttleTab(),
+              _buildIndividualTab(),
+              _buildRentalTab(),
+            ],
+          ),
         ),
-      ),
+      ],
     );
   }
 

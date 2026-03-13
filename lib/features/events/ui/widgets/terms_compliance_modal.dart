@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 
 import '../../../../core/config/app_config.dart';
+import '../../../../shared/widgets/app_checkbox.dart';
 import '../../../auth/providers/auth_provider.dart';
 
 /// Terms & Conditions Compliance Modal
@@ -142,33 +143,24 @@ class _TermsComplianceModalState extends ConsumerState<TermsComplianceModal> {
               const SizedBox(height: 24),
 
               // Checkboxes
-              CheckboxListTile(
+              AppCheckbox(
                 value: _termsAccepted,
                 onChanged: _isSubmitting
-                    ? null
+                    ? (v) {}
                     : (value) {
-                        setState(() => _termsAccepted = value ?? false);
+                        setState(() => _termsAccepted = value);
                       },
-                title: const Text(
-                  'I accept the Terms of Use',
-                  style: TextStyle(fontWeight: FontWeight.w500),
-                ),
-                controlAffinity: ListTileControlAffinity.leading,
-                contentPadding: EdgeInsets.zero,
+                label: 'I accept the Terms of Use',
               ),
-              CheckboxListTile(
+              const SizedBox(height: 8),
+              AppCheckbox(
                 value: _privacyAccepted,
                 onChanged: _isSubmitting
-                    ? null
+                    ? (v) {}
                     : (value) {
-                        setState(() => _privacyAccepted = value ?? false);
+                        setState(() => _privacyAccepted = value);
                       },
-                title: const Text(
-                  'I accept the Privacy Policy',
-                  style: TextStyle(fontWeight: FontWeight.w500),
-                ),
-                controlAffinity: ListTileControlAffinity.leading,
-                contentPadding: EdgeInsets.zero,
+                label: 'I accept the Privacy Policy',
               ),
 
               if (_error != null) ...[

@@ -1,20 +1,19 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
+
+import '../../../core/theme/app_theme.dart';
 import '../../../core/config/app_config.dart';
-import '../../../core/providers/event_context_provider.dart';
 import '../../../core/widgets/app_snackbar.dart';
-import '../../../core/widgets/custom_app_bar.dart';
-import '../../events/ui/widgets/profile_dropdown.dart';
-import '../../notifications/ui/notification_drawer.dart';
+import '../../../core/widgets/app_text_field.dart';
 import '../providers/meeting_providers.dart';
 import '../services/meeting_service.dart';
 
-/// B2B Meeting Request Page - for creating a new meeting request
+/// B2B Meeting Request Page - for creating a new meeting request.
+/// Rendered inside EventShellLayout (sidebar/topbar provided).
 class MeetingRequestPage extends ConsumerStatefulWidget {
   final String eventId;
   final String participantId;
@@ -34,237 +33,56 @@ class MeetingRequestPage extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<MeetingRequestPage> createState() => _MeetingRequestPageState();
+  ConsumerState<MeetingRequestPage> createState() =>
+      _MeetingRequestPageState();
 }
 
 class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
-  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-  bool _isProfileOpen = false;
 
-  // Form fields
+  // Form controllers
   final TextEditingController _subjectController = TextEditingController();
-  final TextEditingController _commentsController = TextEditingController();
+  final TextEditingController _locationController = TextEditingController();
+  final TextEditingController _messageController = TextEditingController();
 
-  // Attendee list (dynamic)
-  final List<TextEditingController> _attendeeControllers = [
-    TextEditingController(),
-  ];
+  // Date and time
+  DateTime? _selectedDate;
+  TimeOfDay? _selectedTime;
 
-  // Meeting with list (dynamic) - positions
-  final List<TextEditingController> _meetingWithControllers = [
-    TextEditingController(),
-  ];
-
-  // Language dropdown
-  String _selectedLanguage = 'EN';
-  final List<String> _languages = ['EN', 'RU', 'TK'];
-
-  // Agenda days dropdown
-  List<Map<String, dynamic>> _agendaDays = [];
-  Map<String, dynamic>? _selectedDay;
-
-  // Time pickers
-  TimeOfDay _startTime = TimeOfDay(hour: 9, minute: 0);
-  TimeOfDay _endTime = TimeOfDay(hour: 10, minute: 0);
-
-  // Data
-  Map<String, dynamic>? _participant;
-  bool _isLoading = true;
   bool _isSubmitting = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _initializeAndFetch();
-  }
-
-  Future<void> _initializeAndFetch() async {
-    // Ensure the event context is loaded for this event
-    final eventId = int.tryParse(widget.eventId);
-    if (eventId != null) {
-      await ref.read(eventContextProvider.notifier).ensureEventContext(eventId);
-    }
-    _fetchData();
-  }
 
   bool get _isSpeakerMeeting => widget.speakerId != null;
 
-  Future<void> _fetchData() async {
+  /// Resolve participant display data from either participantData or speaker fields.
+  Map<String, dynamic> get _displayData {
     if (_isSpeakerMeeting) {
-      // For speaker meetings, build a synthetic participant record
-      _participant = {
-        'name': widget.speakerName ?? 'Speaker',
-        'id': widget.speakerId.toString(),
+      return {
+        'first_name': widget.speakerName ?? 'Speaker',
+        'last_name': '',
       };
-    } else if (widget.participantData != null) {
-      _participant = widget.participantData;
-    } else {
-      await _fetchParticipant();
     }
-    await _fetchAgendaDays();
-    setState(() => _isLoading = false);
-  }
-
-  Future<void> _fetchAgendaDays() async {
-    // Use EventContextService for site_id (already initialized at app startup)
-    final tourismSiteId = ref.read(eventContextProvider).siteId;
-
-    if (tourismSiteId == null) {
-      debugPrint('Warning: No Tourism site_id available, using fallback days');
-      _agendaDays = _getFallbackDays();
-      if (_agendaDays.isNotEmpty) {
-        _selectedDay = _agendaDays.first;
-      }
-      return;
-    }
-
-    try {
-      final response = await http.get(
-        Uri.parse(
-          '${AppConfig.tourismApiBaseUrl}/agenda/days?site_id=$tourismSiteId',
-        ),
-      );
-      if (response.statusCode == 200) {
-        final List data = jsonDecode(response.body);
-        _agendaDays = data.cast<Map<String, dynamic>>();
-        if (_agendaDays.isNotEmpty) {
-          _selectedDay = _agendaDays.first;
-        }
-      } else {
-        debugPrint('Failed to fetch agenda days: ${response.statusCode}');
-        _agendaDays = _getFallbackDays();
-        if (_agendaDays.isNotEmpty) {
-          _selectedDay = _agendaDays.first;
-        }
-      }
-    } catch (e) {
-      debugPrint('Error fetching agenda days: $e');
-      _agendaDays = _getFallbackDays();
-      if (_agendaDays.isNotEmpty) {
-        _selectedDay = _agendaDays.first;
-      }
-    }
-  }
-
-  List<Map<String, dynamic>> _getFallbackDays() {
-    // Generate 3 days starting from tomorrow
-    final now = DateTime.now();
-    final List<Map<String, dynamic>> days = [];
-    for (int i = 1; i <= 3; i++) {
-      final date = now.add(Duration(days: i));
-      days.add({
-        'id': i,
-        'date':
-            '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}',
-        'day_number': date.day,
-        'day_name': _getDayName(date.weekday),
-      });
-    }
-    return days;
-  }
-
-  String _getDayName(int weekday) {
-    const names = [
-      '',
-      'Monday',
-      'Tuesday',
-      'Wednesday',
-      'Thursday',
-      'Friday',
-      'Saturday',
-      'Sunday',
-    ];
-    return names[weekday];
+    return widget.participantData ?? {};
   }
 
   @override
   void dispose() {
     _subjectController.dispose();
-    _commentsController.dispose();
-    for (var controller in _attendeeControllers) {
-      controller.dispose();
-    }
-    for (var controller in _meetingWithControllers) {
-      controller.dispose();
-    }
+    _locationController.dispose();
+    _messageController.dispose();
     super.dispose();
   }
 
-  void _toggleProfile() {
-    setState(() {
-      _isProfileOpen = !_isProfileOpen;
-    });
-  }
-
-  void _closeProfile() {
-    if (_isProfileOpen) {
-      setState(() {
-        _isProfileOpen = false;
-      });
-    }
-  }
-
-  Future<void> _fetchParticipant() async {
-    try {
-      final siteId = ref.read(eventContextProvider).siteId;
-      var uriString =
-          '${AppConfig.tourismApiBaseUrl}/participants/${widget.participantId}';
-      if (siteId != null) {
-        uriString += '?site_id=$siteId';
-      }
-
-      final response = await http.get(Uri.parse(uriString));
-      if (response.statusCode == 200) {
-        setState(() {
-          _participant = jsonDecode(response.body);
-          _isLoading = false;
-        });
-      } else {
-        setState(() => _isLoading = false);
-      }
-    } catch (e) {
-      debugPrint('Error fetching participant: $e');
-      setState(() => _isLoading = false);
-    }
-  }
-
-  void _addAttendee() {
-    setState(() {
-      _attendeeControllers.add(TextEditingController());
-    });
-  }
-
-  void _removeAttendee(int index) {
-    if (_attendeeControllers.length > 1) {
-      setState(() {
-        _attendeeControllers[index].dispose();
-        _attendeeControllers.removeAt(index);
-      });
-    }
-  }
-
-  void _addMeetingWith() {
-    setState(() {
-      _meetingWithControllers.add(TextEditingController());
-    });
-  }
-
-  void _removeMeetingWith(int index) {
-    if (_meetingWithControllers.length > 1) {
-      setState(() {
-        _meetingWithControllers[index].dispose();
-        _meetingWithControllers.removeAt(index);
-      });
-    }
-  }
+  // ── Submit ──────────────────────────────────────────────────────────────
 
   Future<void> _submitRequest() async {
     if (!_formKey.currentState!.validate()) return;
 
-    // Validate day selection
-    if (_selectedDay == null) {
-      AppSnackBar.showWarning(context, 'Please select a day for the meeting');
+    if (_selectedDate == null) {
+      AppSnackBar.showWarning(context, 'Please select a date for the meeting');
+      return;
+    }
+    if (_selectedTime == null) {
+      AppSnackBar.showWarning(context, 'Please select a time for the meeting');
       return;
     }
 
@@ -273,22 +91,16 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
     try {
       final meetingService = ref.read(meetingServiceProvider);
 
-      // Collect attendees as comma-separated text
-      final attendeesText = _attendeeControllers
-          .map((c) => c.text.trim())
-          .where((t) => t.isNotEmpty)
-          .join(', ');
-
-      // Calculate start and end time from selected day and time pickers
-      final dayDate = _selectedDay!['date'] as String;
-      final startTime = DateTime.parse(
-        '${dayDate}T${_startTime.hour.toString().padLeft(2, '0')}:${_startTime.minute.toString().padLeft(2, '0')}:00',
+      final startTime = DateTime(
+        _selectedDate!.year,
+        _selectedDate!.month,
+        _selectedDate!.day,
+        _selectedTime!.hour,
+        _selectedTime!.minute,
       );
-      final endTime = DateTime.parse(
-        '${dayDate}T${_endTime.hour.toString().padLeft(2, '0')}:${_endTime.minute.toString().padLeft(2, '0')}:00',
-      );
+      final endTime = startTime.add(const Duration(hours: 1));
 
-      // Determine target based on meeting type (speaker vs participant)
+      // Determine target based on meeting type
       String? targetUserId;
       int? targetOfficialId;
 
@@ -296,28 +108,27 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
         targetOfficialId = widget.speakerId;
       } else {
         targetUserId = widget.participantId;
-        if (targetUserId.isEmpty && _participant != null) {
-          targetUserId = _participant!['id']?.toString();
-        }
       }
 
-      // Make API call to create meeting
       await meetingService.createMeeting(
         eventId: int.parse(widget.eventId),
         type: MeetingType.b2b,
         subject: _subjectController.text.trim(),
         startTime: startTime,
         endTime: endTime,
-        location: 'Ashgabat, TKM',
+        location: _locationController.text.trim().isEmpty
+            ? null
+            : _locationController.text.trim(),
         targetUserId: targetUserId,
         targetOfficialId: targetOfficialId,
-        attendeesText: attendeesText.isEmpty ? null : attendeesText,
-        language: _selectedLanguage,
+        message: _messageController.text.trim().isEmpty
+            ? null
+            : _messageController.text.trim(),
       );
 
       if (mounted) {
         AppSnackBar.showSuccess(context, 'Meeting request sent successfully!');
-        context.pop(true); // Return true to signal refresh needed
+        context.pop(true);
       }
     } catch (e) {
       if (mounted) {
@@ -330,721 +141,387 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
     }
   }
 
-  String _buildImageUrl(String? imagePath) {
-    if (imagePath == null || imagePath.isEmpty) return '';
-    if (imagePath.startsWith('http')) return imagePath;
-    return '${AppConfig.tourismApiBaseUrl}$imagePath';
-  }
+  // ── Pickers ─────────────────────────────────────────────────────────────
 
-  @override
-  Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 600;
-    final horizontalMargin = isMobile ? 10.0 : 50.0;
-    final contentPadding = isMobile ? 20.0 : 50.0;
-
-    return Scaffold(
-      key: _scaffoldKey,
-      backgroundColor: const Color(0xFF3C4494),
-      endDrawer: const NotificationDrawer(),
-      body: GestureDetector(
-        onTap: _closeProfile,
-        child: Stack(
-          children: [
-            SafeArea(
-              child: Column(
-                children: [
-                  // Header
-                  _buildHeader(isMobile, horizontalMargin),
-                  SizedBox(height: isMobile ? 10 : 20),
-                  // Content
-                  Expanded(
-                    child: Container(
-                      margin: EdgeInsets.symmetric(
-                        horizontal: horizontalMargin,
-                      ),
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFF1F1F6),
-                        borderRadius: BorderRadius.vertical(
-                          top: Radius.circular(20),
-                        ),
-                      ),
-                      child: _isLoading
-                          ? const Center(child: CircularProgressIndicator())
-                          : SingleChildScrollView(
-                              padding: EdgeInsets.all(contentPadding),
-                              child: _buildFormContent(),
-                            ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            // Profile dropdown overlay
-            if (_isProfileOpen)
-              Positioned(
-                top: 100,
-                right: 20,
-                child: ProfileDropdown(onClose: _closeProfile),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeader(bool isMobile, double horizontalPadding) {
-    return Padding(
-      padding: EdgeInsets.only(
-        left: horizontalPadding,
-        right: horizontalPadding,
-        top: isMobile ? 12 : 20,
-      ),
-      child: Row(
-        children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
-            onPressed: () => context.pop(),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
-          ),
-          SizedBox(width: isMobile ? 4 : 8),
-          Flexible(
-            child: Text(
-              'Meeting Request',
-              style: GoogleFonts.montserrat(
-                fontSize: isMobile ? 20 : 28,
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          const Spacer(),
-          CustomAppBar(
-            onNotificationTap: () {
-              _scaffoldKey.currentState?.openEndDrawer();
-            },
-            onProfileTap: _toggleProfile,
-            isMobile: isMobile,
-            showLogo: false,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFormContent() {
-    final participant = _participant;
-    if (participant == null) {
-      return const Center(child: Text('Participant not found'));
-    }
-
-    final name = participant['name'] ?? 'Unknown Company';
-    final logo = participant['logo'];
-    final logoUrl = _buildImageUrl(logo);
-
-    return Form(
-      key: _formKey,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final isWide = constraints.maxWidth > 700;
-
-          if (isWide) {
-            // Desktop layout: image on left, form on right
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Left side - Participant image in white card
-                _buildImageCard(logoUrl, name),
-                const SizedBox(width: 39),
-                // Right side - Form in white card
-                Expanded(child: _buildFormCard()),
-              ],
-            );
-          } else {
-            // Mobile layout: image on top, form below
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildImageCard(logoUrl, name),
-                const SizedBox(height: 30),
-                _buildFormCard(),
-              ],
-            );
-          }
-        },
-      ),
-    );
-  }
-
-  Widget _buildImageCard(String logoUrl, String name) {
-    final isMobile = MediaQuery.of(context).size.width < 600;
-    return Container(
-      constraints: isMobile
-          ? const BoxConstraints(maxHeight: 280)
-          : const BoxConstraints(maxWidth: 300, maxHeight: 351),
-      width: isMobile ? double.infinity : 300,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-      ),
-      child: Center(
-        child: logoUrl.isNotEmpty
-            ? Padding(
-                padding: const EdgeInsets.all(20),
-                child: Image.network(
-                  logoUrl,
-                  fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) =>
-                      _buildImagePlaceholder(name),
-                ),
-              )
-            : _buildImagePlaceholder(name),
-      ),
-    );
-  }
-
-  Widget _buildFormCard() {
-    final isMobile = MediaQuery.of(context).size.width < 600;
-    return Container(
-      padding: EdgeInsets.all(isMobile ? 20 : 40),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header row with title and save button
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Information',
-                style: GoogleFonts.inter(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black,
-                ),
-              ),
-              _buildSaveButton(),
-            ],
-          ),
-          const SizedBox(height: 25),
-          // Form fields in two columns
-          LayoutBuilder(
-            builder: (context, constraints) {
-              if (constraints.maxWidth > 500) {
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Left column
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildAttendeeSection(),
-                          const SizedBox(height: 20),
-                          _buildSubjectsField(),
-                          const SizedBox(height: 20),
-                          _buildCommentsField(),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 20),
-                    // Right column
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildMeetingWithSection(),
-                          const SizedBox(height: 20),
-                          _buildDayDropdown(),
-                          const SizedBox(height: 20),
-                          _buildTimePickers(),
-                          const SizedBox(height: 20),
-                          _buildLanguageDropdown(),
-                        ],
-                      ),
-                    ),
-                  ],
-                );
-              } else {
-                // Single column for mobile
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildAttendeeSection(),
-                    const SizedBox(height: 20),
-                    _buildMeetingWithSection(),
-                    const SizedBox(height: 20),
-                    _buildSubjectsField(),
-                    const SizedBox(height: 20),
-                    _buildDayDropdown(),
-                    const SizedBox(height: 20),
-                    _buildTimePickers(),
-                    const SizedBox(height: 20),
-                    _buildLanguageDropdown(),
-                    const SizedBox(height: 20),
-                    _buildCommentsField(),
-                  ],
-                );
-              }
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAttendeeSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Attendee:',
-          style: GoogleFonts.inter(
-            fontSize: 18,
-            fontWeight: FontWeight.w500,
-            color: Colors.black,
-          ),
-        ),
-        const SizedBox(height: 15),
-        // Dynamic attendee fields
-        ...List.generate(_attendeeControllers.length, (index) {
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: _buildDynamicField(
-              controller: _attendeeControllers[index],
-              hintText: 'Name & Surname',
-              isFirst: index == 0,
-              onAdd: _addAttendee,
-              onRemove: () => _removeAttendee(index),
-            ),
-          );
-        }),
-      ],
-    );
-  }
-
-  Widget _buildMeetingWithSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Meeting with:',
-          style: GoogleFonts.inter(
-            fontSize: 18,
-            fontWeight: FontWeight.w500,
-            color: Colors.black,
-          ),
-        ),
-        const SizedBox(height: 15),
-        // Dynamic meeting with fields
-        ...List.generate(_meetingWithControllers.length, (index) {
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: _buildDynamicField(
-              controller: _meetingWithControllers[index],
-              hintText: 'Position',
-              isFirst: index == 0,
-              onAdd: _addMeetingWith,
-              onRemove: () => _removeMeetingWith(index),
-            ),
-          );
-        }),
-      ],
-    );
-  }
-
-  Widget _buildDynamicField({
-    required TextEditingController controller,
-    required String hintText,
-    required bool isFirst,
-    required VoidCallback onAdd,
-    required VoidCallback onRemove,
-  }) {
-    return Row(
-      children: [
-        Expanded(
-          child: Container(
-            height: 50,
-            decoration: BoxDecoration(
-              border: Border.all(color: const Color(0xFFB7B7B7)),
-              borderRadius: BorderRadius.circular(5),
-            ),
-            child: TextField(
-              controller: controller,
-              style: GoogleFonts.roboto(fontSize: 18),
-              decoration: InputDecoration(
-                hintText: hintText,
-                hintStyle: GoogleFonts.roboto(
-                  fontSize: 18,
-                  color: Colors.black.withValues(alpha: 0.7),
-                ),
-                border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 15),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 10),
-        // Add/Remove button
-        Container(
-          width: 50,
-          height: 50,
-          decoration: BoxDecoration(
-            border: Border.all(color: const Color(0xFFB7B7B7)),
-            borderRadius: BorderRadius.circular(5),
-          ),
-          child: IconButton(
-            onPressed: isFirst ? onAdd : onRemove,
-            icon: Icon(
-              isFirst ? Icons.add : Icons.remove,
-              color: const Color(0xFF808080),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSubjectsField() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Subjects:',
-          style: GoogleFonts.inter(
-            fontSize: 18,
-            fontWeight: FontWeight.w500,
-            color: Colors.black,
-          ),
-        ),
-        const SizedBox(height: 15),
-        Container(
-          height: 50,
-          decoration: BoxDecoration(
-            border: Border.all(color: const Color(0xFFB7B7B7)),
-            borderRadius: BorderRadius.circular(5),
-          ),
-          child: TextField(
-            controller: _subjectController,
-            style: GoogleFonts.roboto(fontSize: 18),
-            decoration: InputDecoration(
-              hintText: 'Enter subject...',
-              hintStyle: GoogleFonts.roboto(
-                fontSize: 18,
-                color: Colors.black.withValues(alpha: 0.7),
-              ),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 15),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildLanguageDropdown() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Language of meeting:',
-          style: GoogleFonts.inter(
-            fontSize: 18,
-            fontWeight: FontWeight.w500,
-            color: Colors.black,
-          ),
-        ),
-        const SizedBox(height: 15),
-        Container(
-          height: 50,
-          decoration: BoxDecoration(
-            border: Border.all(color: const Color(0xFFB7B7B7)),
-            borderRadius: BorderRadius.circular(5),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: _selectedLanguage,
-              isExpanded: true,
-              padding: const EdgeInsets.symmetric(horizontal: 15),
-              icon: Icon(
-                Icons.keyboard_arrow_down,
-                color: Colors.black.withValues(alpha: 0.4),
-              ),
-              items: _languages.map((lang) {
-                return DropdownMenuItem(
-                  value: lang,
-                  child: Text(
-                    lang,
-                    style: GoogleFonts.roboto(
-                      fontSize: 18,
-                      color: Colors.black.withValues(alpha: 0.7),
-                    ),
-                  ),
-                );
-              }).toList(),
-              onChanged: (value) {
-                if (value != null) {
-                  setState(() => _selectedLanguage = value);
-                }
-              },
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDayDropdown() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Meeting day:',
-          style: GoogleFonts.inter(
-            fontSize: 18,
-            fontWeight: FontWeight.w500,
-            color: Colors.black,
-          ),
-        ),
-        const SizedBox(height: 15),
-        Container(
-          height: 50,
-          decoration: BoxDecoration(
-            border: Border.all(color: const Color(0xFFB7B7B7)),
-            borderRadius: BorderRadius.circular(5),
-          ),
-          child: _agendaDays.isEmpty
-              ? Center(
-                  child: Text(
-                    'No days available',
-                    style: GoogleFonts.roboto(fontSize: 16, color: Colors.grey),
-                  ),
-                )
-              : DropdownButtonHideUnderline(
-                  child: DropdownButton<Map<String, dynamic>>(
-                    value: _selectedDay,
-                    isExpanded: true,
-                    padding: const EdgeInsets.symmetric(horizontal: 15),
-                    icon: Icon(
-                      Icons.keyboard_arrow_down,
-                      color: Colors.black.withValues(alpha: 0.4),
-                    ),
-                    items: _agendaDays.map((day) {
-                      // Format day label
-                      String label;
-                      final date = day['date'] as String?;
-                      if (date != null) {
-                        try {
-                          final dt = DateTime.parse(date);
-                          final weekdays = [
-                            '',
-                            'Monday',
-                            'Tuesday',
-                            'Wednesday',
-                            'Thursday',
-                            'Friday',
-                            'Saturday',
-                            'Sunday',
-                          ];
-                          label = '${dt.day} ${weekdays[dt.weekday]}';
-                        } catch (e) {
-                          label = date;
-                        }
-                      } else {
-                        label =
-                            day['name'] ??
-                            'Day ${_agendaDays.indexOf(day) + 1}';
-                      }
-                      return DropdownMenuItem(
-                        value: day,
-                        child: Text(
-                          label,
-                          style: GoogleFonts.roboto(
-                            fontSize: 18,
-                            color: Colors.black.withValues(alpha: 0.7),
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      if (value != null) {
-                        setState(() => _selectedDay = value);
-                      }
-                    },
-                  ),
-                ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTimePickers() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Meeting time:',
-          style: GoogleFonts.inter(
-            fontSize: 18,
-            fontWeight: FontWeight.w500,
-            color: Colors.black,
-          ),
-        ),
-        const SizedBox(height: 15),
-        Row(
-          children: [
-            // Start time
-            Expanded(
-              child: GestureDetector(
-                onTap: () => _selectTime(isStart: true),
-                child: Container(
-                  height: 50,
-                  decoration: BoxDecoration(
-                    border: Border.all(color: const Color(0xFFB7B7B7)),
-                    borderRadius: BorderRadius.circular(5),
-                  ),
-                  child: Row(
-                    children: [
-                      const SizedBox(width: 15),
-                      Icon(
-                        Icons.access_time,
-                        color: Colors.black.withValues(alpha: 0.5),
-                        size: 20,
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        _formatTimeOfDay(_startTime),
-                        style: GoogleFonts.roboto(
-                          fontSize: 18,
-                          color: Colors.black.withValues(alpha: 0.7),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Text(
-                'to',
-                style: GoogleFonts.inter(fontSize: 16, color: Colors.grey),
-              ),
-            ),
-            // End time
-            Expanded(
-              child: GestureDetector(
-                onTap: () => _selectTime(isStart: false),
-                child: Container(
-                  height: 50,
-                  decoration: BoxDecoration(
-                    border: Border.all(color: const Color(0xFFB7B7B7)),
-                    borderRadius: BorderRadius.circular(5),
-                  ),
-                  child: Row(
-                    children: [
-                      const SizedBox(width: 15),
-                      Icon(
-                        Icons.access_time,
-                        color: Colors.black.withValues(alpha: 0.5),
-                        size: 20,
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        _formatTimeOfDay(_endTime),
-                        style: GoogleFonts.roboto(
-                          fontSize: 18,
-                          color: Colors.black.withValues(alpha: 0.7),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Future<void> _selectTime({required bool isStart}) async {
-    final TimeOfDay? picked = await showTimePicker(
+  Future<void> _pickDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
       context: context,
-      initialTime: isStart ? _startTime : _endTime,
+      initialDate: _selectedDate ?? now,
+      firstDate: now,
+      lastDate: DateTime(2050),
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(primary: Color(0xFF3C4494)),
+            colorScheme:
+                const ColorScheme.light(primary: AppColors.gradientStart),
           ),
           child: child!,
         );
       },
     );
-    if (picked != null) {
-      setState(() {
-        if (isStart) {
-          _startTime = picked;
-          // If start time is after end time, adjust end time
-          if (_timeToMinutes(_startTime) >= _timeToMinutes(_endTime)) {
-            _endTime = TimeOfDay(
-              hour: (_startTime.hour + 1) % 24,
-              minute: _startTime.minute,
-            );
-          }
-        } else {
-          _endTime = picked;
-        }
-      });
+    if (picked != null && mounted) {
+      setState(() => _selectedDate = picked);
     }
   }
 
-  int _timeToMinutes(TimeOfDay time) {
-    return time.hour * 60 + time.minute;
+  Future<void> _pickTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _selectedTime ?? const TimeOfDay(hour: 9, minute: 0),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme:
+                const ColorScheme.light(primary: AppColors.gradientStart),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null && mounted) {
+      setState(() => _selectedTime = picked);
+    }
   }
 
-  String _formatTimeOfDay(TimeOfDay time) {
-    final hour = time.hour.toString().padLeft(2, '0');
-    final minute = time.minute.toString().padLeft(2, '0');
-    return '$hour:$minute';
+  // ── Image URL helper ────────────────────────────────────────────────────
+
+  String _buildImageUrl(String? imagePath) {
+    if (imagePath == null || imagePath.isEmpty) return '';
+    if (imagePath.startsWith('http')) return imagePath;
+    return '${AppConfig.b2cApiBaseUrl}$imagePath';
   }
 
-  Widget _buildCommentsField() {
+  // ── Build ───────────────────────────────────────────────────────────────
+
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isDesktop = screenWidth >= 900;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Title
+          Text(
+            'Meetings',
+            style: GoogleFonts.montserrat(
+              fontSize: 30,
+              fontWeight: FontWeight.w600,
+              color: AppColors.gradientStart,
+            ),
+          ),
+          const SizedBox(height: 12),
+          const Divider(height: 0.5, thickness: 0.5, color: Color(0xFFCACACA)),
+          const SizedBox(height: 24),
+
+          // Two cards side by side (desktop) or stacked (mobile)
+          if (isDesktop)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(width: 288, child: _buildPersonCard()),
+                const SizedBox(width: 24),
+                Expanded(child: _buildFormCard()),
+              ],
+            )
+          else
+            Column(
+              children: [
+                _buildPersonCard(),
+                const SizedBox(height: 24),
+                _buildFormCard(),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
+  // ── Person Card (left) ──────────────────────────────────────────────────
+
+  Widget _buildPersonCard() {
+    final data = _displayData;
+    final firstName = data['first_name'] as String? ?? '';
+    final lastName = data['last_name'] as String? ?? '';
+    final fullName = '$firstName $lastName'.trim();
+    final position = data['position'] as String? ?? '';
+    final companyName = data['company_name'] as String? ?? '';
+    final categories = data['company_categories'];
+    final categoryText = categories is List
+        ? categories.join(', ')
+        : (categories as String? ?? '');
+    final photoUrl = _buildImageUrl(
+      data['profile_photo_url'] as String? ??
+          data['company_logo_url'] as String?,
+    );
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: const BorderRadius.only(
+          topRight: Radius.circular(5),
+          bottomLeft: Radius.circular(5),
+          bottomRight: Radius.circular(5),
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x40000000),
+            blurRadius: 10,
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.symmetric(vertical: 24),
+      child: Column(
+        children: [
+          // Circle avatar
+          CircleAvatar(
+            radius: 101,
+            backgroundColor: AppColors.cardBackground,
+            backgroundImage:
+                photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null,
+            child: photoUrl.isEmpty
+                ? Icon(Icons.person, size: 64, color: Colors.grey[400])
+                : null,
+          ),
+          const SizedBox(height: 16),
+
+          // Name
+          Text(
+            fullName.isNotEmpty ? fullName : 'Unknown',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.inter(
+              fontSize: 20,
+              fontWeight: FontWeight.w500,
+              color: Colors.black,
+            ),
+          ),
+          const SizedBox(height: 4),
+
+          // Position
+          if (position.isNotEmpty)
+            Text(
+              position,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+                color: const Color(0xFF747474),
+              ),
+            ),
+          const SizedBox(height: 16),
+          const Divider(
+            height: 0.5,
+            thickness: 0.5,
+            color: Color(0xFFCACACA),
+            indent: 20,
+            endIndent: 20,
+          ),
+
+          // Company
+          if (companyName.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            _buildInfoRow(
+              svgAsset: 'assets/meeting/company.svg',
+              label: 'Company',
+              value: companyName,
+            ),
+            const SizedBox(height: 16),
+            const Divider(
+              height: 0.5,
+              thickness: 0.5,
+              color: Color(0xFFCACACA),
+              indent: 20,
+              endIndent: 20,
+            ),
+          ],
+
+          // Industry
+          if (categoryText.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            _buildInfoRow(
+              svgAsset: 'assets/meeting/industry.svg',
+              label: 'Industry',
+              value: categoryText,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow({
+    required String svgAsset,
+    required String label,
+    required String value,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SvgPicture.asset(
+            svgAsset,
+            width: 20,
+            height: 20,
+            colorFilter: const ColorFilter.mode(
+              AppColors.gradientStart,
+              BlendMode.srcIn,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: GoogleFonts.inter(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.black,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  style: GoogleFonts.inter(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    color: const Color(0xFF747474),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Form Card (right) ──────────────────────────────────────────────────
+
+  Widget _buildFormCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(5),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x40000000),
+            blurRadius: 10,
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(20),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Subject
+            AppTextField(
+              labelText: 'Subject:',
+              hintText: 'Enter subject...',
+              controller: _subjectController,
+              required: true,
+              borderRadius: 5,
+            ),
+            const SizedBox(height: 16),
+
+            // Date + Time row
+            LayoutBuilder(
+              builder: (context, constraints) {
+                if (constraints.maxWidth > 500) {
+                  return Row(
+                    children: [
+                      Expanded(child: _buildDateField()),
+                      const SizedBox(width: 16),
+                      Expanded(child: _buildTimeField()),
+                    ],
+                  );
+                }
+                return Column(
+                  children: [
+                    _buildDateField(),
+                    const SizedBox(height: 16),
+                    _buildTimeField(),
+                  ],
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // Location
+            AppTextField(
+              labelText: 'Location:',
+              hintText: 'Enter location...',
+              controller: _locationController,
+              borderRadius: 5,
+            ),
+            const SizedBox(height: 16),
+
+            // Message
+            AppTextField(
+              labelText: 'Message:',
+              hintText: 'Enter message...',
+              controller: _messageController,
+              maxLines: 6,
+              height: 160,
+              borderRadius: 5,
+            ),
+            const SizedBox(height: 24),
+
+            // Action buttons
+            _buildActionButtons(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Date field ──────────────────────────────────────────────────────────
+
+  Widget _buildDateField() {
+    final dateText = _selectedDate != null
+        ? DateFormat('dd.MM.yyyy').format(_selectedDate!)
+        : '';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Message:',
-          style: GoogleFonts.inter(
-            fontSize: 18,
-            fontWeight: FontWeight.w500,
-            color: Colors.black,
-          ),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 6, left: 4),
+          child: Text('Date:', style: AppTextStyles.label),
         ),
-        const SizedBox(height: 15),
-        Container(
-          height: 117,
-          decoration: BoxDecoration(
-            border: Border.all(color: const Color(0xFFB7B7B7)),
-            borderRadius: BorderRadius.circular(5),
-          ),
-          child: TextField(
-            controller: _commentsController,
-            maxLines: 5,
-            style: GoogleFonts.roboto(fontSize: 18),
-            decoration: InputDecoration(
-              hintText: 'Enter message...',
-              hintStyle: GoogleFonts.roboto(
-                fontSize: 18,
-                color: Colors.black.withValues(alpha: 0.7),
-              ),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.all(15),
+        GestureDetector(
+          onTap: _pickDate,
+          child: Container(
+            height: 48,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border.all(color: AppColors.inputBorder),
+              borderRadius: BorderRadius.circular(5),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    dateText.isNotEmpty ? dateText : 'Select date...',
+                    style: dateText.isNotEmpty
+                        ? AppTextStyles.inputText
+                        : AppTextStyles.placeholder,
+                  ),
+                ),
+                Icon(
+                  Icons.calendar_today,
+                  size: 20,
+                  color: AppColors.textPlaceholder,
+                ),
+              ],
             ),
           ),
         ),
@@ -1052,50 +529,121 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
     );
   }
 
-  Widget _buildSaveButton() {
-    return OutlinedButton(
-      onPressed: _isSubmitting ? null : _submitRequest,
-      style: OutlinedButton.styleFrom(
-        foregroundColor: const Color(0xFF008000),
-        side: const BorderSide(color: Color(0xFF008000)),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-      ),
-      child: _isSubmitting
-          ? const SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF008000)),
-              ),
-            )
-          : Text(
-              'Save',
-              style: GoogleFonts.inter(
-                fontSize: 16,
-                fontWeight: FontWeight.w400,
-                color: const Color(0xFF008000),
-              ),
+  // ── Time field ──────────────────────────────────────────────────────────
+
+  Widget _buildTimeField() {
+    final timeText = _selectedTime != null
+        ? '${_selectedTime!.hour.toString().padLeft(2, '0')}:${_selectedTime!.minute.toString().padLeft(2, '0')}'
+        : '';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 6, left: 4),
+          child: Text('Time:', style: AppTextStyles.label),
+        ),
+        GestureDetector(
+          onTap: _pickTime,
+          child: Container(
+            height: 48,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border.all(color: AppColors.inputBorder),
+              borderRadius: BorderRadius.circular(5),
             ),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    timeText.isNotEmpty ? timeText : 'Select time...',
+                    style: timeText.isNotEmpty
+                        ? AppTextStyles.inputText
+                        : AppTextStyles.placeholder,
+                  ),
+                ),
+                Icon(
+                  Icons.access_time,
+                  size: 20,
+                  color: AppColors.textPlaceholder,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _buildImagePlaceholder(String name) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
+  // ── Action buttons ──────────────────────────────────────────────────────
+
+  Widget _buildActionButtons() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        Icon(Icons.business, size: 48, color: Colors.grey[400]),
-        const SizedBox(height: 8),
-        Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Text(
-            name,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[600],
-              fontWeight: FontWeight.w600,
+        Flexible(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 183),
+            child: SizedBox(
+              height: 43,
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () => context.pop(),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF474747),
+                  side: const BorderSide(color: AppColors.inputBorder),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(5),
+                  ),
+                ),
+                child: Text(
+                  'Cancel',
+                  style: GoogleFonts.inter(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w500,
+                    color: const Color(0xFF474747),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 16),
+        Flexible(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 183),
+            child: SizedBox(
+              height: 43,
+              width: double.infinity,
+              child: ElevatedButton(
+            onPressed: _isSubmitting ? null : _submitRequest,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.gradientStart,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(5),
+              ),
+              elevation: 0,
+            ),
+            child: _isSubmitting
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                : Text(
+                    'Send',
+                    style: GoogleFonts.inter(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white,
+                    ),
+                  ),
+              ),
             ),
           ),
         ),

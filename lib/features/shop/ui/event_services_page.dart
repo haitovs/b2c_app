@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_snackbar.dart';
+import '../../../shared/widgets/app_checkbox.dart';
 import '../../../shared/widgets/product_card.dart';
 import '../models/event_service.dart';
 import '../providers/shop_providers.dart';
@@ -813,13 +814,13 @@ class _MobileCategoryDrawer extends StatelessWidget {
                   controller: scrollController,
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   children: [
-                    _DrawerCheckboxRow(
+                    AppCheckboxRow(
                       label: 'All',
                       isSelected: selected.isEmpty,
                       onTap: onClearAll,
                     ),
                     for (final cat in categories)
-                      _DrawerCheckboxRow(
+                      AppCheckboxRow(
                         label: cat,
                         isSelected: selected.contains(cat),
                         onTap: () => onToggle(cat),
@@ -959,7 +960,7 @@ class _FilterSection extends StatelessWidget {
         ),
         const Divider(color: Color(0xFFCACACA)),
         ...options.map(
-          (opt) => _DrawerCheckboxRow(
+          (opt) => AppCheckboxRow(
             label: opt,
             isSelected: false,
             onTap: () {},
@@ -970,46 +971,6 @@ class _FilterSection extends StatelessWidget {
   }
 }
 
-class _DrawerCheckboxRow extends StatelessWidget {
-  final String label;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _DrawerCheckboxRow({
-    required this.label,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                label,
-                style: GoogleFonts.inter(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w400,
-                  color: Colors.black,
-                ),
-              ),
-            ),
-            Icon(
-              isSelected ? Icons.check_box : Icons.check_box_outline_blank,
-              size: 20,
-              color: isSelected ? AppTheme.primaryColor : Colors.grey.shade400,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Error view with retry

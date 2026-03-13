@@ -2,13 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_snackbar.dart';
-import '../../../../core/widgets/custom_app_bar.dart';
-import '../../auth/providers/auth_provider.dart';
 import '../../events/providers/event_providers.dart';
-import '../../notifications/ui/notification_drawer.dart';
 import 'widgets/event_card.dart';
-import 'widgets/profile_dropdown.dart';
 
 class EventCalendarPage extends ConsumerStatefulWidget {
   const EventCalendarPage({super.key});
@@ -18,13 +15,9 @@ class EventCalendarPage extends ConsumerStatefulWidget {
 }
 
 class _EventCalendarPageState extends ConsumerState<EventCalendarPage> {
-  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-
   // Search Controller
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-
-  bool _isProfileOpen = false;
 
   // Cached event state
   List<dynamic> _allEvents = [];
@@ -73,27 +66,6 @@ class _EventCalendarPageState extends ConsumerState<EventCalendarPage> {
     });
   }
 
-  void _toggleProfile() {
-    setState(() {
-      _isProfileOpen = !_isProfileOpen;
-    });
-  }
-
-  void _closeProfile() {
-    if (_isProfileOpen) {
-      setState(() {
-        _isProfileOpen = false;
-      });
-    }
-  }
-
-  void _logout() async {
-    await ref.read(authNotifierProvider.notifier).logout();
-    if (mounted) {
-      context.go('/login');
-    }
-  }
-
   @override
   void dispose() {
     _searchController.removeListener(_filterEvents);
@@ -105,61 +77,60 @@ class _EventCalendarPageState extends ConsumerState<EventCalendarPage> {
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 800; // Mobile breakpoint
-
-    // Configurable dimensions
-    final double navbarHeight = isMobile ? 60.0 : 70.0;
-    final double navbarTopPadding = isMobile ? 10.0 : 20.0;
-
-    final double searchBarTop = navbarHeight + navbarTopPadding + 20;
-    final double searchBarHeight = isMobile ? 45.0 : 50.0;
-
-    final double listTop =
-        searchBarTop + searchBarHeight + (isMobile ? 20 : 40);
+    final isMobile = screenWidth < 800;
 
     return Scaffold(
-      key: _scaffoldKey,
-      backgroundColor: const Color(0xFF3C4494),
-      endDrawer: const NotificationDrawer(),
-      body: Stack(
-        children: [
-          // 1. Navigation Header
-          Positioned(
-            top: navbarTopPadding,
-            left: isMobile ? 20 : 40,
-            right: isMobile ? 20 : 40,
-            child: CustomAppBar(
-              onProfileTap: _toggleProfile,
-              onNotificationTap: () {
-                _closeProfile();
-                _scaffoldKey.currentState?.openEndDrawer();
-              },
-              isMobile: isMobile,
+      backgroundColor: AppTheme.backgroundColor,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Top bar: title + profile icon
+            Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: isMobile ? 20 : 40,
+                vertical: isMobile ? 16 : 24,
+              ),
+              child: Row(
+                children: [
+                  Text(
+                    'Events',
+                    style: GoogleFonts.montserrat(
+                      fontSize: isMobile ? 24 : 32,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    onPressed: () => context.go('/profile'),
+                    icon: Icon(
+                      Icons.person_outline,
+                      color: AppTheme.primaryColor,
+                      size: isMobile ? 26 : 30,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
 
-          // 2. Search Bar
-          Positioned(
-            top: searchBarTop,
-            left: 0,
-            right: 0,
-            child: Center(
+            // Search bar
+            Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: isMobile ? 20 : 40,
+              ),
               child: Container(
-                width: 1310,
-                height: searchBarHeight,
-                constraints: BoxConstraints(maxWidth: screenWidth * 0.92),
+                height: isMobile ? 45.0 : 50.0,
+                constraints: BoxConstraints(maxWidth: 1310),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF1F1F6).withValues(alpha: 0.15),
+                  color: AppTheme.primaryColor.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 alignment: Alignment.center,
                 child: TextField(
                   controller: _searchController,
-                  onTap: _closeProfile,
-                  cursorColor: const Color(0xFFF1F1F6),
                   style: GoogleFonts.roboto(
                     fontSize: isMobile ? 16 : 18,
-                    color: const Color(0xFFF1F1F6),
+                    color: Colors.black87,
                     fontWeight: FontWeight.w500,
                   ),
                   textAlignVertical: TextAlignVertical.center,
@@ -168,14 +139,14 @@ class _EventCalendarPageState extends ConsumerState<EventCalendarPage> {
                     filled: false,
                     prefixIcon: Icon(
                       Icons.search,
-                      color: const Color(0xFFF1F1F6),
+                      color: AppTheme.primaryColor,
                       size: isMobile ? 24 : 28,
                     ),
                     hintText: "Search by event name",
                     hintStyle: GoogleFonts.roboto(
                       fontWeight: FontWeight.w500,
                       fontSize: isMobile ? 16 : 18,
-                      color: const Color(0xFFF1F1F6),
+                      color: Colors.grey.shade500,
                     ),
                     border: InputBorder.none,
                     focusedBorder: InputBorder.none,
@@ -186,50 +157,31 @@ class _EventCalendarPageState extends ConsumerState<EventCalendarPage> {
                 ),
               ),
             ),
-          ),
 
-          // 3. Scrollable Event List
-          Positioned.fill(
-            top: listTop,
-            child: _buildEventList(isMobile),
-          ),
+            SizedBox(height: isMobile ? 20 : 32),
 
-          // 4. Click-outside overlay (above content, below dropdown)
-          if (_isProfileOpen)
-            Positioned.fill(
-              child: GestureDetector(
-                onTap: _closeProfile,
-                behavior: HitTestBehavior.opaque,
-                child: const SizedBox.expand(),
-              ),
+            // Scrollable Event List
+            Expanded(
+              child: _buildEventList(isMobile),
             ),
-
-          // 5. Profile Dropdown Overlay
-          if (_isProfileOpen)
-            Positioned(
-              top: navbarTopPadding + navbarHeight + 5,
-              right: isMobile ? 20 : 65,
-              left: isMobile ? 20 : null,
-              child: ProfileDropdown(
-                onLogout: _logout,
-                onClose: _closeProfile,
-              ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildEventList(bool isMobile) {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(
+        child: CircularProgressIndicator(color: AppTheme.primaryColor),
+      );
     }
 
     if (_error != null) {
       return Center(
         child: Text(
           "Error: $_error",
-          style: const TextStyle(color: Colors.white),
+          style: const TextStyle(color: Colors.black87),
         ),
       );
     }
@@ -240,58 +192,50 @@ class _EventCalendarPageState extends ConsumerState<EventCalendarPage> {
           _searchController.text.trim().isEmpty
               ? "No events found"
               : "No events match your search",
-          style: const TextStyle(color: Colors.white),
+          style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
         ),
       );
     }
 
-    return Theme(
-      data: ThemeData(
-        scrollbarTheme: ScrollbarThemeData(
-          thumbColor: WidgetStateProperty.all(
-            const Color(0xFFF1F1F6).withValues(alpha: 0.2),
-          ),
-          trackColor: WidgetStateProperty.all(Colors.transparent),
-          radius: const Radius.circular(12),
-          thickness: WidgetStateProperty.all(isMobile ? 4 : 8),
-        ),
-      ),
-      child: Scrollbar(
+    return Scrollbar(
+      controller: _scrollController,
+      thumbVisibility: true,
+      thickness: isMobile ? 4 : 8,
+      radius: const Radius.circular(12),
+      child: SingleChildScrollView(
         controller: _scrollController,
-        thumbVisibility: true,
-        thickness: isMobile ? 4 : 8,
-        radius: const Radius.circular(12),
-        child: SingleChildScrollView(
-          controller: _scrollController,
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.only(bottom: 50, right: 10),
-          child: Column(
-            children: _filteredEvents.map((event) {
-              return Column(
-                children: [
-                  EventCard(
-                    title: event['title'] ?? 'No Title',
-                    date: event['date_str'] ?? '',
-                    location: event['location'] ?? '',
-                    imageUrl: event['image_url'] ?? '',
-                    logoUrl: event['logo_url'],
-                    eventStartTime:
-                        DateTime.tryParse(event['start_time'] ?? '') ??
-                        DateTime.now(),
-                    onTap: () {
-                      final id = event['id'];
-                      if (id != null) {
-                        context.go('/events/$id');
-                      } else {
-                        AppSnackBar.showInfo(context, 'Event ID missing');
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 25),
-                ],
-              );
-            }).toList(),
-          ),
+        physics: const BouncingScrollPhysics(),
+        padding: EdgeInsets.only(
+          bottom: 50,
+          right: 10,
+          left: isMobile ? 20 : 40,
+        ),
+        child: Column(
+          children: _filteredEvents.map((event) {
+            return Column(
+              children: [
+                EventCard(
+                  title: event['title'] ?? 'No Title',
+                  date: event['date_str'] ?? '',
+                  location: event['location'] ?? '',
+                  imageUrl: event['image_url'] ?? '',
+                  logoUrl: event['logo_url'],
+                  eventStartTime:
+                      DateTime.tryParse(event['start_time'] ?? '') ??
+                      DateTime.now(),
+                  onTap: () {
+                    final id = event['id'];
+                    if (id != null) {
+                      context.go('/events/$id');
+                    } else {
+                      AppSnackBar.showInfo(context, 'Event ID missing');
+                    }
+                  },
+                ),
+                const SizedBox(height: 24),
+              ],
+            );
+          }).toList(),
         ),
       ),
     );

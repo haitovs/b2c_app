@@ -429,6 +429,9 @@ class _CartProductCard extends StatelessWidget {
     final name = service?.name ?? 'Service #${item.serviceId}';
     final hasDiscount = (service?.discountPercent ?? 0) > 0;
     final originalPrice = service?.price ?? item.unitPrice;
+    final discountedPrice = hasDiscount
+        ? originalPrice * (1 - (service!.discountPercent / 100))
+        : originalPrice;
     final qty = item.quantity;
 
     return GestureDetector(
@@ -497,7 +500,7 @@ class _CartProductCard extends StatelessWidget {
                     child: Row(
                       children: [
                         Text(
-                          '${_fmt(item.unitPrice)} ${item.currency == "TMT" ? "TMT" : "\$"}',
+                          '${_fmt(discountedPrice)} ${item.currency == "TMT" ? "TMT" : "\$"}',
                           style: GoogleFonts.roboto(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
@@ -618,6 +621,9 @@ class _CartHorizontalCard extends StatelessWidget {
     final name = service?.name ?? 'Service #${item.serviceId}';
     final hasDiscount = (service?.discountPercent ?? 0) > 0;
     final originalPrice = service?.price ?? item.unitPrice;
+    final discountedPrice = hasDiscount
+        ? originalPrice * (1 - (service!.discountPercent / 100))
+        : originalPrice;
     final qty = item.quantity;
 
     return GestureDetector(
@@ -678,7 +684,7 @@ class _CartHorizontalCard extends StatelessWidget {
                     Row(
                       children: [
                         Text(
-                          '${_fmt(item.unitPrice)} ${item.currency == "TMT" ? "TMT" : "\$"}',
+                          '${_fmt(discountedPrice)} ${item.currency == "TMT" ? "TMT" : "\$"}',
                           style: GoogleFonts.roboto(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,

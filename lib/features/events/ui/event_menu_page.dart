@@ -12,6 +12,7 @@ import '../../../core/config/app_config.dart';
 import '../../../core/providers/event_context_provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_snackbar.dart';
+import '../../../shared/widgets/app_cached_image.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../shop/providers/shop_providers.dart';
@@ -276,10 +277,10 @@ class _SponsorCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: fullLogoUrl != null
-                      ? Image.network(
-                          fullLogoUrl,
+                      ? AppCachedImage(
+                          imageUrl: fullLogoUrl,
                           fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) => Icon(
+                          placeholder: Icon(
                             Icons.business,
                             color: tierColor,
                             size: 32,

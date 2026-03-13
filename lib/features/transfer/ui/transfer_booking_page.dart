@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/widgets/app_snackbar.dart';
+import '../../../shared/widgets/app_checkbox.dart';
 import '../providers/transfer_providers.dart';
 import '../services/transfer_service.dart';
 import 'booking_confirmation_page.dart';
@@ -224,21 +225,9 @@ class _TransferBookingPageState extends ConsumerState<TransferBookingPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[100],
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF3C4494),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Booking',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-      ),
-      body: Form(
+    return Container(
+      color: Colors.grey[100],
+      child: Form(
         key: _formKey,
         child: ListView(
           padding: const EdgeInsets.all(16),
@@ -379,15 +368,10 @@ class _TransferBookingPageState extends ConsumerState<TransferBookingPage> {
             const SizedBox(height: 16),
 
             // Terms checkbox
-            CheckboxListTile(
+            AppCheckbox(
               value: _agreedToTerms,
-              onChanged: (v) => setState(() => _agreedToTerms = v ?? false),
-              title: const Text(
-                'I agree to the terms and conditions',
-                style: TextStyle(fontSize: 14),
-              ),
-              controlAffinity: ListTileControlAffinity.leading,
-              contentPadding: EdgeInsets.zero,
+              onChanged: (v) => setState(() => _agreedToTerms = v),
+              label: 'I agree to the terms and conditions',
             ),
             const SizedBox(height: 16),
 
@@ -411,9 +395,7 @@ class _TransferBookingPageState extends ConsumerState<TransferBookingPage> {
                       ),
                     )
                   : Text(
-                      widget.serviceType == 'shuttle'
-                          ? 'Confirm Booking'
-                          : 'Continue to Payment',
+                      'Confirm Booking',
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,

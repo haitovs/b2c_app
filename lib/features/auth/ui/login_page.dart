@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/app_theme.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/app_checkbox.dart';
 import '../../../core/widgets/app_snackbar.dart';
 import '../../../core/widgets/app_text_field.dart';
 import '../providers/auth_provider.dart';
@@ -72,29 +73,11 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   // Remember me
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SizedBox(
-                        width: 17,
-                        height: 18,
-                        child: Checkbox(
-                          value: _rememberMe,
-                          onChanged: (val) =>
-                              setState(() => _rememberMe = val!),
-                          activeColor: AppColors.checkboxActive,
-                          side: const BorderSide(
-                            color: AppColors.checkboxActive,
-                            width: 1.5,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        AppLocalizations.of(context)!.rememberMe,
-                        style: AppTextStyles.rememberMe.copyWith(fontSize: 14),
-                      ),
-                    ],
+                  AppCheckbox(
+                    value: _rememberMe,
+                    onChanged: (val) => setState(() => _rememberMe = val),
+                    label: AppLocalizations.of(context)!.rememberMe,
+                    size: 18,
                   ),
                   // Forgot Password
                   MouseRegion(

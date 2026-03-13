@@ -63,7 +63,10 @@ class DeleteConfirmDialog extends StatelessWidget {
         return DeleteConfirmDialog(
           title: title,
           message: message,
-          onConfirm: () => Navigator.of(dialogContext).pop(true),
+          onConfirm: () {
+            // No-op: the build() Delete button already pops with `true`.
+            // The caller reads the returned Future<bool?> to decide next steps.
+          },
         );
       },
     );
@@ -124,7 +127,7 @@ class DeleteConfirmDialog extends StatelessWidget {
             // Cancel
             Expanded(
               child: OutlinedButton(
-                onPressed: () => Navigator.of(context).pop(false),
+                onPressed: () => Navigator.of(context, rootNavigator: true).pop(false),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.grey.shade700,
                   side: BorderSide(color: Colors.grey.shade300),
@@ -146,7 +149,7 @@ class DeleteConfirmDialog extends StatelessWidget {
             Expanded(
               child: ElevatedButton(
                 onPressed: () {
-                  Navigator.of(context).pop(true);
+                  Navigator.of(context, rootNavigator: true).pop(true);
                   onConfirm();
                 },
                 style: ElevatedButton.styleFrom(

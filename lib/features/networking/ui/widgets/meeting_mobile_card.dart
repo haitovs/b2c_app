@@ -55,12 +55,15 @@ class MeetingMobileCard extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(5),
-        boxShadow: [
+        borderRadius: const BorderRadius.only(
+          topRight: Radius.circular(5),
+          bottomLeft: Radius.circular(5),
+          bottomRight: Radius.circular(5),
+        ),
+        boxShadow: const [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: Color.fromRGBO(60, 68, 148, 0.5),
+            blurRadius: 3.4,
           ),
         ],
       ),
@@ -164,7 +167,7 @@ class MeetingMobileCard extends StatelessWidget {
       child: Text(
         label,
         style: GoogleFonts.inter(
-          fontSize: 11,
+          fontSize: 12,
           fontWeight: FontWeight.w500,
           color: Colors.white,
         ),
@@ -196,6 +199,18 @@ class MeetingMobileCard extends StatelessWidget {
             const Icon(Icons.cancel_outlined, size: 18, color: Colors.red),
             const SizedBox(width: 10),
             Text('Cancel',
+                style: GoogleFonts.inter(
+                    fontWeight: FontWeight.w500, color: Colors.red)),
+          ]),
+        ));
+      }
+      if (isPending) {
+        items.add(PopupMenuItem(
+          value: 'delete',
+          child: Row(children: [
+            const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+            const SizedBox(width: 10),
+            Text('Delete',
                 style: GoogleFonts.inter(
                     fontWeight: FontWeight.w500, color: Colors.red)),
           ]),

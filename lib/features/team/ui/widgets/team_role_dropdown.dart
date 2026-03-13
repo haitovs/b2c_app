@@ -1,21 +1,25 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/theme/app_theme.dart';
 
 // =============================================================================
-// TeamRoleDropdown — overlay-based role selector
+// TeamRoleDropdown — styled to match other form fields (48px height, same border)
 // =============================================================================
+
+const _kInputBorderRadius = 5.0;
+const _kInputBorderColor = Color(0xFFB7B7B7);
 
 class TeamRoleDropdown extends StatefulWidget {
   final String currentRole;
   final ValueChanged<String> onRoleChanged;
+  final bool enabled;
 
   const TeamRoleDropdown({
     super.key,
     required this.currentRole,
     required this.onRoleChanged,
+    this.enabled = true,
   });
 
   @override
@@ -37,43 +41,32 @@ class _TeamRoleDropdownState extends State<TeamRoleDropdown> {
         controller: _overlayController,
         overlayChildBuilder: (_) => _buildOverlay(),
         child: InkWell(
-          onTap: () => _overlayController.toggle(),
-          borderRadius: BorderRadius.circular(6),
+          onTap: widget.enabled ? () => _overlayController.toggle() : null,
+          borderRadius: BorderRadius.circular(_kInputBorderRadius),
           child: Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            height: 48,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(
-                  color: AppTheme.primaryColor.withValues(alpha: 0.4)),
+              color: widget.enabled ? Colors.white : Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(_kInputBorderRadius),
+              border: Border.all(color: _kInputBorderColor),
             ),
             child: Row(
-              mainAxisSize: MainAxisSize.min,
               children: [
-                SvgPicture.asset(
-                  'assets/team/gear.svg',
-                  width: 16,
-                  height: 16,
-                  colorFilter: ColorFilter.mode(
-                    Colors.grey.shade600,
-                    BlendMode.srcIn,
-                  ),
-                ),
-                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     label,
                     style: GoogleFonts.inter(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.black87,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w400,
+                      color: widget.enabled ? Colors.black87 : Colors.grey,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                Icon(Icons.keyboard_arrow_down_rounded,
-                    size: 18, color: Colors.grey.shade600),
+                if (widget.enabled)
+                  Icon(Icons.keyboard_arrow_down_rounded,
+                      size: 20, color: Colors.grey.shade600),
               ],
             ),
           ),
@@ -98,7 +91,7 @@ class _TeamRoleDropdownState extends State<TeamRoleDropdown> {
               borderRadius: BorderRadius.circular(8),
               color: Colors.white,
               child: Container(
-                width: 220,
+                width: 260,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: Colors.grey.shade200),
@@ -110,14 +103,14 @@ class _TeamRoleDropdownState extends State<TeamRoleDropdown> {
                       role: 'USER',
                       title: 'User',
                       description:
-                          'can view and edit only\ntheir own information.',
+                          'can view and edit only their own information.',
                     ),
                     Divider(height: 1, color: Colors.grey.shade200),
                     _buildRoleItem(
                       role: 'ADMINISTRATOR',
                       title: 'Administrator',
                       description:
-                          'can view and edit\ninformation for all users.',
+                          'can view and edit information for all users.',
                     ),
                   ],
                 ),

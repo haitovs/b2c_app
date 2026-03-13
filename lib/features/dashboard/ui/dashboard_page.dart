@@ -12,8 +12,6 @@ import '../../../core/config/app_config.dart';
 import '../../../core/providers/event_context_provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../company/providers/company_providers.dart';
-import '../../registration/providers/registration_providers.dart';
-import '../../registration/services/registration_service.dart';
 import '../../shop/providers/shop_providers.dart';
 import '../../team/providers/team_providers.dart';
 import '../../visa/providers/visa_providers.dart';
@@ -33,7 +31,6 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   Timer? _sponsorScrollTimer;
 
   // Dashboard data
-  RegistrationStatus? _registrationStatus;
   bool _isLoadingData = true;
 
   @override
@@ -83,16 +80,8 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
 
   Future<void> _fetchDashboardData(int eventId) async {
     try {
-      // Registration status (for badge: not registered → pending → confirmed)
-      RegistrationStatus? status;
-      try {
-        final regService = ref.read(registrationServiceProvider);
-        status = await regService.getRegistrationStatus(eventId);
-      } catch (_) {}
-
       if (!mounted) return;
       setState(() {
-        _registrationStatus = status;
         _isLoadingData = false;
       });
     } catch (_) {
@@ -145,19 +134,19 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Status badge: not registered → pending → confirmed
-                  _StatusBadge(
-                    hasPurchased: ref.watch(hasPurchasedProvider(eventId)),
-                    registrationStatus: _registrationStatus,
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Progress bar (no separate registration segment)
+                  // Progress bar
                   _ParticipationProgress(
                     hasPurchased: ref.watch(hasPurchasedProvider(eventId)),
                     companies: ref.watch(myCompaniesProvider(eventId)),
                     teamMembers: ref.watch(allTeamMembersProvider(eventId)),
                     visas: ref.watch(visaListProvider(eventId)),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Status badge: not purchased → pending → approved
+                  _StatusBadge(
+                    hasPurchased: ref.watch(hasPurchasedProvider(eventId)),
+                    orders: ref.watch(ordersProvider(eventId)),
                   ),
                   const SizedBox(height: 24),
 
@@ -324,18 +313,18 @@ class _SponsorCard extends StatelessWidget {
 
 class _StatusBadge extends StatelessWidget {
   final bool hasPurchased;
-  final RegistrationStatus? registrationStatus;
+  final AsyncValue<List<dynamic>> orders;
 
   const _StatusBadge({
     required this.hasPurchased,
-    required this.registrationStatus,
+    required this.orders,
   });
 
   @override
   Widget build(BuildContext context) {
     // Not purchased → Not Registered
-    // Purchased + approved → Confirmed
-    // Purchased + not yet approved → Pending
+    // Purchased + any order approved → Confirmed
+    // Purchased + no approved orders → Pending
     final String label;
     final Color color;
     final IconData icon;
@@ -344,14 +333,23 @@ class _StatusBadge extends StatelessWidget {
       label = 'Not Registered';
       color = Colors.grey;
       icon = Icons.info_outline;
-    } else if (registrationStatus == RegistrationStatus.approved) {
-      label = 'Confirmed';
-      color = AppTheme.successColor;
-      icon = Icons.check_circle;
     } else {
-      label = 'Pending';
-      color = const Color(0xFFFF9800);
-      icon = Icons.schedule;
+      final hasApproved = orders.whenOrNull(
+        data: (list) => list.any((o) {
+          final s = (o['status'] ?? '').toString().toUpperCase();
+          return s == 'APPROVED';
+        }),
+      ) ?? false;
+
+      if (hasApproved) {
+        label = 'Confirmed';
+        color = AppTheme.successColor;
+        icon = Icons.check_circle;
+      } else {
+        label = 'Pending';
+        color = const Color(0xFFFF9800);
+        icon = Icons.schedule;
+      }
     }
 
     return Container(
@@ -509,7 +507,7 @@ class _ParticipationProgress extends StatelessWidget {
         0;
 
     return [
-      _Segment('Payment', payPercent),
+      _Segment('Order', payPercent),
       _Segment('Company', compPercent),
       _Segment('Team', teamPercent),
       _Segment('Visa', visaPercent),

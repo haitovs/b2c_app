@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/app_theme.dart';
+import '../../../../core/theme/app_theme.dart';
 
 /// Shared full-width rounded button for auth pages with loading state.
 class AuthButton extends StatelessWidget {

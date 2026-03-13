@@ -8,9 +8,10 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_snackbar.dart';
 import '../../../core/providers/upload_provider.dart';
 
+import '../../../core/widgets/phone_input_field.dart';
+import '../../../shared/widgets/app_checkbox.dart';
 import '../../../shared/widgets/country_city_picker.dart';
 import '../../../core/providers/reference_data_provider.dart';
-import '../../company/models/user_limits.dart';
 import '../../company/providers/company_providers.dart';
 import '../models/team_member.dart';
 import '../providers/team_providers.dart';
@@ -60,16 +61,13 @@ class _AddTeamMemberPageState extends ConsumerState<AddTeamMemberPage> {
   bool _isSubmitting = false;
   bool _didPopulate = false;
 
-  /// Index into member tabs: 0..N-1 = existing members, N = "new member"
-  int _selectedMemberTabIndex = -1;
-
   final _step1Key = GlobalKey<FormState>();
 
   // --- Step 1: Personal Info ---
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
   final _emailController = TextEditingController();
-  final _mobileController = TextEditingController();
+  String _mobilePhone = '';
   String? _selectedCountry;
   String? _selectedCity;
   String? _selectedPosition;
@@ -88,25 +86,18 @@ class _AddTeamMemberPageState extends ConsumerState<AddTeamMemberPage> {
   /// ID of the member being edited (from tab selection or route param).
   String? _editingMemberId;
 
+  /// user_id of the member being edited (to detect company owner).
+  String? _editingMemberUserId;
+
   bool get _isEditing => _editingMemberId != null;
 
   bool get _hasUnsavedChanges =>
       _firstNameController.text.trim().isNotEmpty ||
       _lastNameController.text.trim().isNotEmpty ||
       _emailController.text.trim().isNotEmpty ||
-      _mobileController.text.trim().isNotEmpty ||
+      _mobilePhone.isNotEmpty ||
       _profilePhotoUrl != null ||
       _socialLinks.isNotEmpty;
-
-  String get _memberTabLabel {
-    final first = _firstNameController.text.trim();
-    final last = _lastNameController.text.trim();
-    if (first.isNotEmpty || last.isNotEmpty) {
-      return '${first.isNotEmpty ? first : '...'} ${last.isNotEmpty ? last : '...'}'
-          .trim();
-    }
-    return 'New Member';
-  }
 
   @override
   void initState() {
@@ -125,7 +116,6 @@ class _AddTeamMemberPageState extends ConsumerState<AddTeamMemberPage> {
     _firstNameController.dispose();
     _lastNameController.dispose();
     _emailController.dispose();
-    _mobileController.dispose();
     for (final link in _socialLinks) {
       link.urlController.dispose();
     }
@@ -138,11 +128,12 @@ class _AddTeamMemberPageState extends ConsumerState<AddTeamMemberPage> {
     _firstNameController.text = member.firstName;
     _lastNameController.text = member.lastName;
     _emailController.text = member.email;
-    _mobileController.text = member.mobile ?? '';
+    _mobilePhone = member.mobile ?? '';
     _selectedCountry = member.country;
     _selectedCity = member.city;
     _selectedPosition = member.position;
     _selectedCompanyId = member.companyId;
+    _editingMemberUserId = member.userId;
     _selectedRole = member.role == TeamMemberRole.administrator
         ? 'ADMINISTRATOR'
         : 'USER';
@@ -163,25 +154,6 @@ class _AddTeamMemberPageState extends ConsumerState<AddTeamMemberPage> {
     }
   }
 
-  void _clearForm() {
-    _firstNameController.clear();
-    _lastNameController.clear();
-    _emailController.clear();
-    _mobileController.clear();
-    _selectedCountry = null;
-    _selectedCity = null;
-    _selectedPosition = null;
-    _profilePhotoUrl = null;
-    _selectedRole = 'USER';
-    _willAttend = true;
-    _allowMeetingRequests = false;
-    _showContactDetails = false;
-    for (final link in _socialLinks) {
-      link.urlController.dispose();
-    }
-    _socialLinks.clear();
-  }
-
   // ===========================================================================
   // Build
   // ===========================================================================
@@ -190,15 +162,6 @@ class _AddTeamMemberPageState extends ConsumerState<AddTeamMemberPage> {
   Widget build(BuildContext context) {
     final eventIdStr = GoRouterState.of(context).pathParameters['id'] ?? '';
     final eventId = int.tryParse(eventIdStr) ?? 0;
-
-    // Dynamic limits
-    final limitsAsync = ref.watch(userLimitsProvider(eventId));
-    final limits = limitsAsync.when(
-      data: (l) => l,
-      loading: () => UserLimits.defaults,
-      error: (_, __) => UserLimits.defaults,
-    );
-    final maxTeamMembers = limits.maxTeamMembersPerCompany;
 
     // Pre-populate form when editing via route param
     if (_editingMemberId != null && !_didPopulate) {
@@ -216,28 +179,18 @@ class _AddTeamMemberPageState extends ConsumerState<AddTeamMemberPage> {
       }
     }
 
-    // Load existing team members for tabs
-    final List<TeamMember> existingMembers;
-    if (_selectedCompanyId != null && _selectedCompanyId!.isNotEmpty) {
-      final membersAsync = ref.watch(teamMembersProvider(_selectedCompanyId!));
-      existingMembers = membersAsync.when(
-        data: (data) => data,
-        loading: () => <TeamMember>[],
-        error: (_, __) => <TeamMember>[],
-      );
-    } else {
-      existingMembers = [];
-    }
-
-    // Auto-set tab index
-    if (_selectedMemberTabIndex == -1) {
-      if (_editingMemberId != null) {
-        final idx =
-            existingMembers.indexWhere((m) => m.id == _editingMemberId);
-        _selectedMemberTabIndex = idx >= 0 ? idx : existingMembers.length;
-      } else {
-        _selectedMemberTabIndex = existingMembers.length;
-      }
+    // Check if the member being edited is the company owner
+    bool isEditingOwner = false;
+    if (_isEditing &&
+        _selectedCompanyId != null &&
+        _editingMemberUserId != null) {
+      final companyAsync =
+          ref.watch(companyDetailProvider(_selectedCompanyId!));
+      companyAsync.whenData((company) {
+        if (company.ownerId == _editingMemberUserId) {
+          isEditingOwner = true;
+        }
+      });
     }
 
     return SingleChildScrollView(
@@ -265,24 +218,16 @@ class _AddTeamMemberPageState extends ConsumerState<AddTeamMemberPage> {
           _buildHintBanner(),
           const SizedBox(height: 16),
 
-          // Member tabs
-          _buildMemberTabs(existingMembers, maxTeamMembers),
-          const SizedBox(height: 0),
-
           // Form card
           Container(
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: const BorderRadius.only(
-                topRight: Radius.circular(12),
-                bottomLeft: Radius.circular(12),
-                bottomRight: Radius.circular(12),
-              ),
+              borderRadius: BorderRadius.circular(12),
               boxShadow: const [_kCardShadow],
             ),
             child: Padding(
               padding: const EdgeInsets.all(20),
-              child: _buildStep1(eventId),
+              child: _buildStep1(eventId, isEditingOwner: isEditingOwner),
             ),
           ),
           const SizedBox(height: 24),
@@ -354,101 +299,10 @@ class _AddTeamMemberPageState extends ConsumerState<AddTeamMemberPage> {
   }
 
   // ===========================================================================
-  // Member Tabs
-  // ===========================================================================
-
-  Widget _buildMemberTabs(List<TeamMember> existingMembers, int maxTeamMembers) {
-    final canAddNew = existingMembers.length < maxTeamMembers;
-    final isNewTab = _selectedMemberTabIndex >= existingMembers.length;
-
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          for (int i = 0; i < existingMembers.length; i++)
-            _buildMemberPillTab(
-              label: existingMembers[i].fullName,
-              isSelected: _selectedMemberTabIndex == i,
-              onTap: () => _onMemberTabTap(i, existingMembers),
-            ),
-          if (isNewTab)
-            _buildMemberPillTab(
-              label: _memberTabLabel,
-              isSelected: true,
-              onTap: null,
-            ),
-          if (canAddNew && !isNewTab)
-            _buildMemberPillTab(
-              label: '+ Add (${existingMembers.length}/$maxTeamMembers)',
-              isSelected: false,
-              onTap: () =>
-                  _onMemberTabTap(existingMembers.length, existingMembers),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMemberPillTab({
-    required String label,
-    required bool isSelected,
-    VoidCallback? onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: const BorderRadius.only(
-        topLeft: Radius.circular(10),
-        topRight: Radius.circular(10),
-      ),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color: isSelected ? AppTheme.primaryColor : const Color(0xFFE8E8F0),
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(10),
-            topRight: Radius.circular(10),
-          ),
-        ),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 200),
-          child: Text(
-            label,
-            style: GoogleFonts.inter(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: isSelected ? Colors.white : Colors.black87,
-            ),
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _onMemberTabTap(int index, List<TeamMember> existingMembers) {
-    if (_selectedMemberTabIndex == index) return;
-
-    setState(() {
-      _selectedMemberTabIndex = index;
-      _didPopulate = false;
-
-      if (index < existingMembers.length) {
-        final member = existingMembers[index];
-        _editingMemberId = member.id;
-        _clearForm();
-        _populateFromMember(member);
-      } else {
-        _editingMemberId = null;
-        _clearForm();
-      }
-    });
-  }
-
-  // ===========================================================================
   // Step 1 — Personal Info
   // ===========================================================================
 
-  Widget _buildStep1(int eventId) {
+  Widget _buildStep1(int eventId, {bool isEditingOwner = false}) {
     final positionsAsync = ref.watch(positionsProvider);
     final companiesAsync = ref.watch(myCompaniesProvider(eventId));
 
@@ -509,11 +363,10 @@ class _AddTeamMemberPageState extends ConsumerState<AddTeamMemberPage> {
             ),
             right: _buildLabeledField(
               label: 'Mobile number:',
-              child: TextFormField(
-                controller: _mobileController,
-                style: GoogleFonts.inter(fontSize: 14),
-                decoration: _inputDecoration(hintText: '+1 234 567 8900'),
-                keyboardType: TextInputType.phone,
+              child: PhoneInputField(
+                key: ValueKey('phone_$_mobilePhone'),
+                initialPhone: _mobilePhone,
+                onChanged: (e164) => _mobilePhone = e164,
               ),
             ),
           ),
@@ -573,10 +426,29 @@ class _AddTeamMemberPageState extends ConsumerState<AddTeamMemberPage> {
             left: _buildLabeledField(
               label: 'Role:',
               required: true,
-              child: TeamRoleDropdown(
-                currentRole: _selectedRole,
-                onRoleChanged: (role) =>
-                    setState(() => _selectedRole = role),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TeamRoleDropdown(
+                    currentRole: _selectedRole,
+                    onRoleChanged: (role) =>
+                        setState(() => _selectedRole = role),
+                    enabled: !isEditingOwner,
+                  ),
+                  if (isEditingOwner)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        'Company owner role cannot be changed.',
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          color: Colors.grey.shade500,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
             right: _buildLabeledField(
@@ -642,32 +514,39 @@ class _AddTeamMemberPageState extends ConsumerState<AddTeamMemberPage> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            width: _kPhotoWidth,
-            height: _kPhotoHeight,
-            color: AppTheme.primaryColor.withValues(alpha: 0.1),
-            child: hasPhoto
-                ? Image.network(
-                    _profilePhotoUrl!,
-                    width: _kPhotoWidth,
-                    height: _kPhotoHeight,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Icon(
-                      Icons.person,
-                      size: 56,
-                      color: AppTheme.primaryColor.withValues(alpha: 0.4),
-                    ),
-                  )
-                : Icon(
+        // Photo preview
+        Container(
+          width: _kPhotoWidth,
+          height: _kPhotoHeight,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: AppTheme.primaryColor.withValues(alpha: 0.3),
+              width: 2,
+            ),
+            color: AppTheme.primaryColor.withValues(alpha: 0.05),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: hasPhoto
+              ? Image.network(
+                  _profilePhotoUrl!,
+                  width: _kPhotoWidth,
+                  height: _kPhotoHeight,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Icon(
                     Icons.person,
                     size: 56,
                     color: AppTheme.primaryColor.withValues(alpha: 0.4),
                   ),
-          ),
+                )
+              : Icon(
+                  Icons.person,
+                  size: 56,
+                  color: AppTheme.primaryColor.withValues(alpha: 0.4),
+                ),
         ),
-        const SizedBox(width: 20),
+        const SizedBox(width: 24),
+        // Buttons
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
@@ -678,29 +557,30 @@ class _AddTeamMemberPageState extends ConsumerState<AddTeamMemberPage> {
                 backgroundColor: AppTheme.primaryColor,
                 foregroundColor: Colors.white,
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(_kInputBorderRadius),
+                  borderRadius: BorderRadius.circular(6),
                 ),
                 textStyle: GoogleFonts.inter(
-                    fontSize: 13, fontWeight: FontWeight.w500),
+                    fontSize: 14, fontWeight: FontWeight.w500),
+                elevation: 0,
               ),
               child: const Text('Upload New Profile Picture'),
             ),
             if (hasPhoto) ...[
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
               OutlinedButton(
                 onPressed: () => setState(() => _profilePhotoUrl = null),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.grey.shade700,
-                  side: BorderSide(color: Colors.grey.shade400),
+                  foregroundColor: AppTheme.primaryColor,
+                  side: const BorderSide(color: AppTheme.primaryColor),
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(_kInputBorderRadius),
+                    borderRadius: BorderRadius.circular(6),
                   ),
                   textStyle: GoogleFonts.inter(
-                      fontSize: 13, fontWeight: FontWeight.w500),
+                      fontSize: 14, fontWeight: FontWeight.w500),
                 ),
                 child: const Text('Remove Profile Picture'),
               ),
@@ -1040,27 +920,10 @@ class _AddTeamMemberPageState extends ConsumerState<AddTeamMemberPage> {
           ),
         ),
         const SizedBox(height: 12),
-        Row(
-          children: [
-            SizedBox(
-              width: 24,
-              height: 24,
-              child: Checkbox(
-                value: _allowMeetingRequests,
-                onChanged: (v) =>
-                    setState(() => _allowMeetingRequests = v ?? false),
-                activeColor: AppTheme.primaryColor,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              'Allow meeting requests',
-              style: GoogleFonts.inter(fontSize: 14, color: Colors.black87),
-            ),
-          ],
+        AppCheckbox(
+          value: _allowMeetingRequests,
+          onChanged: (v) => setState(() => _allowMeetingRequests = v),
+          label: 'Allow meeting requests',
         ),
       ],
     );
@@ -1091,27 +954,10 @@ class _AddTeamMemberPageState extends ConsumerState<AddTeamMemberPage> {
           ),
         ),
         const SizedBox(height: 12),
-        Row(
-          children: [
-            SizedBox(
-              width: 24,
-              height: 24,
-              child: Checkbox(
-                value: _showContactDetails,
-                onChanged: (v) =>
-                    setState(() => _showContactDetails = v ?? false),
-                activeColor: AppTheme.primaryColor,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              'Show contact details to other participants',
-              style: GoogleFonts.inter(fontSize: 14, color: Colors.black87),
-            ),
-          ],
+        AppCheckbox(
+          value: _showContactDetails,
+          onChanged: (v) => setState(() => _showContactDetails = v),
+          label: 'Show contact details to other participants',
         ),
       ],
     );
@@ -1246,8 +1092,8 @@ class _AddTeamMemberPageState extends ConsumerState<AddTeamMemberPage> {
         'show_contact_details': _showContactDetails,
       };
 
-      if (_mobileController.text.trim().isNotEmpty) {
-        data['mobile'] = _mobileController.text.trim();
+      if (_mobilePhone.isNotEmpty) {
+        data['mobile'] = _mobilePhone;
       }
       if (_selectedCountry != null) data['country'] = _selectedCountry;
       if (_selectedCity != null) data['city'] = _selectedCity;

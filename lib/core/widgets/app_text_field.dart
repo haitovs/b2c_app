@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:b2c_app/core/app_theme.dart';
+import 'package:b2c_app/core/theme/app_theme.dart';
 
 /// Reusable text field widget with consistent styling
 class AppTextField extends StatelessWidget {

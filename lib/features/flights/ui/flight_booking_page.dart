@@ -33,7 +33,6 @@ class _FlightBookingPageState extends ConsumerState<FlightBookingPage> {
   final _phoneController = TextEditingController();
   String _gender = '';
   DateTime? _dob;
-  String _paymentMethod = 'card';
 
   @override
   void initState() {
@@ -97,7 +96,6 @@ class _FlightBookingPageState extends ConsumerState<FlightBookingPage> {
         flightId: widget.flightId,
         passengers: 1,
         traveler: traveler,
-        paymentMethod: _paymentMethod,
       );
 
       if (mounted) {
@@ -118,9 +116,9 @@ class _FlightBookingPageState extends ConsumerState<FlightBookingPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF3C4494),
-      body: SafeArea(
+    return Container(
+      color: const Color(0xFF3C4494),
+      child: SafeArea(
         child: Column(
           children: [
             // Header
@@ -272,11 +270,6 @@ class _FlightBookingPageState extends ConsumerState<FlightBookingPage> {
           // Price details
           _buildPriceDetails(),
 
-          const SizedBox(height: 16),
-
-          // Payment methods
-          _buildPaymentSection(),
-
           const SizedBox(height: 24),
 
           // Book button
@@ -303,7 +296,7 @@ class _FlightBookingPageState extends ConsumerState<FlightBookingPage> {
                         ),
                       )
                     : const Text(
-                        'Book and pay',
+                        'Confirm Booking',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w600,
@@ -481,103 +474,4 @@ class _FlightBookingPageState extends ConsumerState<FlightBookingPage> {
     );
   }
 
-  Widget _buildPaymentSection() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'How would you like to pay?',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              _paymentOption('card', Icons.credit_card, 'New card'),
-              const SizedBox(width: 12),
-              _paymentOption('google_pay', Icons.g_mobiledata, 'Google Pay'),
-              const SizedBox(width: 12),
-              _paymentOption('paypal', Icons.paypal, 'PayPal'),
-            ],
-          ),
-          if (_paymentMethod == 'card') ...[
-            const SizedBox(height: 20),
-            _buildCardForm(),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _paymentOption(String value, IconData icon, String label) {
-    final isSelected = _paymentMethod == value;
-    return GestureDetector(
-      onTap: () => setState(() => _paymentMethod = value),
-      child: Column(
-        children: [
-          Container(
-            width: 100,
-            height: 70,
-            decoration: BoxDecoration(
-              border: Border.all(
-                color: isSelected
-                    ? const Color(0xFF3C4494)
-                    : Colors.grey.shade400,
-                width: isSelected ? 2 : 1,
-              ),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(
-              icon,
-              size: 32,
-              color: isSelected ? const Color(0xFF3C4494) : Colors.grey,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(label, style: const TextStyle(fontSize: 12)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCardForm() {
-    return Column(
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: _buildTextField(
-                "Cardholder's name *",
-                TextEditingController(),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: _buildTextField('Card number *', TextEditingController()),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: _buildTextField(
-                'Expiration date *',
-                TextEditingController(),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(child: _buildTextField('CVC *', TextEditingController())),
-          ],
-        ),
-      ],
-    );
-  }
 }

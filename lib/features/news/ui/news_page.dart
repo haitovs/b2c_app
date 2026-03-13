@@ -262,9 +262,8 @@ class _NewsPageState extends ConsumerState<NewsPage> {
       childAspectRatio = 1.0; // Wider cards on mobile
     }
 
-    return Padding(
-      padding: EdgeInsets.all(isMobile ? 12 : 24),
-      child: GridView.builder(
+    return GridView.builder(
+      padding: const EdgeInsets.only(bottom: 24),
         controller: _scrollController,
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: crossAxisCount,
@@ -289,7 +288,6 @@ class _NewsPageState extends ConsumerState<NewsPage> {
             formattedDate: _formatDate(_filteredNews[index]['created_at']),
           );
         },
-      ),
     );
   }
 }

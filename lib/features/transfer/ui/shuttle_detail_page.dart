@@ -16,36 +16,17 @@ class ShuttleDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF3C4494),
-      body: CustomScrollView(
-        slivers: [
-          // App Bar with image
-          SliverAppBar(
-            expandedHeight: 250,
-            pinned: true,
-            backgroundColor: const Color(0xFF3C4494),
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
-              onPressed: () => Navigator.pop(context),
-            ),
-            flexibleSpace: FlexibleSpaceBar(
-              background: shuttle.imageUrl != null
-                  ? Image.network(
-                      shuttle.imageUrl!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
-                        color: const Color(0xFF3C4494),
-                        child: const Center(
-                          child: Icon(
-                            Icons.directions_bus,
-                            size: 80,
-                            color: Colors.white54,
-                          ),
-                        ),
-                      ),
-                    )
-                  : Container(
+    return CustomScrollView(
+      slivers: [
+        // Image header
+        SliverToBoxAdapter(
+          child: SizedBox(
+            height: 250,
+            child: shuttle.imageUrl != null
+                ? Image.network(
+                    shuttle.imageUrl!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
                       color: const Color(0xFF3C4494),
                       child: const Center(
                         child: Icon(
@@ -55,8 +36,19 @@ class ShuttleDetailPage extends StatelessWidget {
                         ),
                       ),
                     ),
-            ),
+                  )
+                : Container(
+                    color: const Color(0xFF3C4494),
+                    child: const Center(
+                      child: Icon(
+                        Icons.directions_bus,
+                        size: 80,
+                        color: Colors.white54,
+                      ),
+                    ),
+                  ),
           ),
+        ),
           // Content
           SliverToBoxAdapter(
             child: Container(
@@ -211,7 +203,6 @@ class ShuttleDetailPage extends StatelessWidget {
             ),
           ),
         ],
-      ),
     );
   }
 

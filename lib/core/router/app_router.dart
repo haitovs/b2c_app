@@ -29,6 +29,7 @@ import '../../features/feedback/ui/feedback_page.dart';
 import '../../features/flights/ui/flight_booking_page.dart';
 import '../../features/flights/ui/flights_page.dart';
 import '../../features/hotline/ui/hotline_page.dart';
+import '../../features/networking/ui/company_meeting_preview_page.dart';
 import '../../features/networking/ui/meeting_b2g_request_page.dart';
 import '../../features/networking/ui/meeting_edit_page.dart';
 import '../../features/networking/ui/meeting_gate_page.dart';
@@ -410,6 +411,22 @@ final routerProvider = Provider<GoRouter>((ref) {
                     NewMeetingPage(
                       eventId: state.pathParameters['id']!,
                       initialIsB2G: isB2G,
+                    ),
+                  );
+                },
+              ),
+              GoRoute(
+                path: 'company/:companyId',
+                pageBuilder: (context, state) {
+                  final eventId = state.pathParameters['id']!;
+                  final companyId = state.pathParameters['companyId']!;
+                  final companyData =
+                      state.extra as Map<String, dynamic>?;
+                  return _noTransition(
+                    CompanyMeetingPreviewPage(
+                      eventId: eventId,
+                      companyId: companyId,
+                      companyData: companyData,
                     ),
                   );
                 },

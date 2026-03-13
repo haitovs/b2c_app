@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+
+import '../../core/theme/app_theme.dart';
 
 class ComingSoonPage extends StatelessWidget {
   final String featureName;
@@ -7,25 +10,53 @@ class ComingSoonPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.construction, size: 64, color: Color(0xFF3C4494)),
-            SizedBox(height: 24),
-            Text(
-              featureName,
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF3C4494),
+            // Icon container
+            Container(
+              width: 96,
+              height: 96,
+              decoration: BoxDecoration(
+                color: AppTheme.primaryColor.withValues(alpha: 0.08),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.construction_rounded,
+                size: 48,
+                color: AppTheme.primaryColor,
               ),
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 24),
+            Text(
+              featureName,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.montserrat(
+                fontSize: 24,
+                fontWeight: FontWeight.w700,
+                color: AppTheme.primaryColor,
+              ),
+            ),
+            const SizedBox(height: 8),
             Text(
               'Coming Soon',
-              style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+              style: GoogleFonts.inter(
+                fontSize: 16,
+                fontWeight: FontWeight.w400,
+                color: Colors.grey.shade500,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'This feature is currently under development.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                color: Colors.grey.shade400,
+              ),
             ),
           ],
         ),

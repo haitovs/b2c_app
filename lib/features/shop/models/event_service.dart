@@ -1,3 +1,5 @@
+import '../../../core/config/app_config.dart';
+
 enum ServiceCategory {
   expo,
   forum,
@@ -47,6 +49,12 @@ class EventServiceItem {
     this.displayOrder = 0,
   });
 
+  static String? _resolveImageUrl(String? url) {
+    if (url == null || url.isEmpty) return null;
+    if (url.startsWith('http')) return url;
+    return '${AppConfig.b2cApiBaseUrl}$url';
+  }
+
   factory EventServiceItem.fromJson(Map<String, dynamic> json) {
     return EventServiceItem(
       id: json['id'] as int,
@@ -54,7 +62,7 @@ class EventServiceItem {
       name: json['name'] as String,
       subtitle: json['subtitle'] as String?,
       description: json['description'] as String?,
-      imageUrl: json['image_url'] as String?,
+      imageUrl: _resolveImageUrl(json['image_url'] as String?),
       price: (json['price'] as num).toDouble(),
       currency: json['currency'] as String? ?? 'USD',
       category: json['category'] as String,

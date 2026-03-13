@@ -22,25 +22,9 @@ class VisaDetailsPage extends ConsumerWidget {
       (eventId: eventId, participantId: participantId),
     ));
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF3C4494),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF3C4494),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => context.pop(),
-        ),
-        title: const Text(
-          'Visa Details',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
-      body: SafeArea(
+    return Container(
+      color: const Color(0xFF3C4494),
+      child: SafeArea(
         child: visaAsync.when(
           loading: () => const Center(
             child: CircularProgressIndicator(color: Colors.white),

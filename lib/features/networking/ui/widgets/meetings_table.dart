@@ -32,9 +32,10 @@ class MeetingsTable extends StatelessWidget {
                 ? _buildEmptyState()
                 : ListView.separated(
                     itemCount: meetings.length,
-                    separatorBuilder: (_, __) => const Divider(
-                      height: 1,
-                      color: Color(0xFFE9EBF8),
+                    separatorBuilder: (_, __) => Divider(
+                      height: 0.2,
+                      thickness: 0.2,
+                      color: const Color(0xFFCBCBCB),
                     ),
                     itemBuilder: (context, index) =>
                         _buildDataRow(meetings[index]),
@@ -55,7 +56,7 @@ class MeetingsTable extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       decoration: const BoxDecoration(
-        color: Color(0xFFE9EBF8),
+        color: Color(0xFFE9ECF9),
         borderRadius: BorderRadius.vertical(top: Radius.circular(10)),
       ),
       child: Row(
@@ -65,9 +66,9 @@ class MeetingsTable extends StatelessWidget {
             child: Text(
               headers[i],
               style: GoogleFonts.roboto(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: const Color(0xFF374151),
+                fontSize: 15,
+                fontWeight: FontWeight.w400,
+                color: const Color(0xFF454545),
               ),
             ),
           );
@@ -133,7 +134,7 @@ class MeetingsTable extends StatelessWidget {
               child: Text(
                 col1,
                 style: GoogleFonts.inter(
-                  fontSize: 13,
+                  fontSize: 12,
                   fontWeight: FontWeight.w500,
                   color: const Color(0xFF1A1A2E),
                 ),
@@ -147,7 +148,7 @@ class MeetingsTable extends StatelessWidget {
               child: Text(
                 col2,
                 style: GoogleFonts.inter(
-                  fontSize: 13,
+                  fontSize: 12,
                   fontWeight: FontWeight.w500,
                   color: const Color(0xFF6B7280),
                 ),
@@ -161,7 +162,7 @@ class MeetingsTable extends StatelessWidget {
               child: Text(
                 subject,
                 style: GoogleFonts.inter(
-                  fontSize: 13,
+                  fontSize: 12,
                   fontWeight: FontWeight.w500,
                   color: const Color(0xFF1A1A2E),
                 ),
@@ -175,7 +176,7 @@ class MeetingsTable extends StatelessWidget {
               child: Text(
                 date,
                 style: GoogleFonts.inter(
-                  fontSize: 13,
+                  fontSize: 12,
                   fontWeight: FontWeight.w500,
                   color: const Color(0xFF6B7280),
                 ),
@@ -187,7 +188,7 @@ class MeetingsTable extends StatelessWidget {
               child: Text(
                 time,
                 style: GoogleFonts.inter(
-                  fontSize: 13,
+                  fontSize: 12,
                   fontWeight: FontWeight.w500,
                   color: const Color(0xFF6B7280),
                 ),
@@ -199,7 +200,7 @@ class MeetingsTable extends StatelessWidget {
               child: Text(
                 location,
                 style: GoogleFonts.inter(
-                  fontSize: 13,
+                  fontSize: 12,
                   fontWeight: FontWeight.w500,
                   color: const Color(0xFF6B7280),
                 ),
@@ -368,6 +369,18 @@ class _ActionsMenu extends StatelessWidget {
             const Icon(Icons.cancel_outlined, size: 18, color: Colors.red),
             const SizedBox(width: 10),
             Text('Cancel',
+                style: GoogleFonts.inter(
+                    fontWeight: FontWeight.w500, color: Colors.red)),
+          ]),
+        ));
+      }
+      if (isPending) {
+        items.add(PopupMenuItem(
+          value: 'delete',
+          child: Row(children: [
+            const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+            const SizedBox(width: 10),
+            Text('Delete',
                 style: GoogleFonts.inter(
                     fontWeight: FontWeight.w500, color: Colors.red)),
           ]),

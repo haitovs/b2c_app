@@ -55,7 +55,7 @@ class FlightService {
     required int flightId,
     required int passengers,
     required TravelerInfo traveler,
-    required String paymentMethod,
+    String paymentMethod = 'card',
   }) async {
     final body = {
       'flight_id': flightId,

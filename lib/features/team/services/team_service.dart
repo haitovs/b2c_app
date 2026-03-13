@@ -1,4 +1,5 @@
 import '../../../core/services/api_client.dart';
+import '../../company/models/company.dart';
 import '../models/team_member.dart';
 
 /// Service for managing team members within a company via the B2C backend.
@@ -85,6 +86,20 @@ class TeamService {
       return TeamMember.fromJson(result.data!);
     }
     throw result.error ?? Exception('Failed to change team member role');
+  }
+
+  /// Get the company the current user is a team member of for a given event.
+  /// Returns null if the user is not a team member of any company.
+  Future<Company?> getMyTeamCompany(int eventId) async {
+    final result = await _api.get<Map<String, dynamic>?>(
+      '/api/v1/team-members/my-company',
+      queryParams: {'event_id': eventId.toString()},
+    );
+
+    if (result.isSuccess && result.data != null) {
+      return Company.fromJson(result.data!);
+    }
+    return null;
   }
 
   /// Resend invitation email to a team member.

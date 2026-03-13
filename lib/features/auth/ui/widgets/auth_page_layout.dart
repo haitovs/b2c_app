@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/app_theme.dart';
+import '../../../../core/theme/app_theme.dart';
 import 'auth_header.dart';
 import 'auth_footer.dart';
 

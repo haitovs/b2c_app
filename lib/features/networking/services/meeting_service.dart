@@ -166,6 +166,46 @@ class MeetingService {
     );
   }
 
+  /// Delete a meeting (requester can delete PENDING, admin can delete any)
+  Future<void> deleteMeeting(String meetingId) async {
+    final result = await _api.delete<dynamic>(
+      '/api/v1/meetings/$meetingId',
+    );
+
+    if (!result.isSuccess) {
+      throw result.error ?? Exception('Failed to delete meeting');
+    }
+  }
+
+  /// Fetch public companies for meeting target selection
+  Future<List<Map<String, dynamic>>> fetchPublicCompanies({
+    required int eventId,
+  }) async {
+    final result = await _api.get<List<dynamic>>(
+      '/api/v1/companies/public',
+      queryParams: {'event_id': eventId.toString()},
+    );
+
+    if (result.isSuccess && result.data != null) {
+      return result.data!.cast<Map<String, dynamic>>();
+    } else {
+      throw result.error ?? Exception('Failed to load companies');
+    }
+  }
+
+  /// Fetch a single public company with team members
+  Future<Map<String, dynamic>> fetchPublicCompany(String companyId) async {
+    final result = await _api.get<Map<String, dynamic>>(
+      '/api/v1/companies/public/$companyId',
+    );
+
+    if (result.isSuccess && result.data != null) {
+      return result.data!;
+    } else {
+      throw result.error ?? Exception('Failed to load company');
+    }
+  }
+
   /// Fetch participants from Tourism backend (for B2B target selection)
   Future<List<Map<String, dynamic>>> fetchParticipants({int? siteId}) async {
     final queryParams = <String, String>{};

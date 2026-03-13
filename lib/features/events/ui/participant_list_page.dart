@@ -198,7 +198,9 @@ class _ParticipantListPageState extends ConsumerState<ParticipantListPage> {
 
         // Grid
         SliverPadding(
-          padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 20),
+          padding: EdgeInsets.fromLTRB(
+            isMobile ? 16 : 20, 4, isMobile ? 16 : 20, 24,
+          ),
           sliver: _isLoading
               ? const SliverToBoxAdapter(
                   child: Padding(

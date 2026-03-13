@@ -157,12 +157,33 @@ class _MeetingsPageState extends ConsumerState<MeetingsPage> {
       case 'cancel':
         await _cancelMeeting(meetingId);
         break;
+      case 'delete':
+        await _deleteMeeting(meetingId);
+        break;
       case 'accept':
         await _respondToMeeting(meetingId, 'accept');
         break;
       case 'decline':
         await _respondToMeeting(meetingId, 'decline');
         break;
+    }
+  }
+
+  Future<void> _deleteMeeting(String meetingId) async {
+    final confirmed = await showDeleteConfirmationDialog(context);
+    if (!confirmed) return;
+
+    try {
+      final meetingService = ref.read(meetingServiceProvider);
+      await meetingService.deleteMeeting(meetingId);
+      await _fetchData();
+      if (mounted) {
+        AppSnackBar.showSuccess(context, 'Meeting deleted successfully');
+      }
+    } catch (e) {
+      if (mounted) {
+        AppSnackBar.showError(context, 'Error: $e');
+      }
     }
   }
 
@@ -222,15 +243,19 @@ class _MeetingsPageState extends ConsumerState<MeetingsPage> {
               Text(
                 'Meetings',
                 style: GoogleFonts.montserrat(
-                  fontSize: isMobile ? 18 : 22,
-                  fontWeight: FontWeight.w700,
-                  color: AppTheme.primaryColor,
+                  fontSize: 30,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF3C4494),
                 ),
               ),
               const Spacer(),
               _buildNewMeetingButton(isMobile),
             ],
           ),
+        ),
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 20),
+          child: Divider(color: Color(0xFFCACACA), thickness: 0.5, height: 0.5),
         ),
         const SizedBox(height: 16),
         // B2B / B2G toggle
@@ -316,7 +341,7 @@ class _MeetingsPageState extends ConsumerState<MeetingsPage> {
               style: GoogleFonts.montserrat(
                 fontSize: fontSize,
                 fontWeight: FontWeight.w600,
-                color: _isB2B ? Colors.white : const Color(0xFF374151),
+                color: _isB2B ? Colors.white : const Color(0xFF3C4494),
               ),
             ),
           ),
@@ -335,7 +360,7 @@ class _MeetingsPageState extends ConsumerState<MeetingsPage> {
               style: GoogleFonts.montserrat(
                 fontSize: fontSize,
                 fontWeight: FontWeight.w600,
-                color: !_isB2B ? Colors.white : const Color(0xFF374151),
+                color: !_isB2B ? Colors.white : const Color(0xFF3C4494),
               ),
             ),
           ),
@@ -377,19 +402,19 @@ class _MeetingsPageState extends ConsumerState<MeetingsPage> {
         hintStyle: GoogleFonts.inter(fontSize: 14, color: Colors.grey),
         prefixIcon: const Icon(Icons.search, size: 20),
         filled: true,
-        fillColor: Colors.white,
+        fillColor: const Color(0xFFE6E7F2),
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: Colors.grey.shade300),
+          borderRadius: BorderRadius.circular(5),
+          borderSide: const BorderSide(color: Color(0xFFCBCBCB), width: 1),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: Colors.grey.shade300),
+          borderRadius: BorderRadius.circular(5),
+          borderSide: const BorderSide(color: Color(0xFFCBCBCB), width: 1),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(5),
           borderSide: const BorderSide(color: AppTheme.primaryColor, width: 2),
         ),
       ),
@@ -403,7 +428,7 @@ class _MeetingsPageState extends ConsumerState<MeetingsPage> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(5),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        border: Border.all(color: const Color(0xFFCBCBCB), width: 1),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
@@ -413,7 +438,7 @@ class _MeetingsPageState extends ConsumerState<MeetingsPage> {
           style: GoogleFonts.roboto(
             fontSize: 14,
             fontWeight: FontWeight.w500,
-            color: const Color(0xFF374151),
+            color: const Color(0xFF757A8A),
           ),
           items: const [
             DropdownMenuItem(value: 'all', child: Text('Sort by: All')),

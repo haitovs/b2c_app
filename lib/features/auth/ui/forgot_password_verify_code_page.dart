@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../../core/app_theme.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_snackbar.dart';
 import '../providers/auth_provider.dart';
 import 'widgets/auth_info_box.dart';

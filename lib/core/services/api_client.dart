@@ -82,23 +82,25 @@ class ApiClient {
     Map<String, String>? queryParams,
     T Function(dynamic json)? parser,
   }) async {
-    try {
-      var uri = Uri.parse('$baseUrl$path');
-      if (queryParams != null && queryParams.isNotEmpty) {
-        uri = uri.replace(queryParameters: queryParams);
-      }
-      final response = await http.post(
-        uri,
-        headers: await _headers(auth: auth),
-        body: body != null ? jsonEncode(body) : null,
-      );
+    return _withTokenRefresh(() async {
+      try {
+        var uri = Uri.parse('$baseUrl$path');
+        if (queryParams != null && queryParams.isNotEmpty) {
+          uri = uri.replace(queryParameters: queryParams);
+        }
+        final response = await http.post(
+          uri,
+          headers: await _headers(auth: auth),
+          body: body != null ? jsonEncode(body) : null,
+        );
 
-      return _handleResponse(response, parser);
-    } catch (e) {
-      return ApiResult.failure(
-        ApiException(statusCode: 0, message: 'Network error: $e'),
-      );
-    }
+        return _handleResponse(response, parser);
+      } catch (e) {
+        return ApiResult.failure(
+          ApiException(statusCode: 0, message: 'Network error: $e'),
+        );
+      }
+    }, auth: auth);
   }
 
   /// POST with form data (for login)
@@ -133,19 +135,21 @@ class ApiClient {
     bool auth = true,
     T Function(dynamic json)? parser,
   }) async {
-    try {
-      final response = await http.patch(
-        Uri.parse('$baseUrl$path'),
-        headers: await _headers(auth: auth),
-        body: body != null ? jsonEncode(body) : null,
-      );
+    return _withTokenRefresh(() async {
+      try {
+        final response = await http.patch(
+          Uri.parse('$baseUrl$path'),
+          headers: await _headers(auth: auth),
+          body: body != null ? jsonEncode(body) : null,
+        );
 
-      return _handleResponse(response, parser);
-    } catch (e) {
-      return ApiResult.failure(
-        ApiException(statusCode: 0, message: 'Network error: $e'),
-      );
-    }
+        return _handleResponse(response, parser);
+      } catch (e) {
+        return ApiResult.failure(
+          ApiException(statusCode: 0, message: 'Network error: $e'),
+        );
+      }
+    }, auth: auth);
   }
 
   /// PUT request
@@ -156,23 +160,25 @@ class ApiClient {
     Map<String, String>? queryParams,
     T Function(dynamic json)? parser,
   }) async {
-    try {
-      var uri = Uri.parse('$baseUrl$path');
-      if (queryParams != null && queryParams.isNotEmpty) {
-        uri = uri.replace(queryParameters: queryParams);
-      }
-      final response = await http.put(
-        uri,
-        headers: await _headers(auth: auth),
-        body: body != null ? jsonEncode(body) : null,
-      );
+    return _withTokenRefresh(() async {
+      try {
+        var uri = Uri.parse('$baseUrl$path');
+        if (queryParams != null && queryParams.isNotEmpty) {
+          uri = uri.replace(queryParameters: queryParams);
+        }
+        final response = await http.put(
+          uri,
+          headers: await _headers(auth: auth),
+          body: body != null ? jsonEncode(body) : null,
+        );
 
-      return _handleResponse(response, parser);
-    } catch (e) {
-      return ApiResult.failure(
-        ApiException(statusCode: 0, message: 'Network error: $e'),
-      );
-    }
+        return _handleResponse(response, parser);
+      } catch (e) {
+        return ApiResult.failure(
+          ApiException(statusCode: 0, message: 'Network error: $e'),
+        );
+      }
+    }, auth: auth);
   }
 
   /// DELETE request
@@ -181,18 +187,20 @@ class ApiClient {
     bool auth = true,
     T Function(dynamic json)? parser,
   }) async {
-    try {
-      final response = await http.delete(
-        Uri.parse('$baseUrl$path'),
-        headers: await _headers(auth: auth),
-      );
+    return _withTokenRefresh(() async {
+      try {
+        final response = await http.delete(
+          Uri.parse('$baseUrl$path'),
+          headers: await _headers(auth: auth),
+        );
 
-      return _handleResponse(response, parser);
-    } catch (e) {
-      return ApiResult.failure(
-        ApiException(statusCode: 0, message: 'Network error: $e'),
-      );
-    }
+        return _handleResponse(response, parser);
+      } catch (e) {
+        return ApiResult.failure(
+          ApiException(statusCode: 0, message: 'Network error: $e'),
+        );
+      }
+    }, auth: auth);
   }
 
   /// Handle HTTP response

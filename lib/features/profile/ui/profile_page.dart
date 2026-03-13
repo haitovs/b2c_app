@@ -391,9 +391,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF3C4494),
-      body: LayoutBuilder(
+    return Container(
+      color: const Color(0xFF3C4494),
+      child: LayoutBuilder(
         builder: (context, constraints) {
           final isMobile = constraints.maxWidth < 1000;
 

@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_snackbar.dart';
+import '../../../core/widgets/phone_input_field.dart';
 import '../../../core/providers/reference_data_provider.dart';
 import '../../../core/providers/upload_provider.dart';
 import '../../../shared/widgets/multi_select_field.dart';
@@ -40,7 +41,7 @@ class _CompanyProfilePageState extends ConsumerState<CompanyProfilePage> {
 
   // --- Contact ---
   final _emailController = TextEditingController();
-  final _mobileController = TextEditingController();
+  String _mobile = '';
 
   // --- Location ---
   String? _selectedCountry;
@@ -70,7 +71,6 @@ class _CompanyProfilePageState extends ConsumerState<CompanyProfilePage> {
     _websiteController.dispose();
     _aboutController.dispose();
     _emailController.dispose();
-    _mobileController.dispose();
     for (final entry in _socialLinks) {
       entry.dispose();
     }
@@ -96,7 +96,7 @@ class _CompanyProfilePageState extends ConsumerState<CompanyProfilePage> {
     }
 
     _emailController.text = company.email ?? '';
-    _mobileController.text = company.mobile ?? '';
+    _mobile = company.mobile ?? '';
     _selectedCountry = company.country;
     _selectedCity = company.city;
     _brandIconUrl = company.brandIconUrl;
@@ -139,7 +139,7 @@ class _CompanyProfilePageState extends ConsumerState<CompanyProfilePage> {
       'website': _websiteController.text.trim(),
       'about': aboutPlainText,
       'email': _emailController.text.trim(),
-      'mobile': _mobileController.text.trim(),
+      'mobile': _mobile.trim(),
       'country': _selectedCountry,
       'city': _selectedCity,
       'brand_icon_url': _brandIconUrl,
@@ -533,14 +533,10 @@ class _CompanyProfilePageState extends ConsumerState<CompanyProfilePage> {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  _buildLabeledField(
-                    label: 'Mobile number:',
-                    child: TextFormField(
-                      controller: _mobileController,
-                      style: GoogleFonts.inter(fontSize: 14),
-                      decoration: _inputDecoration(),
-                      keyboardType: TextInputType.phone,
-                    ),
+                  PhoneInputField(
+                    labelText: 'Mobile number',
+                    initialPhone: _mobile,
+                    onChanged: (e164) => _mobile = e164,
                   ),
                 ],
               );
@@ -561,14 +557,10 @@ class _CompanyProfilePageState extends ConsumerState<CompanyProfilePage> {
                 ),
                 const SizedBox(width: 16),
                 Expanded(
-                  child: _buildLabeledField(
-                    label: 'Mobile number:',
-                    child: TextFormField(
-                      controller: _mobileController,
-                      style: GoogleFonts.inter(fontSize: 14),
-                      decoration: _inputDecoration(),
-                      keyboardType: TextInputType.phone,
-                    ),
+                  child: PhoneInputField(
+                    labelText: 'Mobile number',
+                    initialPhone: _mobile,
+                    onChanged: (e164) => _mobile = e164,
                   ),
                 ),
               ],
@@ -900,7 +892,7 @@ class _CompanyProfilePageState extends ConsumerState<CompanyProfilePage> {
         ),
         const SizedBox(height: 8),
         SizedBox(
-          width: width,
+          width: width < 200 ? 200 : width,
           child: Row(
             children: [
               Expanded(
@@ -908,7 +900,7 @@ class _CompanyProfilePageState extends ConsumerState<CompanyProfilePage> {
                   onPressed: onUpload,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.primaryColor,
-                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -929,7 +921,7 @@ class _CompanyProfilePageState extends ConsumerState<CompanyProfilePage> {
                   child: OutlinedButton(
                     onPressed: onRemove,
                     style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                       side: const BorderSide(color: Colors.red),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),

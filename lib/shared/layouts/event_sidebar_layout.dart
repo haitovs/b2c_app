@@ -8,9 +8,12 @@ import '../../core/providers/event_context_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_snackbar.dart';
 import '../../features/auth/providers/auth_provider.dart';
+import '../../features/company/models/company.dart';
+import '../../features/company/providers/company_providers.dart';
 import '../../features/events/ui/widgets/profile_dropdown.dart';
 import '../../features/notifications/providers/notification_providers.dart';
 import '../../features/shop/providers/shop_providers.dart';
+import '../../features/team/providers/team_providers.dart';
 
 // =============================================================================
 // EventShellLayout — persistent shell for all event sub-pages.
@@ -103,8 +106,40 @@ class _DesktopShell extends ConsumerStatefulWidget {
   ConsumerState<_DesktopShell> createState() => _DesktopShellState();
 }
 
-class _DesktopShellState extends ConsumerState<_DesktopShell> {
+class _DesktopShellState extends ConsumerState<_DesktopShell>
+    with SingleTickerProviderStateMixin {
   bool _isProfileOpen = false;
+  bool _isSidebarCollapsed = false;
+
+  /// Controls whether the sidebar content renders in collapsed mode.
+  /// Separated from `_isSidebarCollapsed` so we can delay switching
+  /// content until the width animation finishes (prevents overflow).
+  bool _showCollapsedContent = false;
+
+  late final AnimationController _sidebarAnim;
+  late final Animation<double> _sidebarWidth;
+
+  static const _expandedWidth = 260.0;
+  static const _collapsedWidth = 64.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _sidebarAnim = AnimationController(
+      duration: const Duration(milliseconds: 200),
+      vsync: this,
+    );
+    _sidebarWidth = Tween<double>(
+      begin: _expandedWidth,
+      end: _collapsedWidth,
+    ).animate(CurvedAnimation(parent: _sidebarAnim, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() {
+    _sidebarAnim.dispose();
+    super.dispose();
+  }
 
   void _toggleProfile() {
     setState(() => _isProfileOpen = !_isProfileOpen);
@@ -114,8 +149,25 @@ class _DesktopShellState extends ConsumerState<_DesktopShell> {
     if (_isProfileOpen) setState(() => _isProfileOpen = false);
   }
 
+  void _toggleSidebar() {
+    if (_isSidebarCollapsed) {
+      // Expanding: animate width first, switch content AFTER animation finishes
+      _isSidebarCollapsed = false;
+      _sidebarAnim.reverse().then((_) {
+        if (mounted) setState(() => _showCollapsedContent = false);
+      });
+      setState(() {}); // trigger rebuild so animation starts
+    } else {
+      // Collapsing: switch content immediately (icons fit any width), then animate
+      _isSidebarCollapsed = true;
+      setState(() => _showCollapsedContent = true);
+      _sidebarAnim.forward();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       body: Stack(
@@ -135,24 +187,29 @@ class _DesktopShellState extends ConsumerState<_DesktopShell> {
                   padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
                   child: Row(
                     children: [
-                      Container(
-                        width: 260,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.08),
-                              blurRadius: 16,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        child: _EventSidebar(
-                          eventId: widget.eventId,
-                          eventIdInt: widget.eventIdInt,
-                          currentPath: widget.currentPath,
+                      AnimatedBuilder(
+                        animation: _sidebarWidth,
+                        builder: (context, child) => Container(
+                          width: _sidebarWidth.value,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.08),
+                                blurRadius: 16,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: _EventSidebar(
+                            eventId: widget.eventId,
+                            eventIdInt: widget.eventIdInt,
+                            currentPath: widget.currentPath,
+                            isCollapsed: _showCollapsedContent,
+                            onToggleCollapse: _toggleSidebar,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 16),
@@ -443,12 +500,16 @@ class _EventSidebar extends ConsumerStatefulWidget {
   final int eventIdInt;
   final String currentPath;
   final VoidCallback? onItemTap;
+  final bool isCollapsed;
+  final VoidCallback? onToggleCollapse;
 
   const _EventSidebar({
     required this.eventId,
     required this.eventIdInt,
     required this.currentPath,
     this.onItemTap,
+    this.isCollapsed = false,
+    this.onToggleCollapse,
   });
 
   @override
@@ -480,6 +541,8 @@ class _EventSidebarState extends ConsumerState<_EventSidebar> {
     final hasPurchased = ref.watch(hasPurchasedProvider(widget.eventIdInt));
     final cartCount = ref.watch(cartBadgeCountProvider(widget.eventIdInt));
 
+    final isCollapsed = widget.isCollapsed;
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -495,8 +558,11 @@ class _EventSidebarState extends ConsumerState<_EventSidebar> {
         children: [
           _CompanyHeader(
             eventId: widget.eventId,
+            eventIdInt: widget.eventIdInt,
             cartCount: cartCount,
             onItemTap: widget.onItemTap,
+            isCollapsed: isCollapsed,
+            onToggleCollapse: widget.onToggleCollapse,
           ),
           const Divider(height: 1, color: Color(0xFFEEEEEE)),
           Expanded(
@@ -504,12 +570,14 @@ class _EventSidebarState extends ConsumerState<_EventSidebar> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _QuickActionsSection(
-                    eventId: widget.eventId,
-                    hasPurchased: hasPurchased,
-                    onItemTap: widget.onItemTap,
-                  ),
-                  const Divider(height: 1, color: Color(0xFFEEEEEE)),
+                  if (!isCollapsed) ...[
+                    _QuickActionsSection(
+                      eventId: widget.eventId,
+                      hasPurchased: hasPurchased,
+                      onItemTap: widget.onItemTap,
+                    ),
+                    const Divider(height: 1, color: Color(0xFFEEEEEE)),
+                  ],
                   const SizedBox(height: 8),
                   _buildNavSection(context, hasPurchased),
                   const SizedBox(height: 8),
@@ -518,7 +586,7 @@ class _EventSidebarState extends ConsumerState<_EventSidebar> {
             ),
           ),
           const Divider(height: 1, color: Color(0xFFEEEEEE)),
-          _BackToEventsLink(onTap: widget.onItemTap),
+          _BackToEventsLink(onTap: widget.onItemTap, isCollapsed: isCollapsed),
         ],
       ),
     );
@@ -716,6 +784,7 @@ class _EventSidebarState extends ConsumerState<_EventSidebar> {
       iconAsset: iconAsset,
       isActive: isActive,
       isLocked: isLocked,
+      isCollapsed: widget.isCollapsed,
       onTap: () {
         if (isLocked) {
           _showLockedSnackbar(context);
@@ -741,6 +810,49 @@ class _EventSidebarState extends ConsumerState<_EventSidebar> {
     required VoidCallback onToggle,
     required List<Widget> children,
   }) {
+    final isCollapsed = widget.isCollapsed;
+
+    if (isCollapsed) {
+      // In collapsed mode, show just the icon centered
+      return Tooltip(
+        message: label,
+        preferBelow: false,
+        child: InkWell(
+          onTap: () {
+            if (isLocked) {
+              _showLockedSnackbar(context);
+              return;
+            }
+            onToggle();
+          },
+          child: Container(
+            decoration: BoxDecoration(
+              border: Border(
+                left: BorderSide(
+                  color: isGroupActive ? AppTheme.primaryColor : Colors.transparent,
+                  width: 3,
+                ),
+              ),
+              color: isGroupActive
+                  ? AppTheme.primaryColor.withValues(alpha: 0.10)
+                  : Colors.transparent,
+            ),
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Center(
+              child: SvgPicture.asset(
+                iconAsset,
+                width: 20,
+                height: 20,
+                colorFilter: isLocked
+                    ? const ColorFilter.mode(Color(0xFFBBBBBB), BlendMode.srcIn)
+                    : null,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Column(
       children: [
         // Group header
@@ -911,24 +1023,91 @@ class _EventSidebarState extends ConsumerState<_EventSidebar> {
 // Company Header
 // =============================================================================
 
-class _CompanyHeader extends StatelessWidget {
+class _CompanyHeader extends ConsumerStatefulWidget {
   final String eventId;
+  final int eventIdInt;
   final int cartCount;
   final VoidCallback? onItemTap;
+  final bool isCollapsed;
+  final VoidCallback? onToggleCollapse;
 
   const _CompanyHeader({
     required this.eventId,
+    required this.eventIdInt,
     required this.cartCount,
     this.onItemTap,
+    this.isCollapsed = false,
+    this.onToggleCollapse,
   });
 
   @override
+  ConsumerState<_CompanyHeader> createState() => _CompanyHeaderState();
+}
+
+class _CompanyHeaderState extends ConsumerState<_CompanyHeader> {
+  bool _isEditing = false;
+  late TextEditingController _nameController;
+  String? _customName;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  Company? _resolveCompany(
+    AsyncValue<Company?> teamCompanyAsync,
+    AsyncValue<List<Company>> ownedCompaniesAsync,
+  ) {
+    // Priority: team company the user belongs to, then first owned company
+    final teamCompany = teamCompanyAsync.whenOrNull(data: (c) => c);
+    if (teamCompany != null) return teamCompany;
+    return ownedCompaniesAsync.whenOrNull(
+      data: (companies) => companies.isNotEmpty ? companies.first : null,
+    );
+  }
+
+  String _resolveCompanyName(Company? company) {
+    if (_customName != null) return _customName!;
+    return company?.name ?? 'Your company';
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final teamCompanyAsync = ref.watch(myTeamCompanyProvider(widget.eventIdInt));
+    final ownedCompaniesAsync = ref.watch(myCompaniesProvider(widget.eventIdInt));
+    final company = _resolveCompany(teamCompanyAsync, ownedCompaniesAsync);
+    final companyName = _resolveCompanyName(company);
+    final logoUrl = company?.brandIconUrl;
+
+    if (widget.isCollapsed) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        child: Center(
+          child: InkWell(
+            onTap: widget.onToggleCollapse,
+            borderRadius: BorderRadius.circular(6),
+            child: SvgPicture.asset(
+              'assets/sidebar/burger.svg',
+              width: 22,
+              height: 22,
+            ),
+          ),
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
         children: [
-          // Company logo placeholder
+          // Company logo
           Container(
             width: 32,
             height: 32,
@@ -937,25 +1116,76 @@ class _CompanyHeader extends StatelessWidget {
               borderRadius: BorderRadius.circular(6),
               border: Border.all(color: const Color(0xFFDDDDDD)),
             ),
-            child: Icon(
-              Icons.business_outlined,
-              size: 18,
-              color: Colors.grey.shade500,
-            ),
+            clipBehavior: Clip.antiAlias,
+            child: logoUrl != null && logoUrl.isNotEmpty
+                ? Image.network(
+                    logoUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Icon(
+                      Icons.business_outlined,
+                      size: 18,
+                      color: Colors.grey.shade500,
+                    ),
+                  )
+                : Icon(
+                    Icons.business_outlined,
+                    size: 18,
+                    color: Colors.grey.shade500,
+                  ),
           ),
           const SizedBox(width: 10),
           Expanded(
-            child: Text(
-              'Your company',
-              style: GoogleFonts.inter(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: Colors.black87,
-              ),
+            child: _isEditing
+                ? TextField(
+                    controller: _nameController,
+                    autofocus: true,
+                    style: GoogleFonts.inter(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 4,
+                      ),
+                      border: UnderlineInputBorder(),
+                    ),
+                    onSubmitted: (value) {
+                      setState(() {
+                        _customName =
+                            value.trim().isEmpty ? null : value.trim();
+                        _isEditing = false;
+                      });
+                    },
+                  )
+                : GestureDetector(
+                    onDoubleTap: () {
+                      _nameController.text = companyName;
+                      setState(() => _isEditing = true);
+                    },
+                    child: Text(
+                      companyName,
+                      style: GoogleFonts.inter(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+          ),
+          // Hamburger menu — toggles collapse
+          InkWell(
+            onTap: widget.onToggleCollapse,
+            borderRadius: BorderRadius.circular(6),
+            child: SvgPicture.asset(
+              'assets/sidebar/burger.svg',
+              width: 22,
+              height: 22,
             ),
           ),
-          // Hamburger menu
-          SvgPicture.asset('assets/sidebar/burger.svg', width: 22, height: 22),
         ],
       ),
     );
@@ -1009,8 +1239,9 @@ class _QuickActionsSection extends StatelessWidget {
           _QuickActionItem(
             iconAsset: 'assets/sidebar/order_additional.svg',
             label: 'Order Additional Services',
-            isLocked: !hasPurchased,
-            onTap: () => _handleTap(context, '/events/$eventId/services'),
+            isLocked: true,
+            comingSoon: true,
+            onTap: () => AppSnackBar.showInfo(context, 'Coming soon'),
           ),
         ],
       ),
@@ -1035,6 +1266,7 @@ class _QuickActionItem extends StatelessWidget {
   final String iconAsset;
   final String label;
   final bool isLocked;
+  final bool comingSoon;
   final VoidCallback onTap;
 
   const _QuickActionItem({
@@ -1042,6 +1274,7 @@ class _QuickActionItem extends StatelessWidget {
     required this.label,
     required this.isLocked,
     required this.onTap,
+    this.comingSoon = false,
   });
 
   @override
@@ -1072,7 +1305,23 @@ class _QuickActionItem extends StatelessWidget {
                 ),
               ),
             ),
-            if (isLocked)
+            if (comingSoon)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade200,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  'Soon',
+                  style: GoogleFonts.inter(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey.shade500,
+                  ),
+                ),
+              )
+            else if (isLocked)
               SvgPicture.asset('assets/sidebar/lock.svg', width: 16, height: 16),
           ],
         ),
@@ -1090,6 +1339,7 @@ class _NavItem extends StatelessWidget {
   final String iconAsset;
   final bool isActive;
   final bool isLocked;
+  final bool isCollapsed;
   final VoidCallback onTap;
 
   const _NavItem({
@@ -1098,10 +1348,45 @@ class _NavItem extends StatelessWidget {
     required this.isActive,
     required this.isLocked,
     required this.onTap,
+    this.isCollapsed = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    if (isCollapsed) {
+      return Tooltip(
+        message: label,
+        preferBelow: false,
+        child: InkWell(
+          onTap: onTap,
+          child: Container(
+            decoration: BoxDecoration(
+              border: Border(
+                left: BorderSide(
+                  color: isActive ? AppTheme.primaryColor : Colors.transparent,
+                  width: 3,
+                ),
+              ),
+              color: isActive
+                  ? AppTheme.primaryColor.withValues(alpha: 0.10)
+                  : Colors.transparent,
+            ),
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Center(
+              child: SvgPicture.asset(
+                iconAsset,
+                width: 20,
+                height: 20,
+                colorFilter: isLocked
+                    ? const ColorFilter.mode(Color(0xFFBBBBBB), BlendMode.srcIn)
+                    : null,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     final Color textColor = isActive
         ? AppTheme.primaryColor
         : isLocked
@@ -1159,11 +1444,31 @@ class _NavItem extends StatelessWidget {
 
 class _BackToEventsLink extends StatelessWidget {
   final VoidCallback? onTap;
+  final bool isCollapsed;
 
-  const _BackToEventsLink({this.onTap});
+  const _BackToEventsLink({this.onTap, this.isCollapsed = false});
 
   @override
   Widget build(BuildContext context) {
+    if (isCollapsed) {
+      return Tooltip(
+        message: 'Back to Events',
+        preferBelow: false,
+        child: InkWell(
+          onTap: () {
+            onTap?.call();
+            context.go('/');
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Center(
+              child: Icon(Icons.arrow_back, size: 18, color: Colors.grey.shade600),
+            ),
+          ),
+        ),
+      );
+    }
+
     return InkWell(
       onTap: () {
         onTap?.call();

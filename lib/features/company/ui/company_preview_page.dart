@@ -316,50 +316,33 @@ class _GalleryLayout extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final totalWidth = constraints.maxWidth;
-        // Left image: ~33%, right side: ~66%
-        final leftWidth = (totalWidth * 0.34).roundToDouble();
-        final rightWidth = totalWidth - leftWidth - 12; // 12 = gap
-        final tallHeight = 571.0 * (totalWidth / 1011).clamp(0.4, 1.0);
-        final smallHeight = (tallHeight - 12) * 0.46; // top pair height
-        final wideHeight = tallHeight - smallHeight - 12; // bottom wide
+        final gap = 12.0;
+        final cellWidth = (totalWidth - gap) / 2;
+        final cellHeight = cellWidth * 0.6; // wider than tall
 
-        return SizedBox(
-          height: tallHeight,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Left tall image
-              _galleryImage(urls[0], leftWidth, tallHeight),
-              const SizedBox(width: 12),
-              // Right side
-              Expanded(
-                child: Column(
-                  children: [
-                    // Top row: 2 small images
-                    Row(
-                      children: [
-                        if (urls.length > 1)
-                          _galleryImage(
-                              urls[1],
-                              (rightWidth - 12) / 2,
-                              smallHeight),
-                        if (urls.length > 1) const SizedBox(width: 12),
-                        if (urls.length > 2)
-                          _galleryImage(
-                              urls[2],
-                              (rightWidth - 12) / 2,
-                              smallHeight),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    // Bottom wide image
-                    if (urls.length > 3)
-                      _galleryImage(urls[3], rightWidth, wideHeight),
-                  ],
-                ),
-              ),
-            ],
-          ),
+        return Column(
+          children: [
+            // Top row
+            Row(
+              children: [
+                _galleryImage(urls[0], cellWidth, cellHeight),
+                SizedBox(width: gap),
+                if (urls.length > 1)
+                  _galleryImage(urls[1], cellWidth, cellHeight),
+              ],
+            ),
+            SizedBox(height: gap),
+            // Bottom row
+            Row(
+              children: [
+                if (urls.length > 2)
+                  _galleryImage(urls[2], cellWidth, cellHeight),
+                SizedBox(width: gap),
+                if (urls.length > 3)
+                  _galleryImage(urls[3], cellWidth, cellHeight),
+              ],
+            ),
+          ],
         );
       },
     );
@@ -395,11 +378,11 @@ class _MemberCarousel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 246,
+      height: 210,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: members.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 16),
+        separatorBuilder: (_, __) => const SizedBox(width: 12),
         itemBuilder: (context, index) => _buildMemberCard(members[index]),
       ),
     );
@@ -409,115 +392,96 @@ class _MemberCarousel extends StatelessWidget {
     final name =
         '${member['first_name'] ?? ''} ${member['last_name'] ?? ''}'.trim();
     final position = member['position'] as String? ?? '';
-    final company = member['company_name'] as String?;
     final photoUrl = member['profile_photo_url'] as String?;
     final country = member['country'] as String?;
-    final role = member['role'] as String? ?? '';
 
     return Container(
-      width: 184,
+      width: 180,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(5),
-        boxShadow: const [
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: [
           BoxShadow(
-            color: Color.fromRGBO(0, 0, 0, 0.25),
-            blurRadius: 5,
-            offset: Offset(0, 1),
+            color: Colors.black.withValues(alpha: 0.10),
+            offset: const Offset(0, 1),
+            blurRadius: 4,
           ),
         ],
       ),
+      padding: const EdgeInsets.fromLTRB(12, 16, 12, 12),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Photo
-          ClipRRect(
-            borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(5)),
-            child: SizedBox(
-              width: 184,
-              height: 122,
-              child: photoUrl != null
-                  ? Image.network(photoUrl, fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _photoPlaceholder(name))
-                  : _photoPlaceholder(name),
+          // Avatar
+          photoUrl != null && photoUrl.isNotEmpty
+              ? ClipOval(
+                  child: Image.network(
+                    photoUrl,
+                    width: 64,
+                    height: 64,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => _avatarPlaceholder(name),
+                  ),
+                )
+              : _avatarPlaceholder(name),
+          const SizedBox(height: 10),
+          // Name
+          Text(
+            name,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.inter(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: Colors.black87,
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Name
-                Text(
-                  name,
-                  style: GoogleFonts.roboto(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.black,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4),
-                // Position + Company
-                if (position.isNotEmpty || (company != null && company.isNotEmpty))
-                  Text(
-                    [position, company].where((e) => e != null && e.isNotEmpty).join(', '),
-                    style: GoogleFonts.roboto(
-                      fontSize: 10,
-                      color: Colors.black,
-                      height: 1.4,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                const SizedBox(height: 8),
-                // Role + country with flag
-                Row(
-                  children: [
-                    if (country != null && country.isNotEmpty) ...[
-                      Icon(Icons.flag_outlined,
-                          size: 14, color: Colors.grey.shade600),
-                      const SizedBox(width: 4),
-                    ],
-                    Expanded(
-                      child: Text(
-                        [role.isNotEmpty ? _roleLabel(role) : null, country]
-                            .where((e) => e != null && e.isNotEmpty)
-                            .join(', '),
-                        style: GoogleFonts.roboto(
-                          fontSize: 14,
-                          color: Colors.black,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+          if (position.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              position,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                color: Colors.grey.shade600,
+              ),
             ),
-          ),
+          ],
+          if (country != null && country.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text(
+              country,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                color: Colors.grey.shade500,
+              ),
+            ),
+          ],
           const Spacer(),
           // View Profile button
-          Padding(
-            padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
-            child: Container(
-              width: double.infinity,
-              height: 25,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(5),
-                border: Border.all(color: AppTheme.primaryColor),
+          SizedBox(
+            width: double.infinity,
+            height: 36,
+            child: OutlinedButton(
+              onPressed: () {},
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppTheme.primaryColor,
+                side: const BorderSide(color: AppTheme.primaryColor, width: 1),
+                padding: EdgeInsets.zero,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
-              child: Center(
-                child: Text(
-                  'View Profile',
-                  style: GoogleFonts.roboto(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: AppTheme.primaryColor,
-                  ),
+              child: Text(
+                'View Profile',
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ),
@@ -527,14 +491,19 @@ class _MemberCarousel extends StatelessWidget {
     );
   }
 
-  Widget _photoPlaceholder(String name) {
+  Widget _avatarPlaceholder(String name) {
     return Container(
-      color: AppTheme.primaryColor.withValues(alpha: 0.1),
+      width: 64,
+      height: 64,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: AppTheme.primaryColor.withValues(alpha: 0.1),
+      ),
       child: Center(
         child: Text(
           name.isNotEmpty ? name[0].toUpperCase() : '?',
           style: GoogleFonts.montserrat(
-            fontSize: 32,
+            fontSize: 24,
             fontWeight: FontWeight.w700,
             color: AppTheme.primaryColor,
           ),
@@ -543,16 +512,4 @@ class _MemberCarousel extends StatelessWidget {
     );
   }
 
-  String _roleLabel(String role) {
-    switch (role.toUpperCase()) {
-      case 'ADMINISTRATOR':
-        return 'Admin';
-      case 'SPEAKER':
-        return 'Speaker';
-      case 'KEYNOTE':
-        return 'Keynote';
-      default:
-        return role;
-    }
-  }
 }

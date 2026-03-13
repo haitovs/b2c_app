@@ -14,54 +14,10 @@ import 'package:intl/intl.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/widgets/app_snackbar.dart';
 import '../../../core/widgets/phone_input_field.dart';
+import '../../../shared/widgets/app_checkbox.dart';
+import '../../../core/providers/reference_data_provider.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../providers/visa_providers.dart';
-
-const List<String> _countries = [
-  'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola',
-  'Antigua and Barbuda', 'Argentina', 'Armenia', 'Australia', 'Austria',
-  'Azerbaijan', 'Bahamas', 'Bahrain', 'Bangladesh', 'Barbados',
-  'Belarus', 'Belgium', 'Belize', 'Benin', 'Bhutan',
-  'Bolivia', 'Bosnia and Herzegovina', 'Botswana', 'Brazil', 'Brunei',
-  'Bulgaria', 'Burkina Faso', 'Burundi', 'Cabo Verde', 'Cambodia',
-  'Cameroon', 'Canada', 'Central African Republic', 'Chad', 'Chile',
-  'China', 'Colombia', 'Comoros', 'Congo', 'Costa Rica',
-  'Croatia', 'Cuba', 'Cyprus', 'Czech Republic', 'Denmark',
-  'Djibouti', 'Dominica', 'Dominican Republic', 'Ecuador', 'Egypt',
-  'El Salvador', 'Equatorial Guinea', 'Eritrea', 'Estonia', 'Eswatini',
-  'Ethiopia', 'Fiji', 'Finland', 'France', 'Gabon',
-  'Gambia', 'Georgia', 'Germany', 'Ghana', 'Greece',
-  'Grenada', 'Guatemala', 'Guinea', 'Guinea-Bissau', 'Guyana',
-  'Haiti', 'Honduras', 'Hungary', 'Iceland', 'India',
-  'Indonesia', 'Iran', 'Iraq', 'Ireland', 'Israel',
-  'Italy', 'Jamaica', 'Japan', 'Jordan', 'Kazakhstan',
-  'Kenya', 'Kiribati', 'Kosovo', 'Kuwait', 'Kyrgyzstan',
-  'Laos', 'Latvia', 'Lebanon', 'Lesotho', 'Liberia',
-  'Libya', 'Liechtenstein', 'Lithuania', 'Luxembourg', 'Madagascar',
-  'Malawi', 'Malaysia', 'Maldives', 'Mali', 'Malta',
-  'Marshall Islands', 'Mauritania', 'Mauritius', 'Mexico', 'Micronesia',
-  'Moldova', 'Monaco', 'Mongolia', 'Montenegro', 'Morocco',
-  'Mozambique', 'Myanmar', 'Namibia', 'Nauru', 'Nepal',
-  'Netherlands', 'New Zealand', 'Nicaragua', 'Niger', 'Nigeria',
-  'North Korea', 'North Macedonia', 'Norway', 'Oman', 'Pakistan',
-  'Palau', 'Palestine', 'Panama', 'Papua New Guinea', 'Paraguay',
-  'Peru', 'Philippines', 'Poland', 'Portugal', 'Qatar',
-  'Romania', 'Russia', 'Rwanda', 'Saint Kitts and Nevis', 'Saint Lucia',
-  'Saint Vincent and the Grenadines', 'Samoa', 'San Marino',
-  'Sao Tome and Principe', 'Saudi Arabia', 'Senegal', 'Serbia',
-  'Seychelles', 'Sierra Leone', 'Singapore', 'Slovakia', 'Slovenia',
-  'Solomon Islands', 'Somalia', 'South Africa', 'South Korea', 'South Sudan',
-  'Spain', 'Sri Lanka', 'Sudan', 'Suriname', 'Sweden',
-  'Switzerland', 'Syria', 'Taiwan', 'Tajikistan', 'Tanzania',
-  'Thailand', 'Timor-Leste', 'Togo', 'Tonga', 'Trinidad and Tobago',
-  'Tunisia', 'Turkey', 'Turkmenistan', 'Tuvalu', 'Uganda',
-  'Ukraine', 'United Arab Emirates', 'United Kingdom', 'United States',
-  'Uruguay', 'Uzbekistan', 'Vanuatu', 'Vatican City', 'Venezuela',
-  'Vietnam', 'Yemen', 'Zambia', 'Zimbabwe',
-  // Historical countries (for place of birth)
-  'USSR (Soviet Union)', 'Yugoslavia', 'Czechoslovakia',
-  'East Germany (GDR)', 'West Germany (FRG)',
-];
 
 const List<String> _passportTypes = [
   'P - Milli Pasport (National)',
@@ -679,6 +635,8 @@ class _VisaApplicationFormPageState
   }
 
   Future<void> _prefillFromParticipant() async {
+    if (widget.participantId == null || widget.participantId!.isEmpty) return;
+
     try {
       final token = await ref.read(authNotifierProvider.notifier).getToken();
 
@@ -733,12 +691,7 @@ class _VisaApplicationFormPageState
     } catch (e) {
       debugPrint('Image picker error: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to pick image. Please try again.'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppSnackBar.showError(context, 'Failed to pick image. Please try again.');
       }
     }
   }
@@ -770,12 +723,7 @@ class _VisaApplicationFormPageState
     } catch (e) {
       debugPrint('Passport scan picker error: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to pick image. Please try again.'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppSnackBar.showError(context, 'Failed to pick image. Please try again.');
       }
     }
   }
@@ -993,53 +941,39 @@ class _VisaApplicationFormPageState
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
-        backgroundColor: Colors.white,
-        body: Center(child: CircularProgressIndicator(color: _primaryColor)),
-      );
+      return const Center(child: CircularProgressIndicator(color: _primaryColor));
     }
 
     if (_errorMessage != null) {
-      return Scaffold(
-        backgroundColor: Colors.white,
-        appBar: AppBar(
-          backgroundColor: Colors.white,
-          elevation: 0,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: _primaryColor),
-            onPressed: () => context.pop(),
-          ),
-        ),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error_outline, size: 64, color: _primaryColor),
-              const SizedBox(height: 16),
-              const Text(
-                'Error loading visa application',
-                style: TextStyle(color: Color(0xFF333333), fontSize: 18),
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 64, color: _primaryColor),
+            const SizedBox(height: 16),
+            const Text(
+              'Error loading visa application',
+              style: TextStyle(color: Color(0xFF333333), fontSize: 18),
+            ),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Text(
+                _errorMessage!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Color(0xFF666666)),
               ),
-              const SizedBox(height: 8),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Text(
-                  _errorMessage!,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Color(0xFF666666)),
-                ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: _loadVisaData,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _primaryColor,
+                foregroundColor: Colors.white,
               ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: _loadVisaData,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _primaryColor,
-                  foregroundColor: Colors.white,
-                ),
-                child: const Text('Retry'),
-              ),
-            ],
-          ),
+              child: const Text('Retry'),
+            ),
+          ],
         ),
       );
     }
@@ -1051,29 +985,8 @@ class _VisaApplicationFormPageState
         await _saveCurrentVisa();
         if (mounted) context.pop();
       },
-      child: Scaffold(
-        backgroundColor: Colors.white,
-        appBar: AppBar(
-          backgroundColor: Colors.white,
-          elevation: 0,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: _primaryColor),
-            onPressed: () async {
-              await _saveCurrentVisa();
-              if (mounted) context.pop();
-            },
-          ),
-          title: const Text(
-            'Visa',
-            style: TextStyle(
-              color: _primaryColor,
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-        body: SafeArea(
-          child: Stack(
+      child: SafeArea(
+        child: Stack(
             children: [
               SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -1145,7 +1058,6 @@ class _VisaApplicationFormPageState
             ],
           ),
         ),
-      ),
     );
   }
 
@@ -1546,34 +1458,11 @@ class _VisaApplicationFormPageState
   }
 
   Widget _buildConfirmationCheckbox() {
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _confirmationChecked = !_confirmationChecked;
-        });
-      },
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: SvgPicture.asset(
-              _confirmationChecked
-                  ? 'assets/visa_application/icons/check-square.svg'
-                  : 'assets/visa_application/icons/square-unchecked.svg',
-              width: 22,
-              height: 22,
-            ),
-          ),
-          const SizedBox(width: 10),
-          const Expanded(
-            child: Text(
-              'I confirm that all information provided is true and complete, and I understand that any incorrect information may result in my visa being denied',
-              style: TextStyle(fontSize: 14, height: 1.4),
-            ),
-          ),
-        ],
-      ),
+    return AppCheckbox(
+      value: _confirmationChecked,
+      onChanged: (v) => setState(() => _confirmationChecked = v),
+      label:
+          'I confirm that all information provided is true and complete, and I understand that any incorrect information may result in my visa being denied',
     );
   }
 
@@ -2127,14 +2016,15 @@ class _VisaApplicationFormPageState
 
   void _showCountryPickerDialog(TextEditingController controller, [VoidCallback? onChanged]) {
     String searchQuery = '';
+    final countries = ref.read(countriesProvider).value ?? [];
     showDialog(
       context: context,
       builder: (ctx) {
         return StatefulBuilder(
           builder: (ctx, setDialogState) {
             final filtered = searchQuery.isEmpty
-                ? _countries
-                : _countries
+                ? countries
+                : countries
                     .where((c) =>
                         c.toLowerCase().contains(searchQuery.toLowerCase()))
                     .toList();
