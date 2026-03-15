@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/providers/event_context_provider.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../company/providers/company_providers.dart';
 import '../providers/meeting_providers.dart';
 
 /// New Meeting Page - Grid of participants/entities to select for meeting
@@ -75,6 +76,17 @@ class _NewMeetingPageState extends ConsumerState<NewMeetingPage> {
         final meetingService = ref.read(meetingServiceProvider);
         final eventId = int.tryParse(widget.eventId) ?? 0;
         _companies = await meetingService.fetchPublicCompanies(eventId: eventId);
+
+        // Filter out user's own companies
+        try {
+          final myCompanies = await ref.read(myCompaniesProvider(eventId).future);
+          final myCompanyIds = myCompanies.map((c) => c.id).toSet();
+          _companies = _companies
+              .where((c) => !myCompanyIds.contains(c['id']?.toString()))
+              .toList();
+        } catch (_) {
+          // If we can't fetch own companies, show all (safe fallback)
+        }
       } catch (companiesError) {
         debugPrint('Error fetching public companies: $companiesError');
       }
@@ -432,7 +444,7 @@ class _NewMeetingPageState extends ConsumerState<NewMeetingPage> {
           );
         } else {
           result = await context.push(
-            '/events/${widget.eventId}/meetings/b2g/new/$itemId',
+            '/events/${widget.eventId}/meetings/new/b2g/$itemId',
             extra: item,
           );
         }

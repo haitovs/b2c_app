@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../analytics/providers/analytics_providers.dart';
 
 /// Social platform icons — consistent with company preview page.
 const _socialIcons = <String, IconData>{
@@ -61,11 +62,23 @@ class _ParticipantDetailPageState
   @override
   void initState() {
     super.initState();
+    _trackView();
     if (widget.participantData != null) {
       _participant = widget.participantData;
       _isLoading = false;
     } else {
       _fetchParticipant();
+    }
+  }
+
+  void _trackView() {
+    final eventId = int.tryParse(widget.eventId) ?? 0;
+    if (eventId > 0) {
+      ref.read(analyticsServiceProvider).recordView(
+            targetType: 'COMPANY',
+            targetId: widget.participantId,
+            eventId: eventId,
+          );
     }
   }
 
@@ -405,8 +418,7 @@ class _ParticipantPreview extends StatelessWidget {
 }
 
 // =============================================================================
-// Gallery Layout — Figma style (matches company preview)
-// 1 tall image left, 2 small top-right, 1 wide bottom-right
+// Gallery Layout — 2x2 grid (matches company preview page)
 // =============================================================================
 
 class _GalleryLayout extends StatelessWidget {
@@ -415,67 +427,37 @@ class _GalleryLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (urls.length == 1) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(10),
-        child: Image.network(
-          urls[0],
-          width: double.infinity,
-          height: 300,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => _imagePlaceholder(300),
-        ),
-      );
-    }
-
     return LayoutBuilder(
       builder: (context, constraints) {
         final totalWidth = constraints.maxWidth;
-        final leftWidth = (totalWidth * 0.34).roundToDouble();
-        final rightWidth = totalWidth - leftWidth - 12;
-        final tallHeight = 571.0 * (totalWidth / 1011).clamp(0.4, 1.0);
-        final smallHeight = (tallHeight - 12) * 0.46;
-        final wideHeight = tallHeight - smallHeight - 12;
+        final gap = 12.0;
+        final cellWidth = (totalWidth - gap) / 2;
+        final cellHeight = cellWidth * 0.6;
 
-        return SizedBox(
-          height: tallHeight,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Left tall image
-              _galleryImage(urls[0], leftWidth, tallHeight),
-              const SizedBox(width: 12),
-              // Right side
-              Expanded(
-                child: Column(
-                  children: [
-                    // Top row: 2 small images
-                    Row(
-                      children: [
-                        if (urls.length > 1)
-                          _galleryImage(
-                            urls[1],
-                            (rightWidth - 12) / 2,
-                            smallHeight,
-                          ),
-                        if (urls.length > 1) const SizedBox(width: 12),
-                        if (urls.length > 2)
-                          _galleryImage(
-                            urls[2],
-                            (rightWidth - 12) / 2,
-                            smallHeight,
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    // Bottom wide image
-                    if (urls.length > 3)
-                      _galleryImage(urls[3], rightWidth, wideHeight),
-                  ],
-                ),
+        return Column(
+          children: [
+            // Top row
+            Row(
+              children: [
+                _galleryImage(urls[0], cellWidth, cellHeight),
+                SizedBox(width: gap),
+                if (urls.length > 1)
+                  _galleryImage(urls[1], cellWidth, cellHeight),
+              ],
+            ),
+            if (urls.length > 2) ...[
+              SizedBox(height: gap),
+              // Bottom row
+              Row(
+                children: [
+                  _galleryImage(urls[2], cellWidth, cellHeight),
+                  SizedBox(width: gap),
+                  if (urls.length > 3)
+                    _galleryImage(urls[3], cellWidth, cellHeight),
+                ],
               ),
             ],
-          ),
+          ],
         );
       },
     );
@@ -490,18 +472,11 @@ class _GalleryLayout extends StatelessWidget {
         child: Image.network(
           url,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => _imagePlaceholder(height),
+          errorBuilder: (_, __, ___) => Container(
+            color: Colors.grey.shade200,
+            child: const Icon(Icons.broken_image, color: Colors.grey),
+          ),
         ),
-      ),
-    );
-  }
-
-  Widget _imagePlaceholder(double height) {
-    return Container(
-      height: height,
-      color: Colors.grey.shade200,
-      child: const Center(
-        child: Icon(Icons.broken_image, color: Colors.grey),
       ),
     );
   }

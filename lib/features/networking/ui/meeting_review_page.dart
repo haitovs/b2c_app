@@ -72,6 +72,8 @@ class _MeetingReviewPageState extends ConsumerState<MeetingReviewPage> {
       );
 
       if (mounted) {
+        final eventId = int.tryParse(widget.eventId);
+        if (eventId != null) ref.invalidate(myMeetingsProvider(eventId));
         AppSnackBar.showSuccess(context, 'Meeting confirmed!');
         context.pop(true);
       }
@@ -121,6 +123,8 @@ class _MeetingReviewPageState extends ConsumerState<MeetingReviewPage> {
       );
 
       if (mounted) {
+        final eventId = int.tryParse(widget.eventId);
+        if (eventId != null) ref.invalidate(myMeetingsProvider(eventId));
         AppSnackBar.showWarning(context, 'Meeting declined');
         context.pop(true);
       }

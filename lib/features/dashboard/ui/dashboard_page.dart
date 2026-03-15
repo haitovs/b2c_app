@@ -231,9 +231,21 @@ class _SponsorCard extends StatelessWidget {
 
     String? fullLogoUrl;
     if (rawLogoUrl != null && rawLogoUrl.isNotEmpty) {
-      fullLogoUrl = rawLogoUrl.startsWith('http')
-          ? rawLogoUrl
-          : '${AppConfig.tourismApiBaseUrl}$rawLogoUrl';
+      if (rawLogoUrl.startsWith('http')) {
+        // Proxy external Tourism API images through B2C backend to avoid CORS
+        final tourismBase = AppConfig.tourismApiBaseUrl;
+        if (rawLogoUrl.startsWith(tourismBase)) {
+          final relativePath = rawLogoUrl.substring(tourismBase.length);
+          fullLogoUrl =
+              '${AppConfig.b2cApiBaseUrl}/proxy/tourism${relativePath.startsWith('/') ? relativePath : '/$relativePath'}';
+        } else {
+          fullLogoUrl = rawLogoUrl;
+        }
+      } else {
+        // Relative path — proxy through B2C backend
+        fullLogoUrl =
+            '${AppConfig.b2cApiBaseUrl}/proxy/tourism${rawLogoUrl.startsWith('/') ? rawLogoUrl : '/$rawLogoUrl'}';
+      }
     }
 
     return Padding(
@@ -335,10 +347,7 @@ class _StatusBadge extends StatelessWidget {
       icon = Icons.info_outline;
     } else {
       final hasApproved = orders.whenOrNull(
-        data: (list) => list.any((o) {
-          final s = (o['status'] ?? '').toString().toUpperCase();
-          return s == 'APPROVED';
-        }),
+        data: (list) => list.any((o) => o.status.toUpperCase() == 'APPROVED'),
       ) ?? false;
 
       if (hasApproved) {
@@ -545,18 +554,23 @@ class _StatusCards extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 16,
-      runSpacing: 16,
+    return Column(
       children: [
-        _CompanyCard(eventId: eventId, isMobile: isMobile, companies: companies),
-        _TeamCard(
-          eventId: eventId,
-          isMobile: isMobile,
-          teamMembers: teamMembers,
+        Row(
+          children: [
+            Expanded(child: _CompanyCard(eventId: eventId, isMobile: isMobile, companies: companies)),
+            const SizedBox(width: 16),
+            Expanded(child: _TeamCard(eventId: eventId, isMobile: isMobile, teamMembers: teamMembers)),
+          ],
         ),
-        _VisaCard(eventId: eventId, isMobile: isMobile, visas: visas),
-        _OrdersCard(eventId: eventId, isMobile: isMobile, orders: orders),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(child: _VisaCard(eventId: eventId, isMobile: isMobile, visas: visas)),
+            const SizedBox(width: 16),
+            Expanded(child: _OrdersCard(eventId: eventId, isMobile: isMobile, orders: orders)),
+          ],
+        ),
       ],
     );
   }
@@ -577,10 +591,7 @@ class _CompanyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cardWidth = _cardWidth(context, isMobile);
-
     return _CardShell(
-      width: cardWidth,
       child: companies.when(
         loading: () => const _CardLoading(),
         error: (_, __) => const _CardError(message: 'Failed to load'),
@@ -622,7 +633,7 @@ class _CompanyCard extends StatelessWidget {
                     child: Text(
                       'My Company',
                       style: GoogleFonts.montserrat(
-                        fontSize: 14,
+                        fontSize: 18,
                         fontWeight: FontWeight.w700,
                         color: Colors.black87,
                       ),
@@ -686,10 +697,7 @@ class _TeamCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cardWidth = _cardWidth(context, isMobile);
-
     return _CardShell(
-      width: cardWidth,
       child: teamMembers.when(
         loading: () => const _CardLoading(),
         error: (_, __) => const _CardError(message: 'Failed to load'),
@@ -712,7 +720,7 @@ class _TeamCard extends StatelessWidget {
                 Text(
                   'Team Members',
                   style: GoogleFonts.montserrat(
-                    fontSize: 14,
+                    fontSize: 18,
                     fontWeight: FontWeight.w700,
                     color: Colors.black87,
                   ),
@@ -772,10 +780,7 @@ class _VisaCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cardWidth = _cardWidth(context, isMobile);
-
     return _CardShell(
-      width: cardWidth,
       child: visas.when(
         loading: () => const _CardLoading(),
         error: (_, __) => const _CardError(message: 'Failed to load'),
@@ -800,7 +805,7 @@ class _VisaCard extends StatelessWidget {
                   Text(
                     'Visa Status',
                     style: GoogleFonts.montserrat(
-                      fontSize: 14,
+                      fontSize: 18,
                       fontWeight: FontWeight.w700,
                       color: Colors.black87,
                     ),
@@ -948,10 +953,7 @@ class _OrdersCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cardWidth = _cardWidth(context, isMobile);
-
     return _CardShell(
-      width: cardWidth,
       child: orders.when(
         loading: () => const _CardLoading(),
         error: (_, __) => const _CardError(message: 'Failed to load'),
@@ -975,7 +977,7 @@ class _OrdersCard extends StatelessWidget {
                   Text(
                     'Services & Orders',
                     style: GoogleFonts.montserrat(
-                      fontSize: 14,
+                      fontSize: 18,
                       fontWeight: FontWeight.w700,
                       color: Colors.black87,
                     ),
@@ -1025,46 +1027,30 @@ class _OrdersCard extends StatelessWidget {
 // Shared card helpers
 // =============================================================================
 
-double _cardWidth(BuildContext context, bool isMobile) {
-  final screenWidth = MediaQuery.of(context).size.width;
-  if (isMobile) {
-    // 2 cards per row: total width minus padding (16*2) minus gap (16), divided by 2
-    return (screenWidth - 32 - 16) / 2;
-  }
-  // Desktop: fit 4 cards with spacing. Content area ~ screenWidth - sidebar - padding
-  final contentWidth = screenWidth - 260 - 56 - 16; // sidebar + outer padding + gap
-  final w = (contentWidth - 48) / 4; // 3 gaps of 16
-  return w.clamp(200, 300).toDouble();
-}
-
 class _CardShell extends StatelessWidget {
-  final double width;
   final Widget child;
 
-  const _CardShell({required this.width, required this.child});
+  const _CardShell({required this.child});
 
   @override
   Widget build(BuildContext context) {
     final isMobile = MediaQuery.of(context).size.width < 600;
-    return SizedBox(
-      width: width,
+    return Container(
       height: isMobile ? 180 : 200,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey.shade200),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: child,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
+      child: child,
     );
   }
 }

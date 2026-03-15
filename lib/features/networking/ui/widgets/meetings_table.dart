@@ -4,7 +4,7 @@ import '../../../../core/theme/app_theme.dart';
 
 /// Desktop table view for meetings list - matches Figma design
 /// B2B columns: Company, Position, Subject, Date, Time, Location, Status
-/// B2G columns: Attendee, Meeting with, Subjects, Date, Time, Location, Status
+/// B2G columns: Our Attendees, Meeting with, Subject, Date, Time, Location, Status
 class MeetingsTable extends StatelessWidget {
   final List<Map<String, dynamic>> meetings;
   final bool isB2B;
@@ -49,9 +49,11 @@ class MeetingsTable extends StatelessWidget {
   Widget _buildHeaderRow() {
     final headers = isB2B
         ? ['Company', 'Position', 'Subject', 'Date', 'Time', 'Location', 'Status', '']
-        : ['Attendee', 'Meeting with', 'Subjects', 'Date', 'Time', 'Location', 'Status', ''];
+        : ['Our Attendees', 'Meeting with', 'Subject', 'Date', 'Time', 'Location', 'Status', ''];
 
-    final flexValues = [3, 3, 4, 2, 1, 2, 2, 1];
+    final flexValues = isB2B
+        ? [3, 3, 4, 2, 1, 2, 2, 1]
+        : [4, 3, 4, 2, 1, 2, 2, 1];
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -63,12 +65,15 @@ class MeetingsTable extends StatelessWidget {
         children: List.generate(headers.length, (i) {
           return Expanded(
             flex: flexValues[i],
-            child: Text(
-              headers[i],
-              style: GoogleFonts.roboto(
-                fontSize: 15,
-                fontWeight: FontWeight.w400,
-                color: const Color(0xFF454545),
+            child: Padding(
+              padding: EdgeInsets.only(right: i < 2 ? 12 : 0),
+              child: Text(
+                headers[i],
+                style: GoogleFonts.roboto(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w400,
+                  color: const Color(0xFF454545),
+                ),
               ),
             ),
           );
@@ -120,7 +125,9 @@ class MeetingsTable extends StatelessWidget {
     final time = _formatTime(meeting['start_time']?.toString());
     final location = meeting['location'] ?? 'TBD';
 
-    final flexValues = [3, 3, 4, 2, 1, 2, 2, 1];
+    final flexValues = isB2B
+        ? [3, 3, 4, 2, 1, 2, 2, 1]
+        : [4, 3, 4, 2, 1, 2, 2, 1];
 
     return InkWell(
       onTap: () => onAction(meeting, 'view'),
@@ -128,32 +135,38 @@ class MeetingsTable extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
         child: Row(
           children: [
-            // Column 1 - Company / Attendee
+            // Column 1 - Company / Our Attendees
             Expanded(
               flex: flexValues[0],
-              child: Text(
-                col1,
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: const Color(0xFF1A1A2E),
+              child: Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: Text(
+                  col1,
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: const Color(0xFF1A1A2E),
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
               ),
             ),
             // Column 2 - Position / Meeting with
             Expanded(
               flex: flexValues[1],
-              child: Text(
-                col2,
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: const Color(0xFF6B7280),
+              child: Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: Text(
+                  col2,
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: const Color(0xFF6B7280),
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
               ),
             ),
             // Subject

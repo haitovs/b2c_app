@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/analytics/ui/analytics_page.dart';
 import '../../features/auth/providers/auth_provider.dart';
 import '../providers/event_context_provider.dart';
 import '../../features/auth/ui/create_password_page.dart';
@@ -31,7 +32,9 @@ import '../../features/flights/ui/flights_page.dart';
 import '../../features/hotline/ui/hotline_page.dart';
 import '../../features/networking/ui/company_meeting_preview_page.dart';
 import '../../features/networking/ui/meeting_b2g_request_page.dart';
+import '../../features/networking/ui/meeting_confirmation_page.dart';
 import '../../features/networking/ui/meeting_edit_page.dart';
+import '../../features/networking/services/meeting_service.dart';
 import '../../features/networking/ui/meeting_gate_page.dart';
 import '../../features/networking/ui/meeting_request_page.dart';
 import '../../features/networking/ui/meeting_review_page.dart';
@@ -59,9 +62,19 @@ import 'auth_refresh_notifier.dart';
 /// Simple in-memory value — consumed once by PostLoginDispatcherPage.
 String? postLoginRedirectUrl;
 
-/// Helper to wrap a child widget in a NoTransitionPage.
-Page<void> _noTransition(Widget child) =>
-    NoTransitionPage<void>(child: child);
+/// Smooth fade transition for shell-route pages.
+/// Sidebar stays mounted; only the content panel fades in.
+Page<void> _fadeTransition(Widget child) => CustomTransitionPage<void>(
+      child: child,
+      transitionDuration: const Duration(milliseconds: 200),
+      reverseTransitionDuration: const Duration(milliseconds: 150),
+      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        return FadeTransition(
+          opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+          child: child,
+        );
+      },
+    );
 
 /// Riverpod provider for the app's GoRouter instance.
 final routerProvider = Provider<GoRouter>((ref) {
@@ -210,8 +223,8 @@ final routerProvider = Provider<GoRouter>((ref) {
             EventDetailsPage(id: state.pathParameters['id']!),
       ),
       // ─── Event sub-pages — all wrapped in persistent sidebar shell ───
-      // Using pageBuilder + NoTransitionPage so content swaps instantly
-      // without slide animation (sidebar stays, only right panel changes).
+      // Using pageBuilder + CustomTransitionPage with fade so content
+      // transitions smoothly (sidebar stays, only right panel fades).
       ShellRoute(
         builder: (context, state, child) => EventShellLayout(child: child),
         routes: [
@@ -225,21 +238,21 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/events/:id/dashboard',
             pageBuilder: (context, state) =>
-                _noTransition(const DashboardPage()),
+                _fadeTransition(const DashboardPage()),
           ),
           GoRoute(
             path: '/events/:id/company-profile',
             pageBuilder: (context, state) =>
-                _noTransition(const CompanyListPage()),
+                _fadeTransition(const CompanyListPage()),
             routes: [
               GoRoute(
                 path: 'add',
                 pageBuilder: (context, state) =>
-                    _noTransition(const CompanyProfilePage()),
+                    _fadeTransition(const CompanyProfilePage()),
               ),
               GoRoute(
                 path: ':companyId/edit',
-                pageBuilder: (context, state) => _noTransition(
+                pageBuilder: (context, state) => _fadeTransition(
                   CompanyProfilePage(
                     companyId: state.pathParameters['companyId'],
                   ),
@@ -247,7 +260,7 @@ final routerProvider = Provider<GoRouter>((ref) {
               ),
               GoRoute(
                 path: ':companyId/preview',
-                pageBuilder: (context, state) => _noTransition(
+                pageBuilder: (context, state) => _fadeTransition(
                   CompanyPreviewPage(
                     companyId: state.pathParameters['companyId']!,
                   ),
@@ -258,16 +271,16 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/events/:id/team',
             pageBuilder: (context, state) =>
-                _noTransition(const TeamMembersPage()),
+                _fadeTransition(const TeamMembersPage()),
             routes: [
               GoRoute(
                 path: 'add',
                 pageBuilder: (context, state) =>
-                    _noTransition(const AddTeamMemberPage()),
+                    _fadeTransition(const AddTeamMemberPage()),
               ),
               GoRoute(
                 path: ':memberId/edit',
-                pageBuilder: (context, state) => _noTransition(
+                pageBuilder: (context, state) => _fadeTransition(
                   AddTeamMemberPage(
                     memberId: state.pathParameters['memberId'],
                   ),
@@ -278,16 +291,16 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/events/:id/services',
             pageBuilder: (context, state) =>
-                _noTransition(const EventServicesPage()),
+                _fadeTransition(const EventServicesPage()),
             routes: [
               GoRoute(
                 path: 'cart',
                 pageBuilder: (context, state) =>
-                    _noTransition(const ShoppingCartPage()),
+                    _fadeTransition(const ShoppingCartPage()),
               ),
               GoRoute(
                 path: ':serviceId',
-                pageBuilder: (context, state) => _noTransition(
+                pageBuilder: (context, state) => _fadeTransition(
                   ServiceDetailPage(
                     serviceId: state.pathParameters['serviceId']!,
                   ),
@@ -300,7 +313,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             pageBuilder: (context, state) {
               final idStr = state.pathParameters['id']!;
               final visaId = state.uri.queryParameters['visaId'];
-              return _noTransition(
+              return _fadeTransition(
                 VisaApplicationFormPage(
                   eventId: int.tryParse(idStr) ?? 0,
                   visaId: visaId,
@@ -311,47 +324,48 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/events/:id/services-addons',
             pageBuilder: (context, state) =>
-                _noTransition(const EventServicesPage()),
+                _fadeTransition(const EventServicesPage()),
           ),
           GoRoute(
             path: '/events/:id/schedule',
-            pageBuilder: (context, state) => _noTransition(
-              MeetingGatePage(eventId: state.pathParameters['id']!),
-            ),
+            redirect: (context, state) {
+              final id = state.pathParameters['id'] ?? '0';
+              return '/events/$id/meetings';
+            },
           ),
           GoRoute(
             path: '/events/:id/financial',
-            pageBuilder: (context, state) => _noTransition(
+            pageBuilder: (context, state) => _fadeTransition(
               const ComingSoonPage(featureName: 'Financial Section'),
             ),
           ),
           GoRoute(
             path: '/events/:id/analytics',
-            pageBuilder: (context, state) => _noTransition(
-              const ComingSoonPage(featureName: 'Analytics'),
+            pageBuilder: (context, state) => _fadeTransition(
+              const AnalyticsPage(),
             ),
           ),
           GoRoute(
             path: '/events/:id/travel',
-            pageBuilder: (context, state) => _noTransition(
+            pageBuilder: (context, state) => _fadeTransition(
               const ComingSoonPage(featureName: 'Travel Information'),
             ),
           ),
           GoRoute(
             path: '/events/:id/hotels',
-            pageBuilder: (context, state) => _noTransition(
+            pageBuilder: (context, state) => _fadeTransition(
               const ComingSoonPage(featureName: 'Hotel Information'),
             ),
           ),
           GoRoute(
             path: '/events/:id/agenda',
-            pageBuilder: (context, state) => _noTransition(
+            pageBuilder: (context, state) => _fadeTransition(
               AgendaPage(eventId: state.pathParameters['id']!),
             ),
           ),
           GoRoute(
             path: '/events/:id/speakers',
-            pageBuilder: (context, state) => _noTransition(
+            pageBuilder: (context, state) => _fadeTransition(
               SpeakerListPage(eventId: state.pathParameters['id']!),
             ),
             routes: [
@@ -361,7 +375,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                   final eventId = state.pathParameters['id']!;
                   final speakerId = state.pathParameters['speakerId']!;
                   final speakerData = state.extra as Map<String, dynamic>?;
-                  return _noTransition(
+                  return _fadeTransition(
                     SpeakerDetailPage(
                       eventId: eventId,
                       speakerId: speakerId,
@@ -374,7 +388,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: '/events/:id/participants',
-            pageBuilder: (context, state) => _noTransition(
+            pageBuilder: (context, state) => _fadeTransition(
               ParticipantListPage(eventId: state.pathParameters['id']!),
             ),
             routes: [
@@ -386,7 +400,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                       state.pathParameters['participantId']!;
                   final participantData =
                       state.extra as Map<String, dynamic>?;
-                  return _noTransition(
+                  return _fadeTransition(
                     ParticipantDetailPage(
                       eventId: eventId,
                       participantId: participantId,
@@ -399,22 +413,78 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: '/events/:id/meetings',
-            pageBuilder: (context, state) => _noTransition(
+            pageBuilder: (context, state) => _fadeTransition(
               MeetingGatePage(eventId: state.pathParameters['id']!),
             ),
             routes: [
+              // /events/:id/meetings/new — company/entity grid
+              // /events/:id/meetings/new/b2b/:participantId — B2B request form
               GoRoute(
                 path: 'new',
                 pageBuilder: (context, state) {
                   final isB2G = state.uri.queryParameters['type'] == 'b2g';
-                  return _noTransition(
+                  return _fadeTransition(
                     NewMeetingPage(
                       eventId: state.pathParameters['id']!,
                       initialIsB2G: isB2G,
                     ),
                   );
                 },
+                routes: [
+                  GoRoute(
+                    path: 'b2b/:participantId',
+                    pageBuilder: (context, state) {
+                      final eventId = state.pathParameters['id']!;
+                      final participantId =
+                          state.pathParameters['participantId']!;
+                      final participantData =
+                          state.extra as Map<String, dynamic>?;
+                      return _fadeTransition(
+                        MeetingRequestPage(
+                          eventId: eventId,
+                          participantId: participantId,
+                          participantData: participantData,
+                        ),
+                      );
+                    },
+                  ),
+                  GoRoute(
+                    path: 'b2g/:govEntityId',
+                    pageBuilder: (context, state) {
+                      final eventId = state.pathParameters['id']!;
+                      final govEntityId =
+                          state.pathParameters['govEntityId']!;
+                      final govEntityData =
+                          state.extra as Map<String, dynamic>?;
+                      return _fadeTransition(
+                        MeetingB2GRequestPage(
+                          eventId: eventId,
+                          govEntityId: govEntityId,
+                          govEntityData: govEntityData,
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ),
+              // /events/:id/meetings/confirm — confirmation before sending
+              GoRoute(
+                path: 'confirm',
+                pageBuilder: (context, state) {
+                  final data = state.extra as Map<String, dynamic>;
+                  final typeStr = data['meeting_type'] as String;
+                  final meetingType = typeStr == 'b2g'
+                      ? MeetingType.b2g
+                      : MeetingType.b2b;
+                  return _fadeTransition(
+                    MeetingConfirmationPage(
+                      meetingType: meetingType,
+                      meetingData: data,
+                    ),
+                  );
+                },
+              ),
+              // /events/:id/meetings/company/:companyId — company preview
               GoRoute(
                 path: 'company/:companyId',
                 pageBuilder: (context, state) {
@@ -422,7 +492,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                   final companyId = state.pathParameters['companyId']!;
                   final companyData =
                       state.extra as Map<String, dynamic>?;
-                  return _noTransition(
+                  return _fadeTransition(
                     CompanyMeetingPreviewPage(
                       eventId: eventId,
                       companyId: companyId,
@@ -431,23 +501,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                   );
                 },
               ),
-              GoRoute(
-                path: 'new/:participantId',
-                pageBuilder: (context, state) {
-                  final eventId = state.pathParameters['id']!;
-                  final participantId =
-                      state.pathParameters['participantId']!;
-                  final participantData =
-                      state.extra as Map<String, dynamic>?;
-                  return _noTransition(
-                    MeetingRequestPage(
-                      eventId: eventId,
-                      participantId: participantId,
-                      participantData: participantData,
-                    ),
-                  );
-                },
-              ),
+              // /events/:id/meetings/speaker/:speakerId — speaker meeting request
               GoRoute(
                 path: 'speaker/:speakerId',
                 pageBuilder: (context, state) {
@@ -459,7 +513,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                   final speakerName = speakerData != null
                       ? '${speakerData['name'] ?? ''} ${speakerData['surname'] ?? ''}'.trim()
                       : null;
-                  return _noTransition(
+                  return _fadeTransition(
                     MeetingRequestPage(
                       eventId: eventId,
                       participantId: '',
@@ -470,30 +524,15 @@ final routerProvider = Provider<GoRouter>((ref) {
                   );
                 },
               ),
+              // /events/:id/meetings/review/:meetingId — view meeting
               GoRoute(
-                path: 'b2g/new/:govEntityId',
-                pageBuilder: (context, state) {
-                  final eventId = state.pathParameters['id']!;
-                  final govEntityId = state.pathParameters['govEntityId']!;
-                  final govEntityData =
-                      state.extra as Map<String, dynamic>?;
-                  return _noTransition(
-                    MeetingB2GRequestPage(
-                      eventId: eventId,
-                      govEntityId: govEntityId,
-                      govEntityData: govEntityData,
-                    ),
-                  );
-                },
-              ),
-              GoRoute(
-                path: ':meetingId',
+                path: 'review/:meetingId',
                 pageBuilder: (context, state) {
                   final eventId = state.pathParameters['id']!;
                   final meetingId = state.pathParameters['meetingId']!;
                   final meetingData =
                       state.extra as Map<String, dynamic>?;
-                  return _noTransition(
+                  return _fadeTransition(
                     MeetingReviewPage(
                       eventId: eventId,
                       meetingId: meetingId,
@@ -509,7 +548,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                       final meetingId = state.pathParameters['meetingId']!;
                       final meetingData =
                           state.extra as Map<String, dynamic>?;
-                      return _noTransition(
+                      return _fadeTransition(
                         MeetingEditPage(
                           eventId: eventId,
                           meetingId: meetingId,
@@ -524,7 +563,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: '/events/:id/news',
-            pageBuilder: (context, state) => _noTransition(
+            pageBuilder: (context, state) => _fadeTransition(
               NewsPage(eventId: state.pathParameters['id']!),
             ),
             routes: [
@@ -534,7 +573,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                   final eventId = state.pathParameters['id']!;
                   final newsId = state.pathParameters['newsId']!;
                   final newsData = state.extra as Map<String, dynamic>?;
-                  return _noTransition(
+                  return _fadeTransition(
                     NewsDetailPage(
                       eventId: eventId,
                       newsId: newsId,
@@ -548,17 +587,17 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/events/:id/hotline',
             pageBuilder: (context, state) =>
-                _noTransition(const HotlinePage()),
+                _fadeTransition(const HotlinePage()),
           ),
           GoRoute(
             path: '/events/:id/faq',
-            pageBuilder: (context, state) => _noTransition(
+            pageBuilder: (context, state) => _fadeTransition(
               FAQPage(eventId: state.pathParameters['id']!),
             ),
           ),
           GoRoute(
             path: '/events/:id/feedback',
-            pageBuilder: (context, state) => _noTransition(
+            pageBuilder: (context, state) => _fadeTransition(
               FeedbackPage(eventId: state.pathParameters['id']!),
             ),
           ),
@@ -566,7 +605,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/events/:id/transfer',
             pageBuilder: (context, state) {
               final idStr = state.pathParameters['id']!;
-              return _noTransition(
+              return _fadeTransition(
                 TransferPage(eventId: int.tryParse(idStr) ?? 0),
               );
             },
@@ -575,7 +614,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/events/:id/flights',
             pageBuilder: (context, state) {
               final idStr = state.pathParameters['id']!;
-              return _noTransition(
+              return _fadeTransition(
                 FlightsPage(eventId: int.tryParse(idStr)),
               );
             },
@@ -587,7 +626,7 @@ final routerProvider = Provider<GoRouter>((ref) {
               final participantId =
                   state.pathParameters['participantId']!;
               final visaId = state.uri.queryParameters['visaId'];
-              return _noTransition(
+              return _fadeTransition(
                 VisaApplicationFormPage(
                   eventId: int.tryParse(eventIdStr) ?? 0,
                   participantId: participantId,
@@ -602,7 +641,7 @@ final routerProvider = Provider<GoRouter>((ref) {
               final eventIdStr = state.pathParameters['id']!;
               final participantId =
                   state.pathParameters['participantId']!;
-              return _noTransition(
+              return _fadeTransition(
                 VisaStatusPage(
                   eventId: int.tryParse(eventIdStr) ?? 0,
                   participantId: participantId,
@@ -616,7 +655,7 @@ final routerProvider = Provider<GoRouter>((ref) {
               final eventIdStr = state.pathParameters['id']!;
               final participantId =
                   state.pathParameters['participantId']!;
-              return _noTransition(
+              return _fadeTransition(
                 VisaDetailsPage(
                   eventId: int.tryParse(eventIdStr) ?? 0,
                   participantId: participantId,

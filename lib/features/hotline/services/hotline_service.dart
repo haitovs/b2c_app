@@ -73,12 +73,11 @@ class HotlineService {
     return result.isSuccess;
   }
 
-  /// Get WebSocket URL for real-time chat
+  /// Get WebSocket URL for real-time chat with token as query param.
   Future<String?> getWebSocketUrl() async {
     final token = await _tokenProvider.getToken();
     if (token == null) return null;
-    // Convert http(s) to ws(s)
     final wsUrl = AppConfig.b2cApiBaseUrl.replaceFirst('http', 'ws');
-    return '$wsUrl/api/v1/chat/ws?token=$token';
+    return '$wsUrl/api/v1/chat/ws?token=${Uri.encodeComponent(token)}';
   }
 }

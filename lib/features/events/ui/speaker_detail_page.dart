@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../analytics/providers/analytics_providers.dart';
 
 /// Speaker detail / profile page — rendered inside EventShellLayout.
 /// Matches Figma: breadcrumb top, photo left + info card right (desktop),
@@ -36,11 +37,23 @@ class _SpeakerDetailPageState extends ConsumerState<SpeakerDetailPage> {
   @override
   void initState() {
     super.initState();
+    _trackView();
     if (widget.speakerData != null) {
       _speaker = widget.speakerData;
       _isLoading = false;
     } else {
       _fetchSpeaker();
+    }
+  }
+
+  void _trackView() {
+    final eventId = int.tryParse(widget.eventId) ?? 0;
+    if (eventId > 0) {
+      ref.read(analyticsServiceProvider).recordView(
+            targetType: 'USER',
+            targetId: widget.speakerId,
+            eventId: eventId,
+          );
     }
   }
 

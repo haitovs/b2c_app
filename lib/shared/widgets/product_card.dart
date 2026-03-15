@@ -39,24 +39,15 @@ class ProductCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasDiscount = discountPercent > 0;
 
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(5),
-      child: InkWell(
-        onTap: onTap,
+    return RepaintBoundary(
+      child: Material(
+        color: Colors.white,
         borderRadius: BorderRadius.circular(5),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(5),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.25),
-                blurRadius: 5,
-                offset: const Offset(0, 1),
-              ),
-            ],
-          ),
+        elevation: 2,
+        shadowColor: Colors.black.withValues(alpha: 0.5),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(5),
           child: Padding(
             padding: const EdgeInsets.all(10),
             child: Column(
@@ -79,7 +70,14 @@ class ProductCard extends StatelessWidget {
                           ? Image.network(
                               imageUrl!,
                               fit: BoxFit.cover,
+                              cacheWidth: 300,
                               errorBuilder: (_, __, ___) => _placeholder(),
+                              frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+                                if (wasSynchronouslyLoaded || frame != null) {
+                                  return child;
+                                }
+                                return _placeholder();
+                              },
                             )
                           : _placeholder(),
                     ),

@@ -8,7 +8,6 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 
 import '../../../core/config/app_config.dart';
-import '../../../core/providers/event_context_provider.dart';
 import '../../../core/theme/app_theme.dart';
 
 /// News Detail Page — displays a full news article inside the EventShellLayout.
@@ -45,12 +44,9 @@ class _NewsDetailPageState extends ConsumerState<NewsDetailPage> {
 
   Future<void> _fetchNewsDetail() async {
     try {
-      final siteId = ref.read(eventContextProvider).siteId;
-      final uri = siteId != null
-          ? Uri.parse(
-              '${AppConfig.tourismApiBaseUrl}/news/${widget.newsId}?site_id=$siteId',
-            )
-          : Uri.parse('${AppConfig.tourismApiBaseUrl}/news/${widget.newsId}');
+      final uri = Uri.parse(
+        '${AppConfig.b2cApiBaseUrl}/api/v1/content/news/${widget.newsId}',
+      );
 
       final response = await http.get(uri);
       if (!mounted) return;
@@ -71,7 +67,7 @@ class _NewsDetailPageState extends ConsumerState<NewsDetailPage> {
   String _buildImageUrl(String? path) {
     if (path == null || path.isEmpty) return '';
     if (path.startsWith('http')) return path;
-    return '${AppConfig.tourismApiBaseUrl}$path';
+    return '${AppConfig.b2cApiBaseUrl}$path';
   }
 
   String _formatDate(String? dateStr) {
@@ -183,8 +179,10 @@ class _NewsDetailPageState extends ConsumerState<NewsDetailPage> {
     final imageUrl = _buildImageUrl(_news!['photo']);
     final header = (_news!['header'] ?? 'No Title').toString();
     final description = (_news!['description'] ?? '').toString();
+    final content = (_news!['content'] ?? '').toString();
     final category = (_news!['category'] ?? 'News').toString();
     final createdAt = _formatDate(_news!['created_at']?.toString());
+    final bodyText = content.isNotEmpty ? content : description;
 
     return Container(
       padding: const EdgeInsets.all(24),
@@ -232,7 +230,7 @@ class _NewsDetailPageState extends ConsumerState<NewsDetailPage> {
               ),
               const SizedBox(width: 24),
 
-              // Excerpt text on right side of image
+              // Description excerpt on right side of image
               Expanded(
                 child: Text(
                   description,
@@ -254,9 +252,9 @@ class _NewsDetailPageState extends ConsumerState<NewsDetailPage> {
           _buildMeta(category, createdAt),
           const SizedBox(height: 20),
 
-          // Full description below — full width
+          // Full article content below — full width
           Text(
-            description,
+            bodyText,
             style: GoogleFonts.inter(
               fontSize: 15,
               fontWeight: FontWeight.w400,
@@ -277,8 +275,10 @@ class _NewsDetailPageState extends ConsumerState<NewsDetailPage> {
     final imageUrl = _buildImageUrl(_news!['photo']);
     final header = (_news!['header'] ?? 'No Title').toString();
     final description = (_news!['description'] ?? '').toString();
+    final content = (_news!['content'] ?? '').toString();
     final category = (_news!['category'] ?? 'News').toString();
     final createdAt = _formatDate(_news!['created_at']?.toString());
+    final bodyText = content.isNotEmpty ? content : description;
 
     return Container(
       decoration: BoxDecoration(
@@ -326,9 +326,9 @@ class _NewsDetailPageState extends ConsumerState<NewsDetailPage> {
                 ),
                 const SizedBox(height: 16),
 
-                // Body
+                // Body — show full content, fall back to description
                 Text(
-                  description,
+                  bodyText,
                   style: GoogleFonts.inter(
                     fontSize: 15,
                     fontWeight: FontWeight.w400,

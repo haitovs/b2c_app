@@ -12,6 +12,7 @@ import '../../features/company/models/company.dart';
 import '../../features/company/providers/company_providers.dart';
 import '../../features/events/ui/widgets/profile_dropdown.dart';
 import '../../features/notifications/providers/notification_providers.dart';
+import '../../features/notifications/ui/notification_drawer.dart';
 import '../../features/shop/providers/shop_providers.dart';
 import '../../features/team/providers/team_providers.dart';
 
@@ -108,6 +109,7 @@ class _DesktopShell extends ConsumerStatefulWidget {
 
 class _DesktopShellState extends ConsumerState<_DesktopShell>
     with SingleTickerProviderStateMixin {
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
   bool _isProfileOpen = false;
   bool _isSidebarCollapsed = false;
 
@@ -169,7 +171,9 @@ class _DesktopShellState extends ConsumerState<_DesktopShell>
   Widget build(BuildContext context) {
 
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor: AppTheme.backgroundColor,
+      endDrawer: const NotificationDrawer(),
       body: Stack(
         children: [
           // Main content
@@ -181,6 +185,9 @@ class _DesktopShellState extends ConsumerState<_DesktopShell>
                 logoUrl: widget.logoUrl,
                 unreadCount: widget.unreadCount,
                 onProfileTap: _toggleProfile,
+                onNotificationTap: () {
+                  _scaffoldKey.currentState?.openEndDrawer();
+                },
               ),
               Expanded(
                 child: Padding(
@@ -189,44 +196,32 @@ class _DesktopShellState extends ConsumerState<_DesktopShell>
                     children: [
                       AnimatedBuilder(
                         animation: _sidebarWidth,
-                        builder: (context, child) => Container(
+                        builder: (context, child) => SizedBox(
                           width: _sidebarWidth.value,
-                          decoration: BoxDecoration(
+                          child: Material(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.08),
-                                blurRadius: 16,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          clipBehavior: Clip.antiAlias,
-                          child: _EventSidebar(
-                            eventId: widget.eventId,
-                            eventIdInt: widget.eventIdInt,
-                            currentPath: widget.currentPath,
-                            isCollapsed: _showCollapsedContent,
-                            onToggleCollapse: _toggleSidebar,
+                            elevation: 4,
+                            shadowColor: Colors.black.withValues(alpha: 0.2),
+                            clipBehavior: Clip.hardEdge,
+                            child: _EventSidebar(
+                              eventId: widget.eventId,
+                              eventIdInt: widget.eventIdInt,
+                              currentPath: widget.currentPath,
+                              isCollapsed: _showCollapsedContent,
+                              onToggleCollapse: _toggleSidebar,
+                            ),
                           ),
                         ),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.08),
-                                blurRadius: 16,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          clipBehavior: Clip.antiAlias,
+                        child: Material(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          elevation: 4,
+                          shadowColor: Colors.black.withValues(alpha: 0.2),
+                          clipBehavior: Clip.hardEdge,
                           child: widget.child,
                         ),
                       ),
@@ -308,6 +303,7 @@ class _MobileShellState extends ConsumerState<_MobileShell> {
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: AppTheme.backgroundColor,
+      endDrawer: const NotificationDrawer(),
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(64),
         child: _EventTopBar(
@@ -321,6 +317,9 @@ class _MobileShellState extends ConsumerState<_MobileShell> {
             _scaffoldKey.currentState?.openDrawer();
           },
           onProfileTap: _toggleProfile,
+          onNotificationTap: () {
+            _scaffoldKey.currentState?.openEndDrawer();
+          },
         ),
       ),
       drawer: Drawer(
@@ -381,6 +380,7 @@ class _EventTopBar extends StatelessWidget {
   final bool showMenuButton;
   final VoidCallback? onMenuPressed;
   final VoidCallback? onProfileTap;
+  final VoidCallback? onNotificationTap;
 
   const _EventTopBar({
     required this.eventName,
@@ -390,6 +390,7 @@ class _EventTopBar extends StatelessWidget {
     this.showMenuButton = false,
     this.onMenuPressed,
     this.onProfileTap,
+    this.onNotificationTap,
   });
 
   @override
@@ -472,7 +473,7 @@ class _EventTopBar extends StatelessWidget {
               ),
             ),
             tooltip: 'Notifications',
-            onPressed: () {},
+            onPressed: onNotificationTap,
           ),
           const SizedBox(width: 4),
           // Profile
@@ -684,7 +685,7 @@ class _EventSidebarState extends ConsumerState<_EventSidebar> {
             _buildSubItem(
               context,
               label: 'Meetings',
-              path: '$basePath/schedule',
+              path: '$basePath/meetings',
               isActive: path.startsWith('$basePath/schedule') ||
                   path.startsWith('$basePath/meetings'),
             ),
@@ -864,7 +865,9 @@ class _EventSidebarState extends ConsumerState<_EventSidebar> {
             }
             onToggle();
           },
-          child: Container(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeInOut,
             decoration: BoxDecoration(
               border: Border(
                 left: BorderSide(
@@ -891,8 +894,8 @@ class _EventSidebarState extends ConsumerState<_EventSidebar> {
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Text(
-                    label,
+                  child: AnimatedDefaultTextStyle(
+                    duration: const Duration(milliseconds: 200),
                     style: GoogleFonts.inter(
                       fontSize: 14,
                       fontWeight: isGroupActive ? FontWeight.w600 : FontWeight.w400,
@@ -902,6 +905,7 @@ class _EventSidebarState extends ConsumerState<_EventSidebar> {
                               ? AppTheme.primaryColor
                               : Colors.black87,
                     ),
+                    child: Text(label),
                   ),
                 ),
                 if (isLocked)
@@ -957,7 +961,9 @@ class _EventSidebarState extends ConsumerState<_EventSidebar> {
               widget.onItemTap?.call();
               context.go(path);
             },
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeInOut,
         decoration: BoxDecoration(
           border: Border(
             left: BorderSide(
@@ -973,13 +979,14 @@ class _EventSidebarState extends ConsumerState<_EventSidebar> {
         child: Row(
           children: [
             Expanded(
-              child: Text(
-                label,
+              child: AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 200),
                 style: GoogleFonts.inter(
                   fontSize: 13,
                   fontWeight: isActive && !comingSoon ? FontWeight.w600 : FontWeight.w400,
                   color: textColor,
                 ),
+                child: Text(label),
               ),
             ),
             if (comingSoon)
@@ -1359,7 +1366,9 @@ class _NavItem extends StatelessWidget {
         preferBelow: false,
         child: InkWell(
           onTap: onTap,
-          child: Container(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeInOut,
             decoration: BoxDecoration(
               border: Border(
                 left: BorderSide(
@@ -1395,7 +1404,9 @@ class _NavItem extends StatelessWidget {
 
     return InkWell(
       onTap: onTap,
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeInOut,
         decoration: BoxDecoration(
           border: Border(
             left: BorderSide(
@@ -1420,13 +1431,14 @@ class _NavItem extends StatelessWidget {
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(
-                label,
+              child: AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 200),
                 style: GoogleFonts.inter(
                   fontSize: 14,
                   fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
                   color: textColor,
                 ),
+                child: Text(label),
               ),
             ),
             if (isLocked)

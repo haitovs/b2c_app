@@ -12,11 +12,13 @@ import '../../../core/config/app_config.dart';
 import '../../../core/providers/event_context_provider.dart';
 import '../../../core/widgets/app_snackbar.dart';
 import '../../../core/widgets/app_text_field.dart';
+import '../../team/providers/team_providers.dart';
+import '../../team/models/team_member.dart';
 import '../providers/meeting_providers.dart';
-import '../services/meeting_service.dart';
 
 /// B2G Meeting Request Page - for creating a meeting with government entities.
-/// Rendered inside EventShellLayout (sidebar/topbar provided).
+/// Features: Our Attendees (autocomplete + custom), Meeting With (name/surname/position),
+/// Language multi-select with flags, Subject, Date/Time, Location, Message.
 class MeetingB2GRequestPage extends ConsumerStatefulWidget {
   final String eventId;
   final String govEntityId;
@@ -38,36 +40,44 @@ class _MeetingB2GRequestPageState
     extends ConsumerState<MeetingB2GRequestPage> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
-  // Form controllers
+  // Subject + Message
   final TextEditingController _subjectController = TextEditingController();
   final TextEditingController _messageController = TextEditingController();
 
-  // Attendee list (dynamic)
-  final List<TextEditingController> _attendeeControllers = [
-    TextEditingController(),
+  // Our Attendees
+  final List<TeamMember> _selectedAttendees = [];
+  final List<String> _customAttendees = [];
+
+  // Meeting With
+  final TextEditingController _meetingWithNameController =
+      TextEditingController();
+  final TextEditingController _meetingWithSurnameController =
+      TextEditingController();
+  final TextEditingController _meetingWithPositionController =
+      TextEditingController();
+
+  // Location
+  String? _selectedLocation;
+
+  // Language multi-select
+  final Set<String> _selectedLanguages = {'EN'};
+  static const _languageOptions = [
+    {'code': 'EN', 'flag': '🇬🇧', 'label': 'English'},
+    {'code': 'RU', 'flag': '🇷🇺', 'label': 'Russian'},
+    {'code': 'TK', 'flag': '🇹🇲', 'label': 'Turkmen'},
   ];
 
-  // Meeting with list (dynamic) - officials/positions
-  final List<TextEditingController> _meetingWithControllers = [
-    TextEditingController(),
-  ];
-
-  // Language dropdown
-  String _selectedLanguage = 'EN';
-  static const _languages = ['EN', 'RU', 'TK'];
-
-  // Agenda days dropdown
+  // Agenda days
   List<Map<String, dynamic>> _agendaDays = [];
   Map<String, dynamic>? _selectedDay;
 
-  // Date and time (manual pickers as fallback when no agenda days)
+  // Date and time (fallback when no agenda days)
   DateTime? _selectedDate;
   TimeOfDay? _selectedTime;
 
   // Data
   Map<String, dynamic>? _govEntity;
   bool _isLoading = true;
-  bool _isSubmitting = false;
 
   @override
   void initState() {
@@ -125,49 +135,25 @@ class _MeetingB2GRequestPageState
   void dispose() {
     _subjectController.dispose();
     _messageController.dispose();
-    for (var c in _attendeeControllers) {
-      c.dispose();
-    }
-    for (var c in _meetingWithControllers) {
-      c.dispose();
-    }
+    _meetingWithNameController.dispose();
+    _meetingWithSurnameController.dispose();
+    _meetingWithPositionController.dispose();
     super.dispose();
-  }
-
-  // ── Dynamic list helpers ──────────────────────────────────────────────
-
-  void _addAttendee() {
-    setState(() => _attendeeControllers.add(TextEditingController()));
-  }
-
-  void _removeAttendee(int index) {
-    if (_attendeeControllers.length > 1) {
-      setState(() {
-        _attendeeControllers[index].dispose();
-        _attendeeControllers.removeAt(index);
-      });
-    }
-  }
-
-  void _addMeetingWith() {
-    setState(() => _meetingWithControllers.add(TextEditingController()));
-  }
-
-  void _removeMeetingWith(int index) {
-    if (_meetingWithControllers.length > 1) {
-      setState(() {
-        _meetingWithControllers[index].dispose();
-        _meetingWithControllers.removeAt(index);
-      });
-    }
   }
 
   // ── Submit ────────────────────────────────────────────────────────────
 
-  Future<void> _submitRequest() async {
+  void _submitRequest() {
     if (!_formKey.currentState!.validate()) return;
 
-    // Determine start/end time from agenda day or manual pickers
+    // Validate position is required for Meeting With
+    if (_meetingWithPositionController.text.trim().isEmpty) {
+      AppSnackBar.showWarning(
+          context, 'Please enter the position of the person you want to meet');
+      return;
+    }
+
+    // Determine start/end time
     DateTime startTime;
     DateTime endTime;
 
@@ -201,38 +187,64 @@ class _MeetingB2GRequestPageState
       endTime = startTime.add(const Duration(hours: 1));
     }
 
-    setState(() => _isSubmitting = true);
+    // Build attendees text from selected team members + custom entries
+    final attendeeNames = [
+      ..._selectedAttendees.map((m) => m.fullName),
+      ..._customAttendees,
+    ];
+    final attendeesText =
+        attendeeNames.isNotEmpty ? attendeeNames.join(', ') : null;
 
-    try {
-      final meetingService = ref.read(meetingServiceProvider);
-
-      final attendeesText = _attendeeControllers
-          .map((c) => c.text.trim())
-          .where((t) => t.isNotEmpty)
-          .join(', ');
-
-      await meetingService.createMeeting(
-        eventId: int.parse(widget.eventId),
-        type: MeetingType.b2g,
-        subject: _subjectController.text.trim(),
-        startTime: startTime,
-        endTime: endTime,
-        location: 'Ashgabat, TKM',
-        targetGovEntityId: int.tryParse(widget.govEntityId),
-        attendeesText: attendeesText.isEmpty ? null : attendeesText,
-      );
-
-      if (mounted) {
-        AppSnackBar.showSuccess(context, 'Meeting request sent successfully!');
-        context.pop(true);
-      }
-    } catch (e) {
-      if (mounted) {
-        AppSnackBar.showError(context, 'Failed to send request: $e');
-      }
-    } finally {
-      if (mounted) setState(() => _isSubmitting = false);
+    // Build "Meeting With" display info
+    final meetingWithName = _meetingWithNameController.text.trim();
+    final meetingWithSurname = _meetingWithSurnameController.text.trim();
+    final meetingWithPosition = _meetingWithPositionController.text.trim();
+    final meetingWithParts = <String>[];
+    if (meetingWithName.isNotEmpty || meetingWithSurname.isNotEmpty) {
+      meetingWithParts.add('$meetingWithName $meetingWithSurname'.trim());
     }
+    meetingWithParts.add(meetingWithPosition);
+    final meetingWithDisplay = meetingWithParts.join(', ');
+
+    final userMessage = _messageController.text.trim();
+    final fullMessage = [
+      'Meeting with: $meetingWithDisplay',
+      if (userMessage.isNotEmpty) userMessage,
+    ].join('\n\n');
+
+    // Language as comma-separated codes and display names
+    final languageText = _selectedLanguages.isNotEmpty
+        ? _selectedLanguages.join(', ')
+        : null;
+    final languageDisplay = _selectedLanguages
+        .map((code) {
+          final opt = _languageOptions.firstWhere((o) => o['code'] == code);
+          return opt['label'];
+        })
+        .join(', ');
+
+    final confirmData = <String, dynamic>{
+      'meeting_type': 'b2g',
+      'event_id': int.parse(widget.eventId),
+      'subject': _subjectController.text.trim(),
+      'start_time': startTime,
+      'end_time': endTime,
+      'location': _selectedLocation,
+      'target_gov_entity_id': int.tryParse(widget.govEntityId),
+      'attendees_text': attendeesText,
+      'language': languageText,
+      'language_display': languageDisplay,
+      'message': fullMessage,
+      'message_display': userMessage,
+      'meeting_with_display': meetingWithDisplay,
+      // Display data for the confirmation card
+      'target_display': _govEntity,
+    };
+
+    context.push(
+      '/events/${widget.eventId}/meetings/confirm',
+      extra: confirmData,
+    );
   }
 
   // ── Pickers ───────────────────────────────────────────────────────────
@@ -244,41 +256,31 @@ class _MeetingB2GRequestPageState
       initialDate: _selectedDate ?? now,
       firstDate: now,
       lastDate: DateTime(2050),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme:
-                const ColorScheme.light(primary: AppColors.gradientStart),
-          ),
-          child: child!,
-        );
-      },
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme:
+              const ColorScheme.light(primary: AppColors.gradientStart),
+        ),
+        child: child!,
+      ),
     );
-    if (picked != null && mounted) {
-      setState(() => _selectedDate = picked);
-    }
+    if (picked != null && mounted) setState(() => _selectedDate = picked);
   }
 
   Future<void> _pickTime() async {
     final picked = await showTimePicker(
       context: context,
       initialTime: _selectedTime ?? const TimeOfDay(hour: 9, minute: 0),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme:
-                const ColorScheme.light(primary: AppColors.gradientStart),
-          ),
-          child: child!,
-        );
-      },
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme:
+              const ColorScheme.light(primary: AppColors.gradientStart),
+        ),
+        child: child!,
+      ),
     );
-    if (picked != null && mounted) {
-      setState(() => _selectedTime = picked);
-    }
+    if (picked != null && mounted) setState(() => _selectedTime = picked);
   }
-
-  // ── Image URL helper ──────────────────────────────────────────────────
 
   String _buildImageUrl(String? imagePath) {
     if (imagePath == null || imagePath.isEmpty) return '';
@@ -306,7 +308,6 @@ class _MeetingB2GRequestPageState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Title
           Text(
             'Meetings',
             style: GoogleFonts.montserrat(
@@ -319,8 +320,6 @@ class _MeetingB2GRequestPageState
           const Divider(
               height: 0.5, thickness: 0.5, color: Color(0xFFCACACA)),
           const SizedBox(height: 24),
-
-          // Two cards side by side (desktop) or stacked (mobile)
           if (isDesktop)
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -354,9 +353,9 @@ class _MeetingB2GRequestPageState
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: const BorderRadius.only(
-          topRight: Radius.circular(5),
-          bottomLeft: Radius.circular(5),
-          bottomRight: Radius.circular(5),
+          topRight: Radius.circular(8),
+          bottomLeft: Radius.circular(8),
+          bottomRight: Radius.circular(8),
         ),
         boxShadow: const [
           BoxShadow(color: Color(0x40000000), blurRadius: 10),
@@ -430,36 +429,24 @@ class _MeetingB2GRequestPageState
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(5),
+        borderRadius: BorderRadius.circular(8),
         boxShadow: const [
           BoxShadow(color: Color(0x40000000), blurRadius: 10),
         ],
       ),
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       child: Form(
         key: _formKey,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Attendee section
-            _buildDynamicSection(
-              label: 'Attendee:',
-              controllers: _attendeeControllers,
-              hintText: 'Name & Surname',
-              onAdd: _addAttendee,
-              onRemove: _removeAttendee,
-            ),
-            const SizedBox(height: 16),
+            // Our Attendees
+            _buildAttendeesSection(),
+            const SizedBox(height: 20),
 
-            // Meeting with section
-            _buildDynamicSection(
-              label: 'Meeting with:',
-              controllers: _meetingWithControllers,
-              hintText: 'Position',
-              onAdd: _addMeetingWith,
-              onRemove: _removeMeetingWith,
-            ),
-            const SizedBox(height: 16),
+            // Meeting With
+            _buildMeetingWithSection(),
+            const SizedBox(height: 20),
 
             // Subject
             AppTextField(
@@ -467,9 +454,9 @@ class _MeetingB2GRequestPageState
               hintText: 'Enter subject...',
               controller: _subjectController,
               required: true,
-              borderRadius: 5,
+              borderRadius: 8,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
 
             // Day or Date+Time
             if (_agendaDays.isNotEmpty)
@@ -495,20 +482,24 @@ class _MeetingB2GRequestPageState
                   );
                 },
               ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
+
+            // Location
+            _buildLocationDropdown(),
+            const SizedBox(height: 20),
 
             // Language
-            _buildLanguageDropdown(),
-            const SizedBox(height: 16),
+            _buildLanguageMultiSelect(),
+            const SizedBox(height: 20),
 
             // Message
             AppTextField(
               labelText: 'Message:',
               hintText: 'Enter message...',
               controller: _messageController,
-              maxLines: 6,
-              height: 160,
-              borderRadius: 5,
+              minLines: 4,
+              maxLines: null,
+              borderRadius: 8,
             ),
             const SizedBox(height: 24),
 
@@ -520,67 +511,436 @@ class _MeetingB2GRequestPageState
     );
   }
 
-  // ── Dynamic list section ──────────────────────────────────────────────
+  // ── Our Attendees Section ─────────────────────────────────────────────
 
-  Widget _buildDynamicSection({
-    required String label,
-    required List<TextEditingController> controllers,
-    required String hintText,
-    required VoidCallback onAdd,
-    required void Function(int) onRemove,
-  }) {
+  Widget _buildAttendeesSection() {
+    final eventId = int.tryParse(widget.eventId);
+    final teamMembersAsync = eventId != null
+        ? ref.watch(allTeamMembersProvider(eventId))
+        : null;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(bottom: 6, left: 4),
-          child: Text(label, style: AppTextStyles.label),
+          padding: const EdgeInsets.only(bottom: 8, left: 4),
+          child: Text('Our Attendees:', style: AppTextStyles.label),
         ),
-        ...List.generate(controllers.length, (index) {
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 8),
+
+        // Unified autocomplete: shows team members as suggestions, allows custom text entry
+        if (teamMembersAsync != null)
+          teamMembersAsync.when(
+            data: (members) {
+              final available = members.where(
+                (m) => !_selectedAttendees.any((s) => s.id == m.id),
+              ).toList();
+
+              return _UnifiedAttendeeAutocomplete(
+                available: available,
+                onTeamMemberSelected: (member) {
+                  setState(() => _selectedAttendees.add(member));
+                },
+                onCustomAttendeeAdded: (name) {
+                  setState(() => _customAttendees.add(name));
+                },
+              );
+            },
+            loading: () => Container(
+              height: 48,
+              decoration: BoxDecoration(
+                border: Border.all(color: AppColors.inputBorder),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Center(
+                child: SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            ),
+            error: (_, __) => const SizedBox.shrink(),
+          ),
+
+        // Selected team member chips
+        if (_selectedAttendees.isNotEmpty || _customAttendees.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: [
+              ..._selectedAttendees.map((m) {
+                return Chip(
+                  label: Text(m.fullName, style: AppTextStyles.inputText),
+                  deleteIcon:
+                      const Icon(Icons.close, size: 16, color: Colors.grey),
+                  onDeleted: () {
+                    setState(() => _selectedAttendees.remove(m));
+                  },
+                  backgroundColor: AppColors.cardBackground,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    side: const BorderSide(color: AppColors.inputBorder),
+                  ),
+                );
+              }),
+              ..._customAttendees.asMap().entries.map((entry) {
+                return Chip(
+                  label: Text(entry.value, style: AppTextStyles.inputText),
+                  deleteIcon:
+                      const Icon(Icons.close, size: 16, color: Colors.grey),
+                  onDeleted: () {
+                    setState(() => _customAttendees.removeAt(entry.key));
+                  },
+                  backgroundColor: const Color(0xFFFFF8E1),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    side: BorderSide(color: Colors.amber.shade300),
+                  ),
+                );
+              }),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
+  // ── Meeting With Section ──────────────────────────────────────────────
+
+  Widget _buildMeetingWithSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8, left: 4),
+          child: Text('Meeting With:', style: AppTextStyles.label),
+        ),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            border: Border.all(color: AppColors.inputBorder),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            children: [
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  if (constraints.maxWidth > 500) {
+                    return Row(
+                      children: [
+                        Expanded(
+                          child: AppTextField(
+                            labelText: 'Name:',
+                            hintText: 'Name (optional)',
+                            controller: _meetingWithNameController,
+                            borderRadius: 8,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: AppTextField(
+                            labelText: 'Surname:',
+                            hintText: 'Surname (optional)',
+                            controller: _meetingWithSurnameController,
+                            borderRadius: 8,
+                          ),
+                        ),
+                      ],
+                    );
+                  }
+                  return Column(
+                    children: [
+                      AppTextField(
+                        labelText: 'Name:',
+                        hintText: 'Name (optional)',
+                        controller: _meetingWithNameController,
+                        borderRadius: 8,
+                      ),
+                      const SizedBox(height: 16),
+                      AppTextField(
+                        labelText: 'Surname:',
+                        hintText: 'Surname (optional)',
+                        controller: _meetingWithSurnameController,
+                        borderRadius: 8,
+                      ),
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
+              AppTextField(
+                labelText: 'Position:',
+                hintText: 'Enter position...',
+                controller: _meetingWithPositionController,
+                required: true,
+                borderRadius: 8,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Language Multi-Select ─────────────────────────────────────────────
+
+  Widget _buildLanguageMultiSelect() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8, left: 4),
+          child: Text('Language of meeting:', style: AppTextStyles.label),
+        ),
+        GestureDetector(
+          onTap: _showLanguagePicker,
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 48),
+            decoration: BoxDecoration(
+              border: Border.all(color: AppColors.inputBorder),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             child: Row(
               children: [
                 Expanded(
-                  child: Container(
-                    height: 48,
-                    decoration: BoxDecoration(
-                      border: Border.all(color: AppColors.inputBorder),
-                      borderRadius: BorderRadius.circular(5),
+                  child: _selectedLanguages.isEmpty
+                      ? Text('Select languages...',
+                          style: AppTextStyles.placeholder)
+                      : Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          children: _selectedLanguages.map((code) {
+                            final opt = _languageOptions.firstWhere(
+                              (o) => o['code'] == code,
+                            );
+                            return Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: AppColors.gradientStart
+                                    .withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                '${opt['flag']} ${opt['label']}',
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppColors.gradientStart,
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                ),
+                Icon(Icons.keyboard_arrow_down,
+                    color: AppColors.textPlaceholder),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showLanguagePicker() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Select Languages',
+                    style: GoogleFonts.montserrat(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.gradientStart,
                     ),
-                    child: TextField(
-                      controller: controllers[index],
-                      style: AppTextStyles.inputText,
-                      decoration: InputDecoration(
-                        hintText: hintText,
-                        hintStyle: AppTextStyles.placeholder,
-                        border: InputBorder.none,
-                        contentPadding:
-                            const EdgeInsets.symmetric(horizontal: 14),
+                  ),
+                  const SizedBox(height: 16),
+                  ..._languageOptions.map((opt) {
+                    final code = opt['code']!;
+                    final isSelected = _selectedLanguages.contains(code);
+                    return ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Text(opt['flag']!,
+                          style: const TextStyle(fontSize: 28)),
+                      title: Text(
+                        '${opt['label']} (${opt['code']})',
+                        style: GoogleFonts.inter(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      trailing: Checkbox(
+                        value: isSelected,
+                        activeColor: AppColors.gradientStart,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        onChanged: (value) {
+                          setSheetState(() {
+                            if (value == true) {
+                              _selectedLanguages.add(code);
+                            } else {
+                              _selectedLanguages.remove(code);
+                            }
+                          });
+                          setState(() {});
+                        },
+                      ),
+                      onTap: () {
+                        setSheetState(() {
+                          if (isSelected) {
+                            _selectedLanguages.remove(code);
+                          } else {
+                            _selectedLanguages.add(code);
+                          }
+                        });
+                        setState(() {});
+                      },
+                    );
+                  }),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.gradientStart,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: Text(
+                        'Done',
+                        style: GoogleFonts.inter(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
                   ),
+                  SizedBox(
+                      height: MediaQuery.of(context).viewPadding.bottom + 8),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // ── Location dropdown ─────────────────────────────────────────────────
+
+  Widget _buildLocationDropdown() {
+    final eventId = int.tryParse(widget.eventId);
+    if (eventId == null) return const SizedBox.shrink();
+
+    final locationsAsync = ref.watch(meetingLocationsProvider(eventId));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8, left: 4),
+          child: Text('Location:', style: AppTextStyles.label),
+        ),
+        locationsAsync.when(
+          data: (locations) {
+            if (locations.isEmpty) {
+              return Container(
+                height: 48,
+                decoration: BoxDecoration(
+                  border: Border.all(color: AppColors.inputBorder),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                const SizedBox(width: 8),
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    border: Border.all(color: AppColors.inputBorder),
-                    borderRadius: BorderRadius.circular(5),
-                  ),
-                  child: IconButton(
-                    onPressed: index == 0 ? onAdd : () => onRemove(index),
-                    icon: Icon(
-                      index == 0 ? Icons.add : Icons.remove,
-                      color: AppColors.textPlaceholder,
-                    ),
-                  ),
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                alignment: Alignment.centerLeft,
+                child: Text('No locations available',
+                    style: AppTextStyles.placeholder),
+              );
+            }
+            final locationNames =
+                locations.map((l) => l['name'] as String).toList();
+            final effectiveValue = locationNames.contains(_selectedLocation)
+                ? _selectedLocation
+                : null;
+            return Container(
+              height: 48,
+              decoration: BoxDecoration(
+                border: Border.all(color: AppColors.inputBorder),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: effectiveValue,
+                  isExpanded: true,
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  hint: Text('Select location...',
+                      style: AppTextStyles.placeholder),
+                  icon: Icon(Icons.keyboard_arrow_down,
+                      color: AppColors.textPlaceholder),
+                  items: locations.map<DropdownMenuItem<String>>((loc) {
+                    final name = loc['name'] as String;
+                    final desc = loc['description'] as String?;
+                    return DropdownMenuItem(
+                      value: name,
+                      child: Text(
+                        desc != null && desc.isNotEmpty
+                            ? '$name - $desc'
+                            : name,
+                        style: AppTextStyles.inputText,
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (value) =>
+                      setState(() => _selectedLocation = value),
                 ),
-              ],
+              ),
+            );
+          },
+          loading: () => Container(
+            height: 48,
+            decoration: BoxDecoration(
+              border: Border.all(color: AppColors.inputBorder),
+              borderRadius: BorderRadius.circular(8),
             ),
-          );
-        }),
+            child: const Center(
+              child: SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+          ),
+          error: (_, __) => Container(
+            height: 48,
+            decoration: BoxDecoration(
+              border: Border.all(color: AppColors.inputBorder),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            alignment: Alignment.centerLeft,
+            child: Text('Failed to load locations',
+                style: AppTextStyles.placeholder),
+          ),
+        ),
       ],
     );
   }
@@ -592,24 +952,22 @@ class _MeetingB2GRequestPageState
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(bottom: 6, left: 4),
+          padding: const EdgeInsets.only(bottom: 8, left: 4),
           child: Text('Meeting day:', style: AppTextStyles.label),
         ),
         Container(
           height: 48,
           decoration: BoxDecoration(
             border: Border.all(color: AppColors.inputBorder),
-            borderRadius: BorderRadius.circular(5),
+            borderRadius: BorderRadius.circular(8),
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<Map<String, dynamic>>(
               value: _selectedDay,
               isExpanded: true,
               padding: const EdgeInsets.symmetric(horizontal: 14),
-              icon: Icon(
-                Icons.keyboard_arrow_down,
-                color: AppColors.textPlaceholder,
-              ),
+              icon: Icon(Icons.keyboard_arrow_down,
+                  color: AppColors.textPlaceholder),
               items: _agendaDays.map((day) {
                 String label;
                 final date = day['date'] as String?;
@@ -617,16 +975,22 @@ class _MeetingB2GRequestPageState
                   try {
                     final dt = DateTime.parse(date);
                     final weekdays = [
-                      '', 'Monday', 'Tuesday', 'Wednesday',
-                      'Thursday', 'Friday', 'Saturday', 'Sunday',
+                      '',
+                      'Monday',
+                      'Tuesday',
+                      'Wednesday',
+                      'Thursday',
+                      'Friday',
+                      'Saturday',
+                      'Sunday',
                     ];
                     label = '${dt.day} ${weekdays[dt.weekday]}';
                   } catch (_) {
                     label = date;
                   }
                 } else {
-                  label = day['name'] ??
-                      'Day ${_agendaDays.indexOf(day) + 1}';
+                  label =
+                      day['name'] ?? 'Day ${_agendaDays.indexOf(day) + 1}';
                 }
                 return DropdownMenuItem(
                   value: day,
@@ -635,47 +999,6 @@ class _MeetingB2GRequestPageState
               }).toList(),
               onChanged: (value) {
                 if (value != null) setState(() => _selectedDay = value);
-              },
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ── Language dropdown ─────────────────────────────────────────────────
-
-  Widget _buildLanguageDropdown() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(bottom: 6, left: 4),
-          child: Text('Language of meeting:', style: AppTextStyles.label),
-        ),
-        Container(
-          height: 48,
-          decoration: BoxDecoration(
-            border: Border.all(color: AppColors.inputBorder),
-            borderRadius: BorderRadius.circular(5),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: _selectedLanguage,
-              isExpanded: true,
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              icon: Icon(
-                Icons.keyboard_arrow_down,
-                color: AppColors.textPlaceholder,
-              ),
-              items: _languages.map((lang) {
-                return DropdownMenuItem(
-                  value: lang,
-                  child: Text(lang, style: AppTextStyles.inputText),
-                );
-              }).toList(),
-              onChanged: (value) {
-                if (value != null) setState(() => _selectedLanguage = value);
               },
             ),
           ),
@@ -695,7 +1018,7 @@ class _MeetingB2GRequestPageState
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(bottom: 6, left: 4),
+          padding: const EdgeInsets.only(bottom: 8, left: 4),
           child: Text('Date:', style: AppTextStyles.label),
         ),
         GestureDetector(
@@ -705,7 +1028,7 @@ class _MeetingB2GRequestPageState
             decoration: BoxDecoration(
               color: Colors.white,
               border: Border.all(color: AppColors.inputBorder),
-              borderRadius: BorderRadius.circular(5),
+              borderRadius: BorderRadius.circular(8),
             ),
             padding: const EdgeInsets.symmetric(horizontal: 14),
             child: Row(
@@ -718,11 +1041,8 @@ class _MeetingB2GRequestPageState
                         : AppTextStyles.placeholder,
                   ),
                 ),
-                Icon(
-                  Icons.calendar_today,
-                  size: 20,
-                  color: AppColors.textPlaceholder,
-                ),
+                Icon(Icons.calendar_today,
+                    size: 20, color: AppColors.textPlaceholder),
               ],
             ),
           ),
@@ -742,7 +1062,7 @@ class _MeetingB2GRequestPageState
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(bottom: 6, left: 4),
+          padding: const EdgeInsets.only(bottom: 8, left: 4),
           child: Text('Time:', style: AppTextStyles.label),
         ),
         GestureDetector(
@@ -752,7 +1072,7 @@ class _MeetingB2GRequestPageState
             decoration: BoxDecoration(
               color: Colors.white,
               border: Border.all(color: AppColors.inputBorder),
-              borderRadius: BorderRadius.circular(5),
+              borderRadius: BorderRadius.circular(8),
             ),
             padding: const EdgeInsets.symmetric(horizontal: 14),
             child: Row(
@@ -765,11 +1085,8 @@ class _MeetingB2GRequestPageState
                         : AppTextStyles.placeholder,
                   ),
                 ),
-                Icon(
-                  Icons.access_time,
-                  size: 20,
-                  color: AppColors.textPlaceholder,
-                ),
+                Icon(Icons.access_time,
+                    size: 20, color: AppColors.textPlaceholder),
               ],
             ),
           ),
@@ -784,63 +1101,268 @@ class _MeetingB2GRequestPageState
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        SizedBox(
-          width: 183,
-          height: 43,
-          child: OutlinedButton(
-            onPressed: () => context.pop(),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFF474747),
-              side: const BorderSide(color: AppColors.inputBorder),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(5),
-              ),
-            ),
-            child: Text(
-              'Cancel',
-              style: GoogleFonts.inter(
-                fontSize: 18,
-                fontWeight: FontWeight.w500,
-                color: const Color(0xFF474747),
+        Flexible(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 183),
+            child: SizedBox(
+              height: 48,
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () => context.pop(),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF474747),
+                  side: const BorderSide(color: AppColors.inputBorder),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: Text(
+                  'Cancel',
+                  style: GoogleFonts.inter(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w500,
+                    color: const Color(0xFF474747),
+                  ),
+                ),
               ),
             ),
           ),
         ),
         const SizedBox(width: 16),
-        SizedBox(
-          width: 183,
-          height: 43,
-          child: ElevatedButton(
-            onPressed: _isSubmitting ? null : _submitRequest,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.gradientStart,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(5),
-              ),
-              elevation: 0,
-            ),
-            child: _isSubmitting
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor:
-                          AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
-                  )
-                : Text(
-                    'Send',
-                    style: GoogleFonts.inter(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.white,
-                    ),
+        Flexible(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 183),
+            child: SizedBox(
+              height: 48,
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _submitRequest,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.gradientStart,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
                   ),
+                  elevation: 0,
+                ),
+                child: Text(
+                  'Send',
+                  style: GoogleFonts.inter(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
       ],
+    );
+  }
+}
+
+/// A unified attendee input that shows team member suggestions on focus/tap
+/// and also allows typing custom attendee names.
+class _UnifiedAttendeeAutocomplete extends StatefulWidget {
+  final List<TeamMember> available;
+  final ValueChanged<TeamMember> onTeamMemberSelected;
+  final ValueChanged<String> onCustomAttendeeAdded;
+
+  const _UnifiedAttendeeAutocomplete({
+    required this.available,
+    required this.onTeamMemberSelected,
+    required this.onCustomAttendeeAdded,
+  });
+
+  @override
+  State<_UnifiedAttendeeAutocomplete> createState() =>
+      _UnifiedAttendeeAutocompleteState();
+}
+
+class _UnifiedAttendeeAutocompleteState
+    extends State<_UnifiedAttendeeAutocomplete> {
+  final TextEditingController _controller = TextEditingController();
+  final FocusNode _focusNode = FocusNode();
+  final LayerLink _layerLink = LayerLink();
+  OverlayEntry? _overlayEntry;
+  List<TeamMember> _filteredMembers = [];
+
+  static final _subtitleStyle = GoogleFonts.inter(
+    fontSize: 12,
+    color: AppColors.textSecondary,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _filteredMembers = widget.available;
+    _focusNode.addListener(_onFocusChanged);
+    _controller.addListener(_onTextChanged);
+  }
+
+  @override
+  void didUpdateWidget(covariant _UnifiedAttendeeAutocomplete oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.available != widget.available) {
+      _filterMembers();
+      _overlayEntry?.markNeedsBuild();
+    }
+  }
+
+  @override
+  void dispose() {
+    _removeOverlay();
+    _focusNode.removeListener(_onFocusChanged);
+    _controller.removeListener(_onTextChanged);
+    _focusNode.dispose();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onFocusChanged() {
+    if (_focusNode.hasFocus) {
+      _filterMembers();
+      _showOverlay();
+    } else {
+      // Delay so overlay onTap can fire before removal
+      Future.delayed(const Duration(milliseconds: 200), () {
+        if (!_focusNode.hasFocus && mounted) {
+          _removeOverlay();
+        }
+      });
+    }
+  }
+
+  void _onTextChanged() {
+    _filterMembers();
+    // Update existing overlay content — don't recreate it
+    if (_overlayEntry != null) {
+      if (_filteredMembers.isEmpty) {
+        _removeOverlay();
+      } else {
+        _overlayEntry!.markNeedsBuild();
+      }
+    } else if (_focusNode.hasFocus && _filteredMembers.isNotEmpty) {
+      _showOverlay();
+    }
+  }
+
+  void _filterMembers() {
+    final query = _controller.text.toLowerCase().trim();
+    if (query.isEmpty) {
+      _filteredMembers = widget.available;
+    } else {
+      _filteredMembers = widget.available
+          .where((m) => m.fullName.toLowerCase().contains(query))
+          .toList();
+    }
+  }
+
+  void _showOverlay() {
+    _removeOverlay();
+    if (_filteredMembers.isEmpty) return;
+
+    final renderBox = context.findRenderObject() as RenderBox?;
+    final width = renderBox?.size.width ?? 300.0;
+
+    _overlayEntry = OverlayEntry(
+      builder: (_) {
+        final members = _filteredMembers;
+        if (members.isEmpty) return const SizedBox.shrink();
+
+        return CompositedTransformFollower(
+          link: _layerLink,
+          showWhenUnlinked: false,
+          targetAnchor: Alignment.bottomLeft,
+          followerAnchor: Alignment.topLeft,
+          offset: const Offset(0, 4),
+          child: SizedBox(
+            width: width,
+            child: Material(
+              elevation: 4,
+              borderRadius: BorderRadius.circular(8),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 200),
+                child: ListView.builder(
+                  padding: EdgeInsets.zero,
+                  shrinkWrap: true,
+                  itemCount: members.length,
+                  itemBuilder: (context, index) {
+                    final member = members[index];
+                    return ListTile(
+                      dense: true,
+                      title: Text(member.fullName,
+                          style: AppTextStyles.inputText),
+                      subtitle: member.position != null
+                          ? Text(member.position!, style: _subtitleStyle)
+                          : null,
+                      onTap: () {
+                        widget.onTeamMemberSelected(member);
+                        _controller.clear();
+                        _removeOverlay();
+                      },
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+    Overlay.of(context).insert(_overlayEntry!);
+  }
+
+  void _removeOverlay() {
+    _overlayEntry?.remove();
+    _overlayEntry = null;
+  }
+
+  void _addCustomAttendee() {
+    final text = _controller.text.trim();
+    if (text.isNotEmpty) {
+      final match = widget.available.where(
+        (m) => m.fullName.toLowerCase() == text.toLowerCase(),
+      );
+      if (match.isNotEmpty) {
+        widget.onTeamMemberSelected(match.first);
+      } else {
+        widget.onCustomAttendeeAdded(text);
+      }
+      _controller.clear();
+      _removeOverlay();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return CompositedTransformTarget(
+      link: _layerLink,
+      child: Container(
+        height: 48,
+        decoration: BoxDecoration(
+          border: Border.all(color: AppColors.inputBorder),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: TextField(
+          controller: _controller,
+          focusNode: _focusNode,
+          style: AppTextStyles.inputText,
+          decoration: InputDecoration(
+            hintText: 'Search team members or type a name...',
+            hintStyle: AppTextStyles.placeholder,
+            border: InputBorder.none,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14),
+            suffixIcon: IconButton(
+              onPressed: _addCustomAttendee,
+              icon: const Icon(Icons.add,
+                  color: AppColors.textPlaceholder, size: 20),
+            ),
+          ),
+          onSubmitted: (_) => _addCustomAttendee(),
+        ),
+      ),
     );
   }
 }

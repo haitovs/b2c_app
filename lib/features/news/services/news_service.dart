@@ -35,40 +35,33 @@ class NewsItem {
     );
   }
 
-  /// Get full image URL
+  /// Get full image URL (now from B2C backend)
   String get imageUrl {
     if (photo == null || photo!.isEmpty) return '';
     if (photo!.startsWith('http')) return photo!;
-    return '${AppConfig.tourismApiBaseUrl}$photo';
+    return '${AppConfig.b2cApiBaseUrl}$photo';
   }
 }
 
-/// Service for fetching news from Tourism backend
+/// Service for fetching news from B2C backend
 class NewsService {
   final ApiClient _api;
 
   NewsService(this._api);
 
-  /// Fetch news with pagination
+  /// Fetch news with pagination (B2C-visible articles only)
   Future<List<NewsItem>> fetchNews({
-    int? siteId,
     int skip = 0,
     int limit = 12,
   }) async {
     final queryParams = <String, String>{
       'skip': skip.toString(),
       'limit': limit.toString(),
+      'visibility': 'B2C',
     };
-    if (siteId != null) {
-      queryParams['site_id'] = siteId.toString();
-    }
 
-    // Note: News comes from Tourism backend, not B2C
-    // For now using the API client which points to B2C
-    // The UI will need to call Tourism API directly for news
     final result = await _api.get<List<dynamic>>(
-      '/news/',
-      auth: false,
+      '/content/news',
       queryParams: queryParams,
     );
 
@@ -81,8 +74,7 @@ class NewsService {
   /// Get single news item by ID
   Future<NewsItem?> getNews(int id) async {
     final result = await _api.get<Map<String, dynamic>>(
-      '/news/$id',
-      auth: false,
+      '/content/news/$id',
     );
 
     if (result.isSuccess && result.data != null) {

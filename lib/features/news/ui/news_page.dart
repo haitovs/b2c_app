@@ -7,10 +7,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import '../../../core/config/app_config.dart';
-import '../../../core/providers/event_context_provider.dart';
 import '../../../core/theme/app_theme.dart';
 
-/// News Page - displays news from Tourism backend with search and infinite scroll
+/// News Page - displays news from B2C backend with search and infinite scroll
 class NewsPage extends ConsumerStatefulWidget {
   final String eventId;
 
@@ -60,14 +59,9 @@ class _NewsPageState extends ConsumerState<NewsPage> {
 
   Future<void> _fetchNews() async {
     try {
-      final siteId = ref.read(eventContextProvider).siteId;
-      final uri = siteId != null
-          ? Uri.parse(
-              '${AppConfig.tourismApiBaseUrl}/news/?site_id=$siteId&skip=$_skip&limit=$_limit',
-            )
-          : Uri.parse(
-              '${AppConfig.tourismApiBaseUrl}/news/?skip=$_skip&limit=$_limit',
-            );
+      final uri = Uri.parse(
+        '${AppConfig.b2cApiBaseUrl}/api/v1/content/news?visibility=B2C&skip=$_skip&limit=$_limit',
+      );
 
       final response = await http.get(uri);
       if (!mounted) return;
@@ -97,14 +91,9 @@ class _NewsPageState extends ConsumerState<NewsPage> {
     setState(() => _isLoadingMore = true);
 
     try {
-      final siteId = ref.read(eventContextProvider).siteId;
-      final uri = siteId != null
-          ? Uri.parse(
-              '${AppConfig.tourismApiBaseUrl}/news/?site_id=$siteId&skip=$_skip&limit=$_limit',
-            )
-          : Uri.parse(
-              '${AppConfig.tourismApiBaseUrl}/news/?skip=$_skip&limit=$_limit',
-            );
+      final uri = Uri.parse(
+        '${AppConfig.b2cApiBaseUrl}/api/v1/content/news?visibility=B2C&skip=$_skip&limit=$_limit',
+      );
 
       final response = await http.get(uri);
       if (!mounted) return;
@@ -149,7 +138,7 @@ class _NewsPageState extends ConsumerState<NewsPage> {
   String _buildImageUrl(String? path) {
     if (path == null || path.isEmpty) return '';
     if (path.startsWith('http')) return path;
-    return '${AppConfig.tourismApiBaseUrl}$path';
+    return '${AppConfig.b2cApiBaseUrl}$path';
   }
 
   String _formatDate(String? dateStr) {
@@ -263,7 +252,7 @@ class _NewsPageState extends ConsumerState<NewsPage> {
     }
 
     return GridView.builder(
-      padding: const EdgeInsets.only(bottom: 24),
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 24),
         controller: _scrollController,
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: crossAxisCount,

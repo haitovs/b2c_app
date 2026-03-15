@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -240,30 +241,41 @@ class ApiClient {
     }
   }
 
-  bool _isRefreshing = false;
+  Completer<String?>? _refreshCompleter;
 
-  /// Wrapper that retries a request once after refreshing the token on 401/403.
+  /// Wrapper that retries a request once after refreshing the token on 401.
+  /// Uses a Completer so concurrent 401s share a single refresh call.
   Future<ApiResult<T>> _withTokenRefresh<T>(
     Future<ApiResult<T>> Function() request, {
     required bool auth,
   }) async {
     final result = await request();
 
-    // Only attempt refresh for authenticated requests that got 401/403
-    if (!auth || _isRefreshing) return result;
+    // Only attempt refresh for authenticated requests that got 401
+    if (!auth) return result;
     if (result.isSuccess) return result;
     final code = result.error?.statusCode;
-    if (code != 401 && code != 403) return result;
+    if (code != 401) return result;
 
-    // Try refreshing the token
-    _isRefreshing = true;
+    // If a refresh is already in flight, wait for it instead of starting another
+    if (_refreshCompleter != null) {
+      final token = await _refreshCompleter!.future;
+      if (token == null) return result;
+      return await request();
+    }
+
+    // Start a new refresh
+    _refreshCompleter = Completer<String?>();
     try {
       final newToken = await _tokenProvider.refreshAccessToken();
-      if (newToken == null) return result; // refresh failed, return original error
-      // Retry the request with the new token
+      _refreshCompleter!.complete(newToken);
+      if (newToken == null) return result;
       return await request();
+    } catch (e) {
+      _refreshCompleter!.complete(null);
+      return result;
     } finally {
-      _isRefreshing = false;
+      _refreshCompleter = null;
     }
   }
 }

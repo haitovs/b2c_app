@@ -80,7 +80,7 @@ class _EventCalendarPageState extends ConsumerState<EventCalendarPage> {
     final isMobile = screenWidth < 800;
 
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: AppTheme.primaryColor,
       body: SafeArea(
         child: Column(
           children: [
@@ -97,7 +97,7 @@ class _EventCalendarPageState extends ConsumerState<EventCalendarPage> {
                     style: GoogleFonts.montserrat(
                       fontSize: isMobile ? 24 : 32,
                       fontWeight: FontWeight.w700,
-                      color: Colors.black87,
+                      color: Colors.white,
                     ),
                   ),
                   const Spacer(),
@@ -105,7 +105,7 @@ class _EventCalendarPageState extends ConsumerState<EventCalendarPage> {
                     onPressed: () => context.go('/profile'),
                     icon: Icon(
                       Icons.person_outline,
-                      color: AppTheme.primaryColor,
+                      color: Colors.white,
                       size: isMobile ? 26 : 30,
                     ),
                   ),
@@ -122,7 +122,7 @@ class _EventCalendarPageState extends ConsumerState<EventCalendarPage> {
                 height: isMobile ? 45.0 : 50.0,
                 constraints: BoxConstraints(maxWidth: 1310),
                 decoration: BoxDecoration(
-                  color: AppTheme.primaryColor.withValues(alpha: 0.08),
+                  color: Colors.white.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 alignment: Alignment.center,
@@ -130,7 +130,7 @@ class _EventCalendarPageState extends ConsumerState<EventCalendarPage> {
                   controller: _searchController,
                   style: GoogleFonts.roboto(
                     fontSize: isMobile ? 16 : 18,
-                    color: Colors.black87,
+                    color: Colors.white,
                     fontWeight: FontWeight.w500,
                   ),
                   textAlignVertical: TextAlignVertical.center,
@@ -139,14 +139,14 @@ class _EventCalendarPageState extends ConsumerState<EventCalendarPage> {
                     filled: false,
                     prefixIcon: Icon(
                       Icons.search,
-                      color: AppTheme.primaryColor,
+                      color: Colors.white70,
                       size: isMobile ? 24 : 28,
                     ),
                     hintText: "Search by event name",
                     hintStyle: GoogleFonts.roboto(
                       fontWeight: FontWeight.w500,
                       fontSize: isMobile ? 16 : 18,
-                      color: Colors.grey.shade500,
+                      color: Colors.white54,
                     ),
                     border: InputBorder.none,
                     focusedBorder: InputBorder.none,
@@ -171,33 +171,44 @@ class _EventCalendarPageState extends ConsumerState<EventCalendarPage> {
   }
 
   Widget _buildEventList(bool isMobile) {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 300),
+      child: _buildEventListContent(isMobile),
+    );
+  }
+
+  Widget _buildEventListContent(bool isMobile) {
     if (_isLoading) {
       return const Center(
-        child: CircularProgressIndicator(color: AppTheme.primaryColor),
+        key: ValueKey('loading'),
+        child: CircularProgressIndicator(color: Colors.white),
       );
     }
 
     if (_error != null) {
       return Center(
+        key: const ValueKey('error'),
         child: Text(
           "Error: $_error",
-          style: const TextStyle(color: Colors.black87),
+          style: const TextStyle(color: Colors.white70),
         ),
       );
     }
 
     if (_filteredEvents.isEmpty) {
       return Center(
+        key: const ValueKey('empty'),
         child: Text(
           _searchController.text.trim().isEmpty
               ? "No events found"
               : "No events match your search",
-          style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
+          style: const TextStyle(color: Colors.white70, fontSize: 16),
         ),
       );
     }
 
     return Scrollbar(
+      key: const ValueKey('list'),
       controller: _scrollController,
       thumbVisibility: true,
       thickness: isMobile ? 4 : 8,

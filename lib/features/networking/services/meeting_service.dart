@@ -129,6 +129,19 @@ class MeetingService {
     }
   }
 
+  /// Fetch meeting locations for an event
+  Future<List<Map<String, dynamic>>> fetchLocations(int eventId) async {
+    final result = await _api.get<List<dynamic>>(
+      '/api/v1/meetings/locations/$eventId',
+    );
+
+    if (result.isSuccess && result.data != null) {
+      return result.data!.cast<Map<String, dynamic>>();
+    } else {
+      throw result.error ?? Exception('Failed to load meeting locations');
+    }
+  }
+
   /// Get government entities list (for B2G meetings)
   Future<List<Map<String, dynamic>>> fetchGovEntities() async {
     final result = await _api.get<List<dynamic>>(

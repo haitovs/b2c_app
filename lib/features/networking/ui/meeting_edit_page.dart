@@ -42,6 +42,9 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
   // Meeting with list (dynamic)
   List<TextEditingController> _meetingWithControllers = [];
 
+  // Location
+  String? _selectedLocation;
+
   // Language dropdown
   final List<String> _languages = ['English', 'Russian', 'Turkmen'];
   String _selectedLanguage = 'English';
@@ -87,6 +90,7 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
 
         _subjectController.text = _meeting!['subject'] ?? '';
         _commentsController.text = _meeting!['message'] ?? '';
+        _selectedLocation = _meeting!['location'] as String?;
 
         // Pre-fill attendees from attendees_text
         final attendeesText = _meeting!['attendees_text'] as String? ?? '';
@@ -270,6 +274,7 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
         subject: _subjectController.text.trim(),
         startTime: startTime,
         endTime: endTime,
+        location: _selectedLocation,
         attendeesText: attendeesText.isEmpty ? null : attendeesText,
         message: _commentsController.text.trim().isEmpty
             ? null
@@ -277,6 +282,8 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
       );
 
       if (mounted) {
+        final eventId = int.tryParse(widget.eventId);
+        if (eventId != null) ref.invalidate(myMeetingsProvider(eventId));
         AppSnackBar.showSuccess(context, 'Meeting updated successfully!');
         context.pop(true);
       }
@@ -571,6 +578,8 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
                           const SizedBox(height: 20),
                           _buildDayDropdown(),
                           const SizedBox(height: 20),
+                          _buildLocationDropdown(),
+                          const SizedBox(height: 20),
                           _buildLanguageDropdown(),
                         ],
                       ),
@@ -588,6 +597,8 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
                     _buildSubjectsField(),
                     const SizedBox(height: 20),
                     _buildDayDropdown(),
+                    const SizedBox(height: 20),
+                    _buildLocationDropdown(),
                     const SizedBox(height: 20),
                     _buildLanguageDropdown(),
                     const SizedBox(height: 20),
@@ -817,6 +828,102 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
                     },
                   ),
                 ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLocationDropdown() {
+    final eventId = int.tryParse(widget.eventId);
+    if (eventId == null) return const SizedBox.shrink();
+
+    final locationsAsync = ref.watch(meetingLocationsProvider(eventId));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Location:', style: AppTheme.labelText),
+        const SizedBox(height: 8),
+        locationsAsync.when(
+          data: (locations) {
+            if (locations.isEmpty) {
+              return Container(
+                height: 48,
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'No locations available',
+                  style: GoogleFonts.inter(fontSize: 14, color: Colors.grey.shade500),
+                ),
+              );
+            }
+            // If pre-filled value doesn't match any location, reset it
+            final locationNames = locations.map((l) => l['name'] as String).toList();
+            final effectiveValue = locationNames.contains(_selectedLocation) ? _selectedLocation : null;
+            return Container(
+              height: 48,
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey.shade300),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: effectiveValue,
+                  isExpanded: true,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  hint: Text(
+                    'Select location...',
+                    style: GoogleFonts.inter(fontSize: 14, color: Colors.grey.shade500),
+                  ),
+                  icon: Icon(Icons.keyboard_arrow_down, color: Colors.grey.shade500),
+                  items: locations.map<DropdownMenuItem<String>>((loc) {
+                    final name = loc['name'] as String;
+                    final desc = loc['description'] as String?;
+                    return DropdownMenuItem(
+                      value: name,
+                      child: Text(
+                        desc != null && desc.isNotEmpty ? '$name - $desc' : name,
+                        style: GoogleFonts.inter(fontSize: 14, color: Colors.grey.shade700),
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    setState(() => _selectedLocation = value);
+                  },
+                ),
+              ),
+            );
+          },
+          loading: () => Container(
+            height: 48,
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey.shade300),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Center(
+              child: SizedBox(
+                width: 16, height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+          ),
+          error: (_, __) => Container(
+            height: 48,
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey.shade300),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Failed to load locations',
+              style: GoogleFonts.inter(fontSize: 14, color: Colors.grey.shade500),
+            ),
+          ),
         ),
       ],
     );

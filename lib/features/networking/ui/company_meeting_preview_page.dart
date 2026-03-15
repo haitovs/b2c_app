@@ -404,7 +404,7 @@ class _CompanyMeetingPreviewPageState
 
   void _onRequestMeeting(Map<String, dynamic> teamMember) {
     context.push(
-      '/events/${widget.eventId}/meetings/new/${teamMember['user_id']}',
+      '/events/${widget.eventId}/meetings/new/b2b/${teamMember['user_id']}',
       extra: {
         'first_name': teamMember['first_name'],
         'last_name': teamMember['last_name'],

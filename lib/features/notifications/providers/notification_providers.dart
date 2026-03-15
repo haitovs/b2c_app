@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/providers/auth_provider.dart';
@@ -8,10 +10,18 @@ final notificationServiceProvider = Provider<NotificationService>((ref) {
   return NotificationService(ref.watch(authApiClientProvider));
 });
 
-/// Fetch notifications.
+/// Fetch notifications — auto-refreshes every 30 seconds.
 final notificationsProvider =
-    FutureProvider<List<NotificationItem>>((ref) {
-  return ref.watch(notificationServiceProvider).getNotifications();
+    FutureProvider<List<NotificationItem>>((ref) async {
+  final notifications = await ref.watch(notificationServiceProvider).getNotifications();
+
+  // Set up periodic refresh every 30 seconds
+  final timer = Timer(const Duration(seconds: 30), () {
+    ref.invalidateSelf();
+  });
+  ref.onDispose(timer.cancel);
+
+  return notifications;
 });
 
 /// Unread notification count.

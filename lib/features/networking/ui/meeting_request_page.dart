@@ -10,16 +10,17 @@ import '../../../core/config/app_config.dart';
 import '../../../core/widgets/app_snackbar.dart';
 import '../../../core/widgets/app_text_field.dart';
 import '../providers/meeting_providers.dart';
-import '../services/meeting_service.dart';
 
-/// B2B Meeting Request Page - for creating a new meeting request.
-/// Rendered inside EventShellLayout (sidebar/topbar provided).
+/// B2B Meeting Request Page - redesigned with:
+/// - Our Attendees (selectable from company + custom writable)
+/// - Meeting With (name/surname optional, position required)
+/// - Language multi-select with flags (EN, RU, TK)
+/// - Location from backend
+/// - Company card on the left
 class MeetingRequestPage extends ConsumerStatefulWidget {
   final String eventId;
   final String participantId;
   final Map<String, dynamic>? participantData;
-
-  /// When set, this is a speaker meeting request (uses targetOfficialId).
   final int? speakerId;
   final String? speakerName;
 
@@ -40,20 +41,20 @@ class MeetingRequestPage extends ConsumerStatefulWidget {
 class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
-  // Form controllers
+  // Subject + Message
   final TextEditingController _subjectController = TextEditingController();
-  final TextEditingController _locationController = TextEditingController();
   final TextEditingController _messageController = TextEditingController();
+
+  // Location
+  String? _selectedLocation;
 
   // Date and time
   DateTime? _selectedDate;
   TimeOfDay? _selectedTime;
 
-  bool _isSubmitting = false;
 
   bool get _isSpeakerMeeting => widget.speakerId != null;
 
-  /// Resolve participant display data from either participantData or speaker fields.
   Map<String, dynamic> get _displayData {
     if (_isSpeakerMeeting) {
       return {
@@ -67,78 +68,62 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
   @override
   void dispose() {
     _subjectController.dispose();
-    _locationController.dispose();
     _messageController.dispose();
     super.dispose();
   }
 
   // ── Submit ──────────────────────────────────────────────────────────────
 
-  Future<void> _submitRequest() async {
+  void _submitRequest() {
     if (!_formKey.currentState!.validate()) return;
 
     if (_selectedDate == null) {
-      AppSnackBar.showWarning(context, 'Please select a date for the meeting');
+      AppSnackBar.showWarning(context, 'Please select a date');
       return;
     }
     if (_selectedTime == null) {
-      AppSnackBar.showWarning(context, 'Please select a time for the meeting');
+      AppSnackBar.showWarning(context, 'Please select a time');
       return;
     }
 
-    setState(() => _isSubmitting = true);
+    final startTime = DateTime(
+      _selectedDate!.year,
+      _selectedDate!.month,
+      _selectedDate!.day,
+      _selectedTime!.hour,
+      _selectedTime!.minute,
+    );
+    final endTime = startTime.add(const Duration(hours: 1));
 
-    try {
-      final meetingService = ref.read(meetingServiceProvider);
-
-      final startTime = DateTime(
-        _selectedDate!.year,
-        _selectedDate!.month,
-        _selectedDate!.day,
-        _selectedTime!.hour,
-        _selectedTime!.minute,
-      );
-      final endTime = startTime.add(const Duration(hours: 1));
-
-      // Determine target based on meeting type
-      String? targetUserId;
-      int? targetOfficialId;
-
-      if (_isSpeakerMeeting) {
-        targetOfficialId = widget.speakerId;
-      } else {
-        targetUserId = widget.participantId;
-      }
-
-      await meetingService.createMeeting(
-        eventId: int.parse(widget.eventId),
-        type: MeetingType.b2b,
-        subject: _subjectController.text.trim(),
-        startTime: startTime,
-        endTime: endTime,
-        location: _locationController.text.trim().isEmpty
-            ? null
-            : _locationController.text.trim(),
-        targetUserId: targetUserId,
-        targetOfficialId: targetOfficialId,
-        message: _messageController.text.trim().isEmpty
-            ? null
-            : _messageController.text.trim(),
-      );
-
-      if (mounted) {
-        AppSnackBar.showSuccess(context, 'Meeting request sent successfully!');
-        context.pop(true);
-      }
-    } catch (e) {
-      if (mounted) {
-        AppSnackBar.showError(context, 'Failed to send request: $e');
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isSubmitting = false);
-      }
+    String? targetUserId;
+    int? targetOfficialId;
+    if (_isSpeakerMeeting) {
+      targetOfficialId = widget.speakerId;
+    } else {
+      targetUserId = widget.participantId;
     }
+
+    final messageText = _messageController.text.trim();
+
+    final confirmData = <String, dynamic>{
+      'meeting_type': 'b2b',
+      'event_id': int.parse(widget.eventId),
+      'subject': _subjectController.text.trim(),
+      'start_time': startTime,
+      'end_time': endTime,
+      'location': _selectedLocation,
+      'target_user_id': targetUserId,
+      'target_official_id': targetOfficialId,
+      'message': messageText.isNotEmpty ? messageText : null,
+      'message_display': messageText,
+      // Display data for the confirmation card
+      'target_display': _displayData,
+    };
+
+    context.push(
+      '/events/${widget.eventId}/meetings/confirm',
+      extra: confirmData,
+    );
   }
 
   // ── Pickers ─────────────────────────────────────────────────────────────
@@ -150,41 +135,31 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
       initialDate: _selectedDate ?? now,
       firstDate: now,
       lastDate: DateTime(2050),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme:
-                const ColorScheme.light(primary: AppColors.gradientStart),
-          ),
-          child: child!,
-        );
-      },
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme:
+              const ColorScheme.light(primary: AppColors.gradientStart),
+        ),
+        child: child!,
+      ),
     );
-    if (picked != null && mounted) {
-      setState(() => _selectedDate = picked);
-    }
+    if (picked != null && mounted) setState(() => _selectedDate = picked);
   }
 
   Future<void> _pickTime() async {
     final picked = await showTimePicker(
       context: context,
       initialTime: _selectedTime ?? const TimeOfDay(hour: 9, minute: 0),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme:
-                const ColorScheme.light(primary: AppColors.gradientStart),
-          ),
-          child: child!,
-        );
-      },
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme:
+              const ColorScheme.light(primary: AppColors.gradientStart),
+        ),
+        child: child!,
+      ),
     );
-    if (picked != null && mounted) {
-      setState(() => _selectedTime = picked);
-    }
+    if (picked != null && mounted) setState(() => _selectedTime = picked);
   }
-
-  // ── Image URL helper ────────────────────────────────────────────────────
 
   String _buildImageUrl(String? imagePath) {
     if (imagePath == null || imagePath.isEmpty) return '';
@@ -204,7 +179,6 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Title
           Text(
             'Meetings',
             style: GoogleFonts.montserrat(
@@ -214,25 +188,26 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
             ),
           ),
           const SizedBox(height: 12),
-          const Divider(height: 0.5, thickness: 0.5, color: Color(0xFFCACACA)),
+          const Divider(
+              height: 0.5, thickness: 0.5, color: Color(0xFFCACACA)),
           const SizedBox(height: 24),
-
-          // Two cards side by side (desktop) or stacked (mobile)
           if (isDesktop)
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(width: 288, child: _buildPersonCard()),
-                const SizedBox(width: 24),
-                Expanded(child: _buildFormCard()),
-              ],
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SizedBox(width: 288, child: _buildCompanyCard()),
+                  const SizedBox(width: 24),
+                  Expanded(child: _buildFormCard(wideLayout: true)),
+                ],
+              ),
             )
           else
             Column(
               children: [
-                _buildPersonCard(),
+                _buildCompanyCard(),
                 const SizedBox(height: 24),
-                _buildFormCard(),
+                _buildFormCard(wideLayout: screenWidth > 500),
               ],
             ),
         ],
@@ -240,20 +215,22 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
     );
   }
 
-  // ── Person Card (left) ──────────────────────────────────────────────────
+  // ── Company Card (left) ─────────────────────────────────────────────────
 
-  Widget _buildPersonCard() {
+  Widget _buildCompanyCard() {
     final data = _displayData;
     final firstName = data['first_name'] as String? ?? '';
     final lastName = data['last_name'] as String? ?? '';
-    final fullName = '$firstName $lastName'.trim();
-    final position = data['position'] as String? ?? '';
+    final personName = '$firstName $lastName'.trim();
+    final position = data['position'] as String? ??
+        data['job_title'] as String? ??
+        '';
     final companyName = data['company_name'] as String? ?? '';
     final categories = data['company_categories'];
     final categoryText = categories is List
         ? categories.join(', ')
         : (categories as String? ?? '');
-    final photoUrl = _buildImageUrl(
+    final profilePhotoUrl = _buildImageUrl(
       data['profile_photo_url'] as String? ??
           data['company_logo_url'] as String?,
     );
@@ -261,57 +238,67 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: const BorderRadius.only(
-          topRight: Radius.circular(5),
-          bottomLeft: Radius.circular(5),
-          bottomRight: Radius.circular(5),
-        ),
+        borderRadius: BorderRadius.circular(8),
         boxShadow: const [
-          BoxShadow(
-            color: Color(0x40000000),
-            blurRadius: 10,
-          ),
+          BoxShadow(color: Color(0x40000000), blurRadius: 10),
         ],
       ),
-      padding: const EdgeInsets.symmetric(vertical: 24),
       child: Column(
         children: [
-          // Circle avatar
-          CircleAvatar(
-            radius: 101,
-            backgroundColor: AppColors.cardBackground,
-            backgroundImage:
-                photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null,
-            child: photoUrl.isEmpty
-                ? Icon(Icons.person, size: 64, color: Colors.grey[400])
-                : null,
-          ),
-          const SizedBox(height: 16),
-
-          // Name
-          Text(
-            fullName.isNotEmpty ? fullName : 'Unknown',
-            textAlign: TextAlign.center,
-            style: GoogleFonts.inter(
-              fontSize: 20,
-              fontWeight: FontWeight.w500,
-              color: Colors.black,
+          // Person photo + name + position
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+            child: Column(
+              children: [
+                Container(
+                  width: 180,
+                  height: 180,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white,
+                    border: Border.all(
+                        color: const Color(0xFFE0E0E0), width: 2),
+                  ),
+                  child: ClipOval(
+                    child: profilePhotoUrl.isNotEmpty
+                        ? Image.network(
+                            profilePhotoUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Icon(
+                                Icons.person,
+                                size: 64,
+                                color: Colors.grey[400]),
+                          )
+                        : Icon(Icons.person,
+                            size: 64, color: Colors.grey[400]),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  personName.isNotEmpty ? personName : 'Unknown',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.black,
+                  ),
+                ),
+                if (position.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    position,
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.inter(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w400,
+                      color: const Color(0xFF747474),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
-          const SizedBox(height: 4),
-
-          // Position
-          if (position.isNotEmpty)
-            Text(
-              position,
-              textAlign: TextAlign.center,
-              style: GoogleFonts.inter(
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-                color: const Color(0xFF747474),
-              ),
-            ),
-          const SizedBox(height: 16),
+          // Divider
           const Divider(
             height: 0.5,
             thickness: 0.5,
@@ -319,16 +306,52 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
             indent: 20,
             endIndent: 20,
           ),
-
           // Company
-          if (companyName.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            _buildInfoRow(
-              svgAsset: 'assets/meeting/company.svg',
-              label: 'Company',
-              value: companyName,
+          if (companyName.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SvgPicture.asset(
+                    'assets/meeting/company.svg',
+                    width: 20,
+                    height: 20,
+                    colorFilter: const ColorFilter.mode(
+                      AppColors.gradientStart,
+                      BlendMode.srcIn,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Company',
+                          style: GoogleFonts.inter(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          companyName,
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w400,
+                            color: const Color(0xFF747474),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 16),
+          // Divider before Industry
+          if (categoryText.isNotEmpty) ...[
             const Divider(
               height: 0.5,
               thickness: 0.5,
@@ -336,66 +359,56 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
               indent: 20,
               endIndent: 20,
             ),
-          ],
-
-          // Industry
-          if (categoryText.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            _buildInfoRow(
-              svgAsset: 'assets/meeting/industry.svg',
-              label: 'Industry',
-              value: categoryText,
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoRow({
-    required String svgAsset,
-    required String label,
-    required String value,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SvgPicture.asset(
-            svgAsset,
-            width: 20,
-            height: 20,
-            colorFilter: const ColorFilter.mode(
-              AppColors.gradientStart,
-              BlendMode.srcIn,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: GoogleFonts.inter(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.black,
+            // Industry with different background
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF5F5FA),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SvgPicture.asset(
+                    'assets/meeting/industry.svg',
+                    width: 20,
+                    height: 20,
+                    colorFilter: const ColorFilter.mode(
+                      AppColors.gradientStart,
+                      BlendMode.srcIn,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  value,
-                  style: GoogleFonts.inter(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                    color: const Color(0xFF747474),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Industry',
+                          style: GoogleFonts.inter(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          categoryText,
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w400,
+                            color: const Color(0xFF747474),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -403,19 +416,16 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
 
   // ── Form Card (right) ──────────────────────────────────────────────────
 
-  Widget _buildFormCard() {
+  Widget _buildFormCard({bool wideLayout = true}) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(5),
+        borderRadius: BorderRadius.circular(8),
         boxShadow: const [
-          BoxShadow(
-            color: Color(0x40000000),
-            blurRadius: 10,
-          ),
+          BoxShadow(color: Color(0x40000000), blurRadius: 10),
         ],
       ),
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       child: Form(
         key: _formKey,
         child: Column(
@@ -427,54 +437,45 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
               hintText: 'Enter subject...',
               controller: _subjectController,
               required: true,
-              borderRadius: 5,
+              borderRadius: 8,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
 
             // Date + Time row
-            LayoutBuilder(
-              builder: (context, constraints) {
-                if (constraints.maxWidth > 500) {
-                  return Row(
-                    children: [
-                      Expanded(child: _buildDateField()),
-                      const SizedBox(width: 16),
-                      Expanded(child: _buildTimeField()),
-                    ],
-                  );
-                }
-                return Column(
-                  children: [
-                    _buildDateField(),
-                    const SizedBox(height: 16),
-                    _buildTimeField(),
-                  ],
-                );
-              },
-            ),
-            const SizedBox(height: 16),
+            if (wideLayout)
+              Row(
+                children: [
+                  Expanded(child: _buildDateField()),
+                  const SizedBox(width: 16),
+                  Expanded(child: _buildTimeField()),
+                ],
+              )
+            else
+              Column(
+                children: [
+                  _buildDateField(),
+                  const SizedBox(height: 16),
+                  _buildTimeField(),
+                ],
+              ),
+            const SizedBox(height: 20),
 
             // Location
-            AppTextField(
-              labelText: 'Location:',
-              hintText: 'Enter location...',
-              controller: _locationController,
-              borderRadius: 5,
-            ),
-            const SizedBox(height: 16),
+            _buildLocationDropdown(),
+            const SizedBox(height: 20),
 
             // Message
             AppTextField(
               labelText: 'Message:',
               hintText: 'Enter message...',
               controller: _messageController,
-              maxLines: 6,
-              height: 160,
-              borderRadius: 5,
+              minLines: 4,
+              maxLines: null,
+              borderRadius: 8,
             ),
             const SizedBox(height: 24),
 
-            // Action buttons
+            // Buttons
             _buildActionButtons(),
           ],
         ),
@@ -482,7 +483,105 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
     );
   }
 
-  // ── Date field ──────────────────────────────────────────────────────────
+  // ── Location dropdown ──────────────────────────────────────────────────
+
+  Widget _buildLocationDropdown() {
+    final eventId = int.tryParse(widget.eventId);
+    if (eventId == null) return const SizedBox.shrink();
+
+    final locationsAsync = ref.watch(meetingLocationsProvider(eventId));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8, left: 4),
+          child: Text('Location:', style: AppTextStyles.label),
+        ),
+        locationsAsync.when(
+          data: (locations) {
+            if (locations.isEmpty) {
+              return Container(
+                height: 48,
+                decoration: BoxDecoration(
+                  border: Border.all(color: AppColors.inputBorder),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                alignment: Alignment.centerLeft,
+                child: Text('No locations available',
+                    style: AppTextStyles.placeholder),
+              );
+            }
+            final locationNames =
+                locations.map((l) => l['name'] as String).toList();
+            final effectiveValue =
+                locationNames.contains(_selectedLocation) ? _selectedLocation : null;
+            return Container(
+              height: 48,
+              decoration: BoxDecoration(
+                border: Border.all(color: AppColors.inputBorder),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: effectiveValue,
+                  isExpanded: true,
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  hint: Text('Select location...',
+                      style: AppTextStyles.placeholder),
+                  icon: Icon(Icons.keyboard_arrow_down,
+                      color: AppColors.textPlaceholder),
+                  items: locations.map<DropdownMenuItem<String>>((loc) {
+                    final name = loc['name'] as String;
+                    final desc = loc['description'] as String?;
+                    return DropdownMenuItem(
+                      value: name,
+                      child: Text(
+                        desc != null && desc.isNotEmpty
+                            ? '$name - $desc'
+                            : name,
+                        style: AppTextStyles.inputText,
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (value) =>
+                      setState(() => _selectedLocation = value),
+                ),
+              ),
+            );
+          },
+          loading: () => Container(
+            height: 48,
+            decoration: BoxDecoration(
+              border: Border.all(color: AppColors.inputBorder),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Center(
+              child: SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+          ),
+          error: (_, __) => Container(
+            height: 48,
+            decoration: BoxDecoration(
+              border: Border.all(color: AppColors.inputBorder),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            alignment: Alignment.centerLeft,
+            child: Text('Failed to load locations',
+                style: AppTextStyles.placeholder),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Date field ────────────────────────────────────────────────────────
 
   Widget _buildDateField() {
     final dateText = _selectedDate != null
@@ -493,7 +592,7 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(bottom: 6, left: 4),
+          padding: const EdgeInsets.only(bottom: 8, left: 4),
           child: Text('Date:', style: AppTextStyles.label),
         ),
         GestureDetector(
@@ -503,7 +602,7 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
             decoration: BoxDecoration(
               color: Colors.white,
               border: Border.all(color: AppColors.inputBorder),
-              borderRadius: BorderRadius.circular(5),
+              borderRadius: BorderRadius.circular(8),
             ),
             padding: const EdgeInsets.symmetric(horizontal: 14),
             child: Row(
@@ -516,11 +615,8 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
                         : AppTextStyles.placeholder,
                   ),
                 ),
-                Icon(
-                  Icons.calendar_today,
-                  size: 20,
-                  color: AppColors.textPlaceholder,
-                ),
+                Icon(Icons.calendar_today,
+                    size: 20, color: AppColors.textPlaceholder),
               ],
             ),
           ),
@@ -529,7 +625,7 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
     );
   }
 
-  // ── Time field ──────────────────────────────────────────────────────────
+  // ── Time field ────────────────────────────────────────────────────────
 
   Widget _buildTimeField() {
     final timeText = _selectedTime != null
@@ -540,7 +636,7 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(bottom: 6, left: 4),
+          padding: const EdgeInsets.only(bottom: 8, left: 4),
           child: Text('Time:', style: AppTextStyles.label),
         ),
         GestureDetector(
@@ -550,7 +646,7 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
             decoration: BoxDecoration(
               color: Colors.white,
               border: Border.all(color: AppColors.inputBorder),
-              borderRadius: BorderRadius.circular(5),
+              borderRadius: BorderRadius.circular(8),
             ),
             padding: const EdgeInsets.symmetric(horizontal: 14),
             child: Row(
@@ -563,11 +659,8 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
                         : AppTextStyles.placeholder,
                   ),
                 ),
-                Icon(
-                  Icons.access_time,
-                  size: 20,
-                  color: AppColors.textPlaceholder,
-                ),
+                Icon(Icons.access_time,
+                    size: 20, color: AppColors.textPlaceholder),
               ],
             ),
           ),
@@ -576,7 +669,7 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
     );
   }
 
-  // ── Action buttons ──────────────────────────────────────────────────────
+  // ── Action buttons ────────────────────────────────────────────────────
 
   Widget _buildActionButtons() {
     return Row(
@@ -586,7 +679,7 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 183),
             child: SizedBox(
-              height: 43,
+              height: 48,
               width: double.infinity,
               child: OutlinedButton(
                 onPressed: () => context.pop(),
@@ -594,7 +687,7 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
                   foregroundColor: const Color(0xFF474747),
                   side: const BorderSide(color: AppColors.inputBorder),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(5),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                 ),
                 child: Text(
@@ -614,35 +707,26 @@ class _MeetingRequestPageState extends ConsumerState<MeetingRequestPage> {
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 183),
             child: SizedBox(
-              height: 43,
+              height: 48,
               width: double.infinity,
               child: ElevatedButton(
-            onPressed: _isSubmitting ? null : _submitRequest,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.gradientStart,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(5),
-              ),
-              elevation: 0,
-            ),
-            child: _isSubmitting
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
-                  )
-                : Text(
-                    'Send',
-                    style: GoogleFonts.inter(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.white,
-                    ),
+                onPressed: _submitRequest,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.gradientStart,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
                   ),
+                  elevation: 0,
+                ),
+                child: Text(
+                  'Send',
+                  style: GoogleFonts.inter(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.white,
+                  ),
+                ),
               ),
             ),
           ),

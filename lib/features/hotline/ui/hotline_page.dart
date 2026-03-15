@@ -26,6 +26,7 @@ class HotlinePage extends ConsumerStatefulWidget {
 class _HotlinePageState extends ConsumerState<HotlinePage> {
   late HotlineService _service;
   final TextEditingController _messageController = TextEditingController();
+  final FocusNode _messageFocusNode = FocusNode();
   final ScrollController _scrollController = ScrollController();
   final List<ChatMessage> _messages = [];
 
@@ -54,6 +55,7 @@ class _HotlinePageState extends ConsumerState<HotlinePage> {
     _wsSubscription?.cancel();
     _channel?.sink.close();
     _messageController.dispose();
+    _messageFocusNode.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -79,10 +81,13 @@ class _HotlinePageState extends ConsumerState<HotlinePage> {
     }
   }
 
+  int _wsRetryCount = 0;
+  static const _maxWsRetries = 3;
+
   Future<void> _connectWebSocket() async {
     final wsUrl = await _service.getWebSocketUrl();
     if (wsUrl == null) {
-      if (mounted) setState(() => _error = 'Please login to use hotline');
+      // No token — can't connect, use REST only
       return;
     }
 
@@ -92,14 +97,16 @@ class _HotlinePageState extends ConsumerState<HotlinePage> {
       _wsSubscription = _channel!.stream.listen(
         (data) {
           if (!mounted) return;
+          _wsRetryCount = 0; // reset on successful message
           final message = json.decode(data);
           _handleWebSocketMessage(message);
         },
         onDone: () {
-          if (mounted) {
-            setState(() => _isConnected = false);
-            // Reconnect after a delay
-            Future.delayed(const Duration(seconds: 3), () {
+          if (!mounted) return;
+          setState(() => _isConnected = false);
+          _wsRetryCount++;
+          if (_wsRetryCount < _maxWsRetries) {
+            Future.delayed(Duration(seconds: 5 * _wsRetryCount), () {
               if (mounted) _connectWebSocket();
             });
           }
@@ -149,6 +156,7 @@ class _HotlinePageState extends ConsumerState<HotlinePage> {
       );
     });
     _messageController.clear();
+    _messageFocusNode.requestFocus();
     _scrollToBottom();
 
     // Send via WebSocket if connected, otherwise REST
@@ -493,20 +501,26 @@ class _HotlinePageState extends ConsumerState<HotlinePage> {
               ],
             ),
           ),
-          IconButton(
-            onPressed: () {},
-            icon: Icon(
-              Icons.videocam_outlined,
-              color: Colors.grey.shade600,
-              size: 24,
+          Tooltip(
+            message: 'Coming soon',
+            child: IconButton(
+              onPressed: null,
+              icon: Icon(
+                Icons.videocam_outlined,
+                color: Colors.grey.shade400,
+                size: 24,
+              ),
             ),
           ),
-          IconButton(
-            onPressed: () {},
-            icon: Icon(
-              Icons.phone_outlined,
-              color: Colors.grey.shade600,
-              size: 24,
+          Tooltip(
+            message: 'Coming soon',
+            child: IconButton(
+              onPressed: null,
+              icon: Icon(
+                Icons.phone_outlined,
+                color: Colors.grey.shade400,
+                size: 24,
+              ),
             ),
           ),
         ],
@@ -725,90 +739,132 @@ class _HotlinePageState extends ConsumerState<HotlinePage> {
   }
 
   Widget _buildInputArea() {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(12),
-          bottomRight: Radius.circular(12),
+    final hasText = _messageController.text.trim().isNotEmpty;
+
+    return SafeArea(
+      top: false,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade100,
+          borderRadius: const BorderRadius.only(
+            bottomLeft: Radius.circular(12),
+            bottomRight: Radius.circular(12),
+          ),
         ),
-        border: Border(top: BorderSide(color: Colors.grey.shade200)),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            // Emoji toggle
+            _InputIconButton(
+              onPressed: _toggleEmojiPicker,
+              icon: _showEmojiPicker
+                  ? Icons.keyboard
+                  : Icons.emoji_emotions_outlined,
+            ),
+            const SizedBox(width: 12),
+
+            // Text field — matches the grey container's pill shape
+            Expanded(
+              child: TextField(
+                controller: _messageController,
+                focusNode: _messageFocusNode,
+                minLines: 1,
+                maxLines: 5,
+                textInputAction: TextInputAction.send,
+                style: GoogleFonts.inter(
+                  color: Colors.black87,
+                  fontSize: 14,
+                  height: 1.4,
+                ),
+                cursorColor: AppTheme.primaryColor,
+                decoration: InputDecoration(
+                  hintText: 'Type a message...',
+                  hintStyle: GoogleFonts.inter(
+                    color: Colors.grey.shade400,
+                    fontSize: 14,
+                  ),
+                  filled: true,
+                  fillColor: Colors.white,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(24),
+                    borderSide: const BorderSide(
+                        color: AppTheme.primaryColor, width: 1.5),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(24),
+                    borderSide: const BorderSide(
+                        color: AppTheme.primaryColor, width: 1.5),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(24),
+                    borderSide: const BorderSide(
+                        color: AppTheme.primaryColor, width: 1.5),
+                  ),
+                  isDense: true,
+                ),
+                onSubmitted: (_) => _sendMessage(),
+                onChanged: (_) => setState(() {}),
+              ),
+            ),
+            const SizedBox(width: 12),
+
+            // Attachment
+            _InputIconButton(
+              onPressed: _isSendingFile ? null : _pickAndSendFile,
+              icon: Icons.attach_file,
+            ),
+            const SizedBox(width: 8),
+
+            // Send / Mic button
+            GestureDetector(
+              onTap: _sendMessage,
+              child: Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: hasText
+                      ? AppTheme.primaryColor
+                      : AppTheme.primaryColor.withValues(alpha: 0.85),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  hasText ? Icons.send_rounded : Icons.mic_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: Colors.grey.shade300),
-              ),
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: _toggleEmojiPicker,
-                    icon: Icon(
-                      _showEmojiPicker
-                          ? Icons.keyboard
-                          : Icons.emoji_emotions_outlined,
-                      color: Colors.grey.shade500,
-                      size: 22,
-                    ),
-                  ),
-                  Expanded(
-                    child: TextField(
-                      controller: _messageController,
-                      style: GoogleFonts.inter(
-                        color: Colors.black87,
-                        fontSize: 14,
-                      ),
-                      decoration: InputDecoration(
-                        hintText: 'Message...',
-                        hintStyle: GoogleFonts.inter(
-                          color: Colors.grey,
-                          fontSize: 14,
-                        ),
-                        border: InputBorder.none,
-                        contentPadding:
-                            const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                      onSubmitted: (_) => _sendMessage(),
-                      onChanged: (_) => setState(() {}),
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: _pickAndSendFile,
-                    icon: Icon(
-                      Icons.attach_file,
-                      color: Colors.grey.shade500,
-                      size: 22,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          GestureDetector(
-            onTap: _sendMessage,
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: const BoxDecoration(
-                color: AppTheme.primaryColor,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                _messageController.text.trim().isEmpty
-                    ? Icons.mic
-                    : Icons.send,
-                color: Colors.white,
-                size: 20,
-              ),
-            ),
-          ),
-        ],
+    );
+  }
+}
+
+/// Consistent icon button used outside the text field in the chat input bar.
+class _InputIconButton extends StatelessWidget {
+  final VoidCallback? onPressed;
+  final IconData icon;
+
+  const _InputIconButton({required this.onPressed, required this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 40,
+      height: 40,
+      child: IconButton(
+        onPressed: onPressed,
+        icon: Icon(icon, size: 22),
+        color: Colors.grey.shade500,
+        splashRadius: 20,
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
       ),
     );
   }

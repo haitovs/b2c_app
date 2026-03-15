@@ -650,6 +650,7 @@ class _ServicesGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GridView.builder(
+      addAutomaticKeepAlives: false,
       padding: const EdgeInsets.fromLTRB(8, 8, 8, 24),
       gridDelegate: crossAxisCount != null
           ? SliverGridDelegateWithFixedCrossAxisCount(

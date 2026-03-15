@@ -112,7 +112,7 @@ class _VisaApplicationFormPageState
   bool _isSubmitting = false;
 
   // Marital Status & Relatives
-  String _maritalStatus = 'single'; // 'single', 'married', 'divorced', 'widowed'
+  String _maritalStatus = ''; // '', 'single', 'married', 'divorced', 'widowed'
   final List<Map<String, dynamic>> _relatives = [];
 
   bool _confirmationChecked = false;
@@ -278,7 +278,7 @@ class _VisaApplicationFormPageState
     if (visa['marital_status'] != null) {
       _maritalStatus = (visa['marital_status'] as String).toLowerCase();
     } else {
-      _maritalStatus = 'single';
+      _maritalStatus = '';
     }
 
     // Clear existing relatives
@@ -396,7 +396,8 @@ class _VisaApplicationFormPageState
           _plannedResidentialAddressController.text.trim(),
       if (photoUrl != null) 'photo_url': photoUrl,
       if (passportScanUrl != null) 'passport_scan_url': passportScanUrl,
-      'marital_status': _maritalStatus[0].toUpperCase() + _maritalStatus.substring(1),
+      if (_maritalStatus.isNotEmpty)
+        'marital_status': _maritalStatus[0].toUpperCase() + _maritalStatus.substring(1),
       'relatives': _relatives.map((rel) {
         return {
           'relationship': rel['relationship'],
@@ -1384,7 +1385,6 @@ class _VisaApplicationFormPageState
 
           // Relatives section (always available — children possible for any status)
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
                 'Relatives:',
@@ -1393,12 +1393,18 @@ class _VisaApplicationFormPageState
                   fontWeight: FontWeight.w500,
                 ),
               ),
-              TextButton.icon(
+              const SizedBox(width: 12),
+              OutlinedButton.icon(
                 onPressed: _addRelative,
                 icon: const Icon(Icons.add, size: 18),
                 label: const Text('Add'),
-                style: TextButton.styleFrom(
+                style: OutlinedButton.styleFrom(
                   foregroundColor: _primaryColor,
+                  side: const BorderSide(color: _primaryColor, width: 1.5),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 ),
               ),
             ],

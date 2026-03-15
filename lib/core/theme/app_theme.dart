@@ -163,6 +163,12 @@ class AppTheme {
     textStyle: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w600),
   );
 
+  // Animation Constants
+  static const Duration animFast = Duration(milliseconds: 150);
+  static const Duration animNormal = Duration(milliseconds: 250);
+  static const Duration animSlow = Duration(milliseconds: 400);
+  static const Curve animCurve = Curves.easeInOut;
+
   // Full Theme
   static ThemeData get theme => ThemeData(
     primaryColor: primaryColor,
@@ -175,6 +181,16 @@ class AppTheme {
       displayMedium: heading2,
       bodyLarge: bodyText,
       labelLarge: labelText,
+    ),
+    // Smooth page transitions on all platforms
+    pageTransitionsTheme: const PageTransitionsTheme(
+      builders: {
+        TargetPlatform.android: FadeUpwardsPageTransitionsBuilder(),
+        TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+        TargetPlatform.macOS: FadeUpwardsPageTransitionsBuilder(),
+        TargetPlatform.windows: FadeUpwardsPageTransitionsBuilder(),
+        TargetPlatform.linux: FadeUpwardsPageTransitionsBuilder(),
+      },
     ),
   );
 }

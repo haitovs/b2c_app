@@ -28,22 +28,17 @@ class _MeetingsPageState extends ConsumerState<MeetingsPage> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
-  List<Map<String, dynamic>> _meetings = [];
   List<Map<String, dynamic>> _filteredMeetings = [];
-  bool _isLoading = true;
+
+  int? get _eventIdInt => int.tryParse(widget.eventId);
 
   @override
   void initState() {
     super.initState();
-    _initializeAndFetch();
-  }
-
-  Future<void> _initializeAndFetch() async {
-    final eventId = int.tryParse(widget.eventId);
+    final eventId = _eventIdInt;
     if (eventId != null) {
-      await ref.read(eventContextProvider.notifier).ensureEventContext(eventId);
+      ref.read(eventContextProvider.notifier).ensureEventContext(eventId);
     }
-    _fetchData();
   }
 
   @override
@@ -52,29 +47,12 @@ class _MeetingsPageState extends ConsumerState<MeetingsPage> {
     super.dispose();
   }
 
-  Future<void> _fetchData() async {
-    setState(() => _isLoading = true);
-    try {
-      final meetingService = ref.read(meetingServiceProvider);
-      final eventId = int.tryParse(widget.eventId);
-      _meetings = await meetingService.fetchMyMeetings(eventId: eventId);
-      if (mounted) {
-        setState(() {
-          _applyFilters();
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      debugPrint('Error fetching meetings: $e');
-      if (mounted) {
-        setState(() {
-          _meetings = [];
-          _filteredMeetings = [];
-          _isLoading = false;
-        });
-      }
-    }
+  /// Invalidate the provider to trigger a reactive refetch in build().
+  void _refreshMeetings() {
+    ref.invalidate(myMeetingsProvider(_eventIdInt));
   }
+
+  List<Map<String, dynamic>> _meetings = [];
 
   void _applyFilters() {
     List<Map<String, dynamic>> result = List.from(_meetings);
@@ -142,17 +120,17 @@ class _MeetingsPageState extends ConsumerState<MeetingsPage> {
         final isSender = meeting['is_sender'] ?? true;
         if (!isSender && meeting['status'] == 'PENDING') {
           context.push(
-            '/events/${widget.eventId}/meetings/$meetingId/review',
+            '/events/${widget.eventId}/meetings/review/$meetingId',
             extra: meeting,
           );
         }
         break;
       case 'edit':
         final result = await context.push(
-          '/events/${widget.eventId}/meetings/$meetingId/edit',
+          '/events/${widget.eventId}/meetings/review/$meetingId/edit',
           extra: meeting,
         );
-        if (result == true && mounted) _fetchData();
+        if (result == true && mounted) _refreshMeetings();
         break;
       case 'cancel':
         await _cancelMeeting(meetingId);
@@ -176,7 +154,7 @@ class _MeetingsPageState extends ConsumerState<MeetingsPage> {
     try {
       final meetingService = ref.read(meetingServiceProvider);
       await meetingService.deleteMeeting(meetingId);
-      await _fetchData();
+      _refreshMeetings();
       if (mounted) {
         AppSnackBar.showSuccess(context, 'Meeting deleted successfully');
       }
@@ -194,7 +172,7 @@ class _MeetingsPageState extends ConsumerState<MeetingsPage> {
     try {
       final meetingService = ref.read(meetingServiceProvider);
       await meetingService.cancelMeeting(meetingId);
-      await _fetchData();
+      _refreshMeetings();
       if (mounted) {
         AppSnackBar.showSuccess(context, 'Meeting cancelled successfully');
       }
@@ -212,7 +190,7 @@ class _MeetingsPageState extends ConsumerState<MeetingsPage> {
         meetingId: meetingId,
         action: action,
       );
-      await _fetchData();
+      _refreshMeetings();
       if (mounted) {
         final label = action == 'accept' ? 'accepted' : 'declined';
         if (action == 'accept') {
@@ -231,6 +209,18 @@ class _MeetingsPageState extends ConsumerState<MeetingsPage> {
   @override
   Widget build(BuildContext context) {
     final isMobile = MediaQuery.of(context).size.width < 700;
+
+    // Watch the provider reactively — refetches when invalidated
+    final meetingsAsync = ref.watch(myMeetingsProvider(_eventIdInt));
+
+    // Sync provider data into local state for filtering
+    final isLoading = meetingsAsync.isLoading && _meetings.isEmpty;
+    meetingsAsync.whenData((data) {
+      if (data != _meetings) {
+        _meetings = data;
+        _applyFilters();
+      }
+    });
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -272,7 +262,7 @@ class _MeetingsPageState extends ConsumerState<MeetingsPage> {
         const SizedBox(height: 16),
         // Content
         Expanded(
-          child: _isLoading
+          child: isLoading
               ? Center(
                   child:
                       CircularProgressIndicator(color: AppTheme.primaryColor))
@@ -297,7 +287,7 @@ class _MeetingsPageState extends ConsumerState<MeetingsPage> {
         final type = _isB2B ? 'b2b' : 'b2g';
         await context
             .push('/events/${widget.eventId}/meetings/new?type=$type');
-        if (mounted) _fetchData();
+        if (mounted) _refreshMeetings();
       },
       icon: const Icon(Icons.add, size: 18, color: Colors.white),
       label: Text(
@@ -471,7 +461,7 @@ class _MeetingsPageState extends ConsumerState<MeetingsPage> {
                 final type = _isB2B ? 'b2b' : 'b2g';
                 await context.push(
                     '/events/${widget.eventId}/meetings/new?type=$type');
-                if (mounted) _fetchData();
+                if (mounted) _refreshMeetings();
               },
               icon: const Icon(Icons.add),
               label: const Text('Create New Meeting'),

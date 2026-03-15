@@ -14,6 +14,12 @@ final myMeetingsProvider =
   return ref.watch(meetingServiceProvider).fetchMyMeetings(eventId: eventId);
 });
 
+/// Fetch meeting locations for an event.
+final meetingLocationsProvider =
+    FutureProvider.family<List<Map<String, dynamic>>, int>((ref, eventId) {
+  return ref.watch(meetingServiceProvider).fetchLocations(eventId);
+});
+
 /// Fetch government entities.
 final govEntitiesProvider =
     FutureProvider<List<Map<String, dynamic>>>((ref) {

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../analytics/providers/analytics_providers.dart';
 import '../models/company.dart';
 import '../providers/company_providers.dart';
 
@@ -42,6 +44,18 @@ class CompanyPreviewPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final companyAsync = ref.watch(companyDetailProvider(companyId));
+
+    // Track company profile view (deduped in service)
+    final routerState = GoRouterState.of(context);
+    final eventId =
+        int.tryParse(routerState.pathParameters['id'] ?? '0') ?? 0;
+    if (eventId > 0) {
+      ref.read(analyticsServiceProvider).recordView(
+            targetType: 'COMPANY',
+            targetId: companyId,
+            eventId: eventId,
+          );
+    }
 
     return companyAsync.when(
       loading: () => const Center(
