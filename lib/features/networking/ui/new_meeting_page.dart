@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -163,8 +165,40 @@ class _NewMeetingPageState extends ConsumerState<NewMeetingPage> {
 
   String _buildImageUrl(String? imagePath) {
     if (imagePath == null || imagePath.isEmpty) return '';
-    if (imagePath.startsWith('http')) return imagePath;
+    if (imagePath.startsWith('http') || imagePath.startsWith('data:')) {
+      return imagePath;
+    }
     return '${AppConfig.b2cApiBaseUrl}$imagePath';
+  }
+
+  Widget _buildImage(String imageUrl,
+      {BoxFit fit = BoxFit.cover,
+      double? width,
+      double? height,
+      Widget Function()? errorBuilder}) {
+    final placeholder = errorBuilder ?? _buildPhotoPlaceholder;
+    if (imageUrl.startsWith('data:')) {
+      try {
+        final base64Str = imageUrl.split(',').last;
+        final bytes = base64Decode(base64Str);
+        return Image.memory(
+          bytes,
+          fit: fit,
+          width: width,
+          height: height,
+          errorBuilder: (_, __, ___) => placeholder(),
+        );
+      } catch (_) {
+        return placeholder();
+      }
+    }
+    return Image.network(
+      imageUrl,
+      fit: fit,
+      width: width,
+      height: height,
+      errorBuilder: (_, __, ___) => placeholder(),
+    );
   }
 
   @override
@@ -484,13 +518,11 @@ class _NewMeetingPageState extends ConsumerState<NewMeetingPage> {
                   ),
                   clipBehavior: Clip.antiAlias,
                   child: imageUrl.isNotEmpty
-                      ? Image.network(
+                      ? _buildImage(
                           imageUrl,
                           fit: BoxFit.cover,
                           width: double.infinity,
                           height: double.infinity,
-                          errorBuilder: (context, error, stackTrace) =>
-                              _buildPhotoPlaceholder(),
                         )
                       : _buildPhotoPlaceholder(),
                 ),

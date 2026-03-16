@@ -285,8 +285,38 @@ class _MeetingB2GRequestPageState
 
   String _buildImageUrl(String? imagePath) {
     if (imagePath == null || imagePath.isEmpty) return '';
-    if (imagePath.startsWith('http')) return imagePath;
+    if (imagePath.startsWith('http') || imagePath.startsWith('data:')) {
+      return imagePath;
+    }
     return '${AppConfig.b2cApiBaseUrl}$imagePath';
+  }
+
+  Widget _buildImageWidget(String imageUrl,
+      {double? width, double? height, BoxFit fit = BoxFit.contain}) {
+    if (imageUrl.startsWith('data:')) {
+      try {
+        final base64Str = imageUrl.split(',').last;
+        final bytes = base64Decode(base64Str);
+        return Image.memory(
+          bytes,
+          width: width,
+          height: height,
+          fit: fit,
+          errorBuilder: (_, __, ___) =>
+              _buildPlaceholder(_govEntity?['name'] ?? ''),
+        );
+      } catch (_) {
+        return _buildPlaceholder(_govEntity?['name'] ?? '');
+      }
+    }
+    return Image.network(
+      imageUrl,
+      width: width,
+      height: height,
+      fit: fit,
+      errorBuilder: (_, __, ___) =>
+          _buildPlaceholder(_govEntity?['name'] ?? ''),
+    );
   }
 
   // ── Build ─────────────────────────────────────────────────────────────
@@ -369,12 +399,11 @@ class _MeetingB2GRequestPageState
           if (logoUrl.isNotEmpty)
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
-              child: Image.network(
+              child: _buildImageWidget(
                 logoUrl,
                 width: 200,
                 height: 200,
                 fit: BoxFit.contain,
-                errorBuilder: (_, __, ___) => _buildPlaceholder(name),
               ),
             )
           else
