@@ -9,7 +9,7 @@ services:
       context: .
       args:
         B2C_API_URL: https://b2c.oguzforum.com
-        TOURISM_API_URL: http://backend:8000
+        TOURISM_API_URL: https://api.turkmenchina.com
     image: b2c-web:latest
     restart: unless-stopped
     ports:

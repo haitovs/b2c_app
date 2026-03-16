@@ -28,7 +28,7 @@ jobs:
         run: |
           flutter build web --release \
             --dart-define=B2C_API_URL=https://b2c.oguzforum.com \
-            --dart-define=TOURISM_API_URL=http://backend:8000
+            --dart-define=TOURISM_API_URL=https://api.turkmenchina.com
 
       # ---------------------------------------------------------
       # STEP 2: PREPARE SERVER (Self-Healing Sync)
