@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -63,7 +64,7 @@ class _PostLoginDispatcherPageState
       // Multiple events — go to event calendar to pick
       context.go('/');
     } catch (e) {
-      debugPrint('[PostLoginDispatcher] Error: $e');
+      if (kDebugMode) debugPrint('[PostLoginDispatcher] Error: $e');
       if (mounted) context.go('/');
     }
   }

@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -64,7 +65,7 @@ class _SpeakerListPageState extends ConsumerState<SpeakerListPage> {
         setState(() => _isLoading = false);
       }
     } catch (e) {
-      debugPrint('Error fetching speakers: $e');
+      if (kDebugMode) debugPrint('Error fetching speakers: $e');
       setState(() => _isLoading = false);
     }
   }

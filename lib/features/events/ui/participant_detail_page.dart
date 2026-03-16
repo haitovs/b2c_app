@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -95,11 +96,11 @@ class _ParticipantDetailPageState
           _isLoading = false;
         });
       } else {
-        debugPrint('Failed to fetch participant: ${response.statusCode}');
+        if (kDebugMode) debugPrint('Failed to fetch participant: ${response.statusCode}');
         setState(() => _isLoading = false);
       }
     } catch (e) {
-      debugPrint('Error fetching participant: $e');
+      if (kDebugMode) debugPrint('Error fetching participant: $e');
       if (!mounted) return;
       setState(() => _isLoading = false);
     }

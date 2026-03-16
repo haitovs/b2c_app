@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -88,7 +89,7 @@ class _NewMeetingPageState extends ConsumerState<NewMeetingPage> {
           // If we can't fetch own companies, show all (safe fallback)
         }
       } catch (companiesError) {
-        debugPrint('Error fetching public companies: $companiesError');
+        if (kDebugMode) debugPrint('Error fetching public companies: $companiesError');
       }
       if (!_isB2B) {
         await _fetchGovEntities();
@@ -98,7 +99,7 @@ class _NewMeetingPageState extends ConsumerState<NewMeetingPage> {
         _isLoading = false;
       });
     } catch (e) {
-      debugPrint('Error fetching data: $e');
+      if (kDebugMode) debugPrint('Error fetching data: $e');
       setState(() => _isLoading = false);
     }
   }
@@ -113,7 +114,7 @@ class _NewMeetingPageState extends ConsumerState<NewMeetingPage> {
         _applyFilters();
       });
     } catch (govError) {
-      debugPrint('Error fetching gov entities: $govError');
+      if (kDebugMode) debugPrint('Error fetching gov entities: $govError');
     }
   }
 

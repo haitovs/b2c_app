@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -139,7 +140,7 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
       if (!mounted) return;
       setState(() => _isLoading = false);
     } catch (e) {
-      debugPrint('Error fetching meeting: $e');
+      if (kDebugMode) debugPrint('Error fetching meeting: $e');
       if (!mounted) return;
       setState(() => _isLoading = false);
     }

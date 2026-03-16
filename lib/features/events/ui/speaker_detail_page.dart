@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -73,7 +74,7 @@ class _SpeakerDetailPageState extends ConsumerState<SpeakerDetailPage> {
         setState(() => _isLoading = false);
       }
     } catch (e) {
-      debugPrint('Error fetching speaker: $e');
+      if (kDebugMode) debugPrint('Error fetching speaker: $e');
       if (!mounted) return;
       setState(() => _isLoading = false);
     }
@@ -94,7 +95,7 @@ class _SpeakerDetailPageState extends ConsumerState<SpeakerDetailPage> {
       final uri = Uri.parse(finalUrl);
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (e) {
-      debugPrint('Could not launch $url: $e');
+      if (kDebugMode) debugPrint('Could not launch $url: $e');
     }
   }
 

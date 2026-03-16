@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -113,7 +114,7 @@ class _MeetingB2GRequestPageState
         }
       }
     } catch (e) {
-      debugPrint('Error fetching agenda days: $e');
+      if (kDebugMode) debugPrint('Error fetching agenda days: $e');
     }
   }
 
@@ -127,7 +128,7 @@ class _MeetingB2GRequestPageState
       );
       _govEntity = entity.isNotEmpty ? entity : null;
     } catch (e) {
-      debugPrint('Error fetching gov entity: $e');
+      if (kDebugMode) debugPrint('Error fetching gov entity: $e');
     }
   }
 

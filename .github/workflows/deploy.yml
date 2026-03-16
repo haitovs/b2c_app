@@ -93,8 +93,8 @@ jobs:
             if docker compose version >/dev/null 2>&1; then DC="docker compose"; else DC="docker-compose"; fi
             
             echo "==> Rebuilding..."
-            $DC build --no-cache b2c-frontend
-            $DC up -d b2c-frontend
+            $DC build --no-cache b2c-web
+            $DC up -d b2c-web
             
             echo "==> Pruning..."
             docker image prune -f

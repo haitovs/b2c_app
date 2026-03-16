@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -75,11 +76,11 @@ class _NewsPageState extends ConsumerState<NewsPage> {
           _skip = _news.length;
         });
       } else {
-        debugPrint('Failed to fetch news: ${response.statusCode}');
+        if (kDebugMode) debugPrint('Failed to fetch news: ${response.statusCode}');
         setState(() => _isLoading = false);
       }
     } catch (e) {
-      debugPrint('Error fetching news: $e');
+      if (kDebugMode) debugPrint('Error fetching news: $e');
       if (!mounted) return;
       setState(() => _isLoading = false);
     }
@@ -110,7 +111,7 @@ class _NewsPageState extends ConsumerState<NewsPage> {
         setState(() => _isLoadingMore = false);
       }
     } catch (e) {
-      debugPrint('Error loading more news: $e');
+      if (kDebugMode) debugPrint('Error loading more news: $e');
       if (!mounted) return;
       setState(() => _isLoadingMore = false);
     }

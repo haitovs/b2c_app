@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -79,7 +80,7 @@ class _EventDetailsPageState extends ConsumerState<EventDetailsPage> {
         setState(() => _isLoading = false);
       }
     } catch (e) {
-      debugPrint('Error loading event: $e');
+      if (kDebugMode) debugPrint('Error loading event: $e');
       if (mounted) setState(() => _isLoading = false);
     }
   }

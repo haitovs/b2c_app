@@ -63,13 +63,15 @@ class EventContextNotifier extends Notifier<EventContextState> {
         );
         return true;
       } else {
-        debugPrint(
-          'Failed to fetch event $requiredEventId: ${response.statusCode}',
-        );
+        if (kDebugMode) {
+          debugPrint(
+            'Failed to fetch event $requiredEventId: ${response.statusCode}',
+          );
+        }
         return false;
       }
     } catch (e) {
-      debugPrint('Error fetching event context: $e');
+      if (kDebugMode) debugPrint('Error fetching event context: $e');
       return false;
     }
   }

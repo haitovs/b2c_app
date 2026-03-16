@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -80,7 +81,7 @@ class _AgendaPageState extends ConsumerState<AgendaPage> {
         if (mounted) setState(() => _isLoadingDays = false);
       }
     } catch (e) {
-      debugPrint('Error fetching agenda days: $e');
+      if (kDebugMode) debugPrint('Error fetching agenda days: $e');
       if (mounted) setState(() => _isLoadingDays = false);
     }
   }
@@ -105,7 +106,7 @@ class _AgendaPageState extends ConsumerState<AgendaPage> {
         if (mounted) setState(() => _isLoadingEpisodes = false);
       }
     } catch (e) {
-      debugPrint('Error fetching episodes: $e');
+      if (kDebugMode) debugPrint('Error fetching episodes: $e');
       if (mounted) setState(() => _isLoadingEpisodes = false);
     }
   }

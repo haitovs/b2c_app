@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -110,7 +111,7 @@ class _ParticipantListPageState extends ConsumerState<ParticipantListPage> {
         });
       }
     } catch (e) {
-      debugPrint('Error fetching participants: $e');
+      if (kDebugMode) debugPrint('Error fetching participants: $e');
       setState(() {
         _isLoading = false;
         _isLoadingMore = false;

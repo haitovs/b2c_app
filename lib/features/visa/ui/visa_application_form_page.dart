@@ -506,7 +506,7 @@ class _VisaApplicationFormPageState
       final formData = _buildFormData();
       await visaService.updateMyVisaById(visaId: _visaId!, data: formData);
     } catch (e) {
-      debugPrint('Auto-save failed: $e');
+      if (kDebugMode) debugPrint('Auto-save failed: $e');
     }
   }
 
@@ -668,7 +668,7 @@ class _VisaApplicationFormPageState
         }
       }
     } catch (e) {
-      debugPrint('Error pre-filling from participant data: $e');
+      if (kDebugMode) debugPrint('Error pre-filling from participant data: $e');
     }
   }
 
@@ -690,7 +690,7 @@ class _VisaApplicationFormPageState
         }
       }
     } catch (e) {
-      debugPrint('Image picker error: $e');
+      if (kDebugMode) debugPrint('Image picker error: $e');
       if (mounted) {
         AppSnackBar.showError(context, 'Failed to pick image. Please try again.');
       }
@@ -722,7 +722,7 @@ class _VisaApplicationFormPageState
         }
       }
     } catch (e) {
-      debugPrint('Passport scan picker error: $e');
+      if (kDebugMode) debugPrint('Passport scan picker error: $e');
       if (mounted) {
         AppSnackBar.showError(context, 'Failed to pick image. Please try again.');
       }

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -53,7 +54,7 @@ class _MeetingReviewPageState extends ConsumerState<MeetingReviewPage> {
         });
       }
     } catch (e) {
-      debugPrint('Error fetching meeting: $e');
+      if (kDebugMode) debugPrint('Error fetching meeting: $e');
       if (mounted) {
         setState(() => _isLoading = false);
       }
