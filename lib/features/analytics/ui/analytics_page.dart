@@ -83,13 +83,15 @@ class _AnalyticsPageState extends ConsumerState<AnalyticsPage> {
             final orderSection = _OrdersCard(orders: data.orders);
 
             if (isWide && meetingSection != null) {
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(child: meetingSection),
-                  const SizedBox(width: 16),
-                  Expanded(child: orderSection),
-                ],
+              return IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(child: meetingSection),
+                    const SizedBox(width: 16),
+                    Expanded(child: orderSection),
+                  ],
+                ),
               );
             }
             return Column(
@@ -639,7 +641,7 @@ class _TeamMemberViewsCard extends StatelessWidget {
               member: members[i],
               rank: i + 1,
               onTap: () =>
-                  context.push('/events/$eventId/team-members/${members[i].id}'),
+                  context.push('/events/$eventId/team/${members[i].id}/edit'),
             ),
           ],
         ],

@@ -18,6 +18,7 @@ const _secureStorage = FlutterSecureStorage();
 class AuthNotifier extends Notifier<AuthState> implements TokenProvider {
   late final ApiClient _api;
   late final SharedPreferences _prefs;
+  bool _isRefreshing = false;
 
   @override
   AuthState build() {
@@ -34,10 +35,13 @@ class AuthNotifier extends Notifier<AuthState> implements TokenProvider {
     final token = state.token ?? await _secureStorage.read(key: 'auth_token');
     if (token == null) return null;
 
-    // Proactive refresh: if token expires within 2 minutes, refresh early
-    if (_isTokenExpiringSoon(token)) {
+    // Proactive refresh: if token expires within 2 minutes, refresh early.
+    // Skip if a refresh is already in flight to avoid cascading calls.
+    if (_isTokenExpiringSoon(token) && !_isRefreshing) {
       final newToken = await refreshAccessToken();
-      return newToken ?? token; // fall back to old token if refresh fails
+      if (newToken != null) return newToken;
+      // Refresh failed — don't return the expired token
+      return null;
     }
     return token;
   }
@@ -70,27 +74,35 @@ class AuthNotifier extends Notifier<AuthState> implements TokenProvider {
   /// Returns the new access token on success, or null on failure.
   @override
   Future<String?> refreshAccessToken() async {
-    final rt = await _secureStorage.read(key: 'refresh_token');
-    if (rt == null) return null;
+    // Prevent concurrent refresh attempts
+    if (_isRefreshing) return null;
+    _isRefreshing = true;
 
-    final result = await _api.post<Map<String, dynamic>>(
-      '/api/v1/auth/refresh',
-      body: {'refresh_token': rt},
-      auth: false,
-    );
+    try {
+      final rt = await _secureStorage.read(key: 'refresh_token');
+      if (rt == null) return null;
 
-    if (result.isSuccess && result.data != null) {
-      final newToken = result.data!['access_token'] as String;
-      final newRefresh = result.data!['refresh_token'] as String;
-      await _secureStorage.write(key: 'auth_token', value: newToken);
-      await _secureStorage.write(key: 'refresh_token', value: newRefresh);
-      state = state.copyWith(token: newToken);
-      return newToken;
+      final result = await _api.post<Map<String, dynamic>>(
+        '/api/v1/auth/refresh',
+        body: {'refresh_token': rt},
+        auth: false,
+      );
+
+      if (result.isSuccess && result.data != null) {
+        final newToken = result.data!['access_token'] as String;
+        final newRefresh = result.data!['refresh_token'] as String;
+        await _secureStorage.write(key: 'auth_token', value: newToken);
+        await _secureStorage.write(key: 'refresh_token', value: newRefresh);
+        state = state.copyWith(token: newToken);
+        return newToken;
+      }
+
+      // Refresh failed — force logout
+      await logout();
+      return null;
+    } finally {
+      _isRefreshing = false;
     }
-
-    // Refresh failed — force logout
-    await logout();
-    return null;
   }
 
   /// The ApiClient instance for this auth session.
@@ -159,17 +171,21 @@ class AuthNotifier extends Notifier<AuthState> implements TokenProvider {
   }
 
   Future<void> logout() async {
-    // Revoke refresh token on server (best-effort, don't block logout on failure)
+    // Clear state and storage first to stop any further API calls
     final rt = await _secureStorage.read(key: 'refresh_token');
-    if (rt != null && state.token != null) {
-      await _api.post(
-        '/api/v1/auth/logout',
-        body: {'refresh_token': rt},
-      );
-    }
+    final token = state.token;
     await _secureStorage.delete(key: 'auth_token');
     await _secureStorage.delete(key: 'refresh_token');
     state = const AuthState(isInitialized: true);
+
+    // Revoke refresh token on server (best-effort, auth: false to avoid loop)
+    if (rt != null && token != null) {
+      await _api.post(
+        '/api/v1/auth/logout',
+        body: {'refresh_token': rt},
+        auth: false,
+      );
+    }
   }
 
   /// Register a new user. Returns null on success, or error message.

@@ -629,8 +629,6 @@ class _EventSidebarState extends ConsumerState<_EventSidebar> {
           isExpanded: _visaExpanded,
           isLocked: !hasPurchased,
           isGroupActive: path.startsWith('$basePath/visa') ||
-              path.startsWith('$basePath/transfer') ||
-              path.startsWith('$basePath/hotels') ||
               path.startsWith('$basePath/travel'),
           onToggle: () => setState(() => _visaExpanded = !_visaExpanded),
           children: [
@@ -645,21 +643,6 @@ class _EventSidebarState extends ConsumerState<_EventSidebar> {
               label: 'Travel Information',
               path: '$basePath/travel',
               isActive: path.startsWith('$basePath/travel'),
-              comingSoon: true,
-            ),
-            _buildSubItem(
-              context,
-              label: 'Transfer Information',
-              path: '$basePath/transfer',
-              isActive: path.startsWith('$basePath/transfer'),
-              comingSoon: true,
-            ),
-            _buildSubItem(
-              context,
-              label: 'Hotel Information',
-              path: '$basePath/hotels',
-              isActive: path.startsWith('$basePath/hotels'),
-              comingSoon: true,
             ),
           ],
         ),

@@ -48,6 +48,8 @@ import '../../features/shop/ui/shopping_cart_page.dart';
 import '../../features/team/ui/add_team_member_page.dart';
 import '../../features/team/ui/team_members_page.dart';
 import '../../features/transfer/ui/transfer_page.dart';
+import '../../features/travel_info/ui/travel_info_list_page.dart';
+import '../../features/travel_info/ui/travel_info_form_page.dart';
 import '../../features/visa/ui/visa_application_form_page.dart';
 import '../../features/visa/ui/visa_details_page.dart';
 import '../../features/visa/ui/visa_status_page.dart';
@@ -347,15 +349,22 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: '/events/:id/travel',
-            pageBuilder: (context, state) => _fadeTransition(
-              const ComingSoonPage(featureName: 'Travel Information'),
-            ),
+            pageBuilder: (context, state) =>
+                _fadeTransition(const TravelInfoListPage()),
+            routes: [
+              GoRoute(
+                path: ':memberId',
+                pageBuilder: (context, state) =>
+                    _fadeTransition(const TravelInfoFormPage()),
+              ),
+            ],
           ),
           GoRoute(
             path: '/events/:id/hotels',
-            pageBuilder: (context, state) => _fadeTransition(
-              const ComingSoonPage(featureName: 'Hotel Information'),
-            ),
+            redirect: (context, state) {
+              final id = state.pathParameters['id'] ?? '0';
+              return '/events/$id/travel';
+            },
           ),
           GoRoute(
             path: '/events/:id/agenda',
