@@ -11,6 +11,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/providers/event_context_provider.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/app_snackbar.dart';
 import '../../company/providers/company_providers.dart';
 import '../../shop/providers/shop_providers.dart';
 import '../../team/providers/team_providers.dart';
@@ -154,6 +155,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                   _StatusCards(
                     eventId: eventId,
                     isMobile: isMobile,
+                    hasPurchased: ref.watch(hasPurchasedProvider(eventId)),
                     companies: ref.watch(myCompaniesProvider(eventId)),
                     teamMembers: ref.watch(allTeamMembersProvider(eventId)),
                     visas: ref.watch(visaListProvider(eventId)),
@@ -538,6 +540,7 @@ class _Segment {
 class _StatusCards extends StatelessWidget {
   final int eventId;
   final bool isMobile;
+  final bool hasPurchased;
   final AsyncValue<List<dynamic>> companies;
   final AsyncValue<List<dynamic>> teamMembers;
   final AsyncValue<List<Map<String, dynamic>>> visas;
@@ -546,6 +549,7 @@ class _StatusCards extends StatelessWidget {
   const _StatusCards({
     required this.eventId,
     required this.isMobile,
+    required this.hasPurchased,
     required this.companies,
     required this.teamMembers,
     required this.visas,
@@ -558,15 +562,15 @@ class _StatusCards extends StatelessWidget {
       children: [
         Row(
           children: [
-            Expanded(child: _CompanyCard(eventId: eventId, isMobile: isMobile, companies: companies)),
+            Expanded(child: _CompanyCard(eventId: eventId, isMobile: isMobile, hasPurchased: hasPurchased, companies: companies)),
             const SizedBox(width: 16),
-            Expanded(child: _TeamCard(eventId: eventId, isMobile: isMobile, teamMembers: teamMembers)),
+            Expanded(child: _TeamCard(eventId: eventId, isMobile: isMobile, hasPurchased: hasPurchased, teamMembers: teamMembers)),
           ],
         ),
         const SizedBox(height: 16),
         Row(
           children: [
-            Expanded(child: _VisaCard(eventId: eventId, isMobile: isMobile, visas: visas)),
+            Expanded(child: _VisaCard(eventId: eventId, isMobile: isMobile, hasPurchased: hasPurchased, visas: visas)),
             const SizedBox(width: 16),
             Expanded(child: _OrdersCard(eventId: eventId, isMobile: isMobile, orders: orders)),
           ],
@@ -581,11 +585,13 @@ class _StatusCards extends StatelessWidget {
 class _CompanyCard extends StatelessWidget {
   final int eventId;
   final bool isMobile;
+  final bool hasPurchased;
   final AsyncValue<List<dynamic>> companies;
 
   const _CompanyCard({
     required this.eventId,
     required this.isMobile,
+    required this.hasPurchased,
     required this.companies,
   });
 
@@ -655,10 +661,15 @@ class _CompanyCard extends StatelessWidget {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () =>
-                      context.go('/events/$eventId/company-profile'),
+                  onPressed: () {
+                    if (!hasPurchased) {
+                      AppSnackBar.showInfo(context, 'Purchase a service package to unlock this feature');
+                      return;
+                    }
+                    context.go('/events/$eventId/company-profile');
+                  },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.successColor,
+                    backgroundColor: hasPurchased ? AppTheme.successColor : Colors.grey,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     shape: RoundedRectangleBorder(
@@ -687,11 +698,13 @@ class _CompanyCard extends StatelessWidget {
 class _TeamCard extends StatelessWidget {
   final int eventId;
   final bool isMobile;
+  final bool hasPurchased;
   final AsyncValue<List<dynamic>> teamMembers;
 
   const _TeamCard({
     required this.eventId,
     required this.isMobile,
+    required this.hasPurchased,
     required this.teamMembers,
   });
 
@@ -740,9 +753,15 @@ class _TeamCard extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () => context.go('/events/$eventId/team'),
+                onPressed: () {
+                  if (!hasPurchased) {
+                    AppSnackBar.showInfo(context, 'Purchase a service package to unlock this feature');
+                    return;
+                  }
+                  context.go('/events/$eventId/team');
+                },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.successColor,
+                  backgroundColor: hasPurchased ? AppTheme.successColor : Colors.grey,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   shape: RoundedRectangleBorder(
@@ -770,11 +789,13 @@ class _TeamCard extends StatelessWidget {
 class _VisaCard extends StatelessWidget {
   final int eventId;
   final bool isMobile;
+  final bool hasPurchased;
   final AsyncValue<List<Map<String, dynamic>>> visas;
 
   const _VisaCard({
     required this.eventId,
     required this.isMobile,
+    required this.hasPurchased,
     required this.visas,
   });
 
@@ -837,10 +858,16 @@ class _VisaCard extends StatelessWidget {
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton(
-                  onPressed: () => context.go('/events/$eventId/visa-travel'),
+                  onPressed: () {
+                    if (!hasPurchased) {
+                      AppSnackBar.showInfo(context, 'Purchase a service package to unlock this feature');
+                      return;
+                    }
+                    context.go('/events/$eventId/visa-travel');
+                  },
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: AppTheme.primaryColor,
-                    side: const BorderSide(color: AppTheme.primaryColor),
+                    foregroundColor: hasPurchased ? AppTheme.primaryColor : Colors.grey,
+                    side: BorderSide(color: hasPurchased ? AppTheme.primaryColor : Colors.grey),
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
