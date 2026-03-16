@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/animated_fade_in.dart';
 import '../../../core/widgets/app_snackbar.dart';
 import '../providers/feedback_providers.dart';
 import '../services/feedback_service.dart';
@@ -125,7 +126,8 @@ class _FeedbackPageState extends ConsumerState<FeedbackPage> {
       );
     }
 
-    return Padding(
+    return AnimatedFadeIn(
+      child: Padding(
       padding: EdgeInsets.all(isMobile ? 16 : 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -179,6 +181,7 @@ class _FeedbackPageState extends ConsumerState<FeedbackPage> {
           ),
         ],
       ),
+    ),
     );
   }
 

@@ -8,6 +8,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 
 import '../../../core/config/app_config.dart';
+import '../../../core/widgets/animated_fade_in.dart';
+import '../../../core/widgets/staggered_fade_in.dart';
 import '../../../core/providers/event_context_provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/country_flags.dart';
@@ -189,7 +191,7 @@ class _SpeakerListPageState extends ConsumerState<SpeakerListPage> {
                         ],
                       ),
                     )
-                  : _buildContent(isMobile, hPad),
+                  : AnimatedFadeIn(child: _buildContent(isMobile, hPad)),
         ),
       ],
     );
@@ -200,7 +202,7 @@ class _SpeakerListPageState extends ConsumerState<SpeakerListPage> {
       return ListView.builder(
         padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 24),
         itemCount: _filteredSpeakers.length,
-        itemBuilder: (context, index) => _buildMobileCard(index),
+        itemBuilder: (context, index) => StaggeredFadeIn(index: index, child: _buildMobileCard(index)),
       );
     }
 
@@ -221,7 +223,7 @@ class _SpeakerListPageState extends ConsumerState<SpeakerListPage> {
             childAspectRatio: 184 / 246,
           ),
           itemCount: _filteredSpeakers.length,
-          itemBuilder: (context, index) => _buildDesktopCard(index),
+          itemBuilder: (context, index) => StaggeredFadeIn(index: index, child: _buildDesktopCard(index)),
         );
       },
     );

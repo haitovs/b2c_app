@@ -8,6 +8,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import '../../../core/config/app_config.dart';
+import '../../../core/widgets/animated_fade_in.dart';
+import '../../../core/widgets/staggered_fade_in.dart';
 import '../../../core/theme/app_theme.dart';
 
 /// News Page - displays news from B2C backend with search and infinite scroll
@@ -210,7 +212,7 @@ class _NewsPageState extends ConsumerState<NewsPage> {
                     child: CircularProgressIndicator(
                         color: AppTheme.primaryColor),
                   )
-                : _buildNewsGrid(isMobile, screenWidth),
+                : AnimatedFadeIn(child: _buildNewsGrid(isMobile, screenWidth)),
           ),
         ],
       ),
@@ -271,11 +273,14 @@ class _NewsPageState extends ConsumerState<NewsPage> {
               ),
             );
           }
-          return _NewsCard(
-            eventId: widget.eventId,
-            news: _filteredNews[index],
-            imageUrl: _buildImageUrl(_filteredNews[index]['photo']),
-            formattedDate: _formatDate(_filteredNews[index]['created_at']),
+          return StaggeredFadeIn(
+            index: index,
+            child: _NewsCard(
+              eventId: widget.eventId,
+              news: _filteredNews[index],
+              imageUrl: _buildImageUrl(_filteredNews[index]['photo']),
+              formattedDate: _formatDate(_filteredNews[index]['created_at']),
+            ),
           );
         },
     );

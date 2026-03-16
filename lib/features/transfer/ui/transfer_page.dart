@@ -8,6 +8,7 @@ import '../widgets/car_card.dart';
 import '../widgets/shuttle_card.dart';
 import 'car_detail_page.dart';
 import 'shuttle_detail_page.dart';
+import '../../../core/widgets/staggered_fade_in.dart';
 
 /// Main transfer page with 3 tabs: Shuttle, Individual Car, Rent Car
 class TransferPage extends ConsumerStatefulWidget {
@@ -190,7 +191,7 @@ class _TransferPageState extends ConsumerState<TransferPage>
         itemCount: _shuttles.length,
         itemBuilder: (context, index) {
           final shuttle = _shuttles[index];
-          return ShuttleCard(
+          return StaggeredFadeIn(index: index, child: ShuttleCard(
             shuttle: shuttle,
             onTap: () => Navigator.push(
               context,
@@ -201,7 +202,7 @@ class _TransferPageState extends ConsumerState<TransferPage>
                 ),
               ),
             ),
-          );
+          ));
         },
       ),
     );
@@ -257,7 +258,7 @@ class _TransferPageState extends ConsumerState<TransferPage>
         itemCount: _individualCars.length,
         itemBuilder: (context, index) {
           final car = _individualCars[index];
-          return CarCard(
+          return StaggeredFadeIn(index: index, child: CarCard(
             car: car,
             onTap: () => Navigator.push(
               context,
@@ -266,7 +267,7 @@ class _TransferPageState extends ConsumerState<TransferPage>
                     CarDetailPage(car: car, eventId: widget.eventId),
               ),
             ),
-          );
+          ));
         },
       ),
     );
@@ -322,7 +323,7 @@ class _TransferPageState extends ConsumerState<TransferPage>
         itemCount: _rentalCars.length,
         itemBuilder: (context, index) {
           final car = _rentalCars[index];
-          return CarCard(
+          return StaggeredFadeIn(index: index, child: CarCard(
             car: car,
             onTap: () => Navigator.push(
               context,
@@ -331,7 +332,7 @@ class _TransferPageState extends ConsumerState<TransferPage>
                     CarDetailPage(car: car, eventId: widget.eventId),
               ),
             ),
-          );
+          ));
         },
       ),
     );

@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_snackbar.dart';
+import '../../../core/widgets/staggered_fade_in.dart';
 import '../../../shared/widgets/app_checkbox.dart';
 import '../../../shared/widgets/product_card.dart';
 import '../models/event_service.dart';
@@ -671,18 +672,21 @@ class _ServicesGrid extends StatelessWidget {
         final cartItem = cartMap[service.id];
         final qty = cartItem?.quantity ?? 0;
 
-        return ProductCard(
-          name: service.name,
-          imageUrl: service.imageUrl,
-          price: service.price,
-          currency: service.currency,
-          discountPercent: service.discountPercent,
-          subtitle: service.subtitle,
-          cartQuantity: qty,
-          onTap: () => context.go('/events/$eventIdStr/services/${service.id}'),
-          onAddToCart: () => onAddToCart(service),
-          onIncrement: () => onIncrement(service),
-          onDecrement: () => onDecrement(service),
+        return StaggeredFadeIn(
+          index: index,
+          child: ProductCard(
+            name: service.name,
+            imageUrl: service.imageUrl,
+            price: service.price,
+            currency: service.currency,
+            discountPercent: service.discountPercent,
+            subtitle: service.subtitle,
+            cartQuantity: qty,
+            onTap: () => context.go('/events/$eventIdStr/services/${service.id}'),
+            onAddToCart: () => onAddToCart(service),
+            onIncrement: () => onIncrement(service),
+            onDecrement: () => onDecrement(service),
+          ),
         );
       },
     );

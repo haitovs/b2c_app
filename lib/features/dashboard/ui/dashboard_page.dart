@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
+import '../../../core/widgets/animated_fade_in.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/providers/event_context_provider.dart';
@@ -122,7 +123,8 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
           ? const Center(
               child: CircularProgressIndicator(color: AppTheme.primaryColor),
             )
-          : SingleChildScrollView(
+          : AnimatedFadeIn(
+              child: SingleChildScrollView(
               padding: EdgeInsets.all(isMobile ? 16 : 24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -163,7 +165,8 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                   ),
                 ],
               ),
-            );
+            ),
+          );
   }
 }
 

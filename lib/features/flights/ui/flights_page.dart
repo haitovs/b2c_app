@@ -8,6 +8,8 @@ import '../providers/flight_providers.dart';
 import '../services/flight_service.dart';
 import '../widgets/flight_card.dart';
 import '../widgets/flight_search_bar.dart';
+import '../../../core/widgets/animated_fade_in.dart';
+import '../../../core/widgets/staggered_fade_in.dart';
 
 /// Main flights search and listing page.
 class FlightsPage extends ConsumerStatefulWidget {
@@ -205,15 +207,20 @@ class _FlightsPageState extends ConsumerState<FlightsPage> {
       );
     }
 
-    return ListView.builder(
-      itemCount: _flights.length,
-      itemBuilder: (context, index) {
-        final flight = _flights[index];
-        return FlightCard(
-          flight: flight,
-          onBookPressed: () => _navigateToBooking(flight),
-        );
-      },
+    return AnimatedFadeIn(
+      child: ListView.builder(
+        itemCount: _flights.length,
+        itemBuilder: (context, index) {
+          final flight = _flights[index];
+          return StaggeredFadeIn(
+            index: index,
+            child: FlightCard(
+              flight: flight,
+              onBookPressed: () => _navigateToBooking(flight),
+            ),
+          );
+        },
+      ),
     );
   }
 }
