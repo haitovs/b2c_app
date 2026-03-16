@@ -480,7 +480,14 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: 'confirm',
                 pageBuilder: (context, state) {
-                  final data = state.extra as Map<String, dynamic>;
+                  final data = state.extra as Map<String, dynamic>?;
+                  if (data == null) {
+                    // Deep link without extra data — redirect to meetings list
+                    final eventId = state.pathParameters['id'] ?? '0';
+                    return _fadeTransition(
+                      MeetingGatePage(eventId: eventId),
+                    );
+                  }
                   final typeStr = data['meeting_type'] as String;
                   final meetingType = typeStr == 'b2g'
                       ? MeetingType.b2g
@@ -624,7 +631,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             pageBuilder: (context, state) {
               final idStr = state.pathParameters['id']!;
               return _fadeTransition(
-                FlightsPage(eventId: int.tryParse(idStr)),
+                FlightsPage(eventId: int.tryParse(idStr) ?? 0),
               );
             },
           ),

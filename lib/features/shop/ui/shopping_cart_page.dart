@@ -115,6 +115,7 @@ class _ShoppingCartPageState extends ConsumerState<ShoppingCartPage> {
       ref.invalidate(cartProvider(eventId));
       ref.invalidate(cartBadgeCountProvider(eventId));
       ref.invalidate(purchaseStatusProvider(eventId));
+      ref.invalidate(ordersProvider(eventId));
       if (mounted) {
         AppSnackBar.showSuccess(context, 'Order placed successfully!');
         context.go('/events/$eventIdStr/services');

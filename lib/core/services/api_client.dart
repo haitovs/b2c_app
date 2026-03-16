@@ -112,12 +112,13 @@ class ApiClient {
     T Function(dynamic json)? parser,
   }) async {
     try {
+      final headers = {
+        if (auth) ...await _headers(auth: true),
+        'Content-Type': 'application/x-www-form-urlencoded',
+      };
       final response = await http.post(
         Uri.parse('$baseUrl$path'),
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          if (auth) ...await _headers(auth: true),
-        },
+        headers: headers,
         body: body,
       );
 

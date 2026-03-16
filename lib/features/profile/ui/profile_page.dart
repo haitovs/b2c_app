@@ -35,6 +35,7 @@ class ProfilePage extends ConsumerStatefulWidget {
 
 class _ProfilePageState extends ConsumerState<ProfilePage> {
   bool _isEditing = false;
+  bool _hasPopulatedControllers = false;
   XFile? _selectedImage;
   Uint8List? _selectedImageBytes;
   String? _profilePhotoUrl;
@@ -86,8 +87,10 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    if (_hasPopulatedControllers) return;
     final user = ref.read(authNotifierProvider).currentUser;
     if (user != null) {
+      _hasPopulatedControllers = true;
       _nameController.text = user['first_name'] ?? '';
       _surnameController.text = user['last_name'] ?? '';
       _emailController.text = user['email'] ?? '';

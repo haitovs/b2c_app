@@ -103,10 +103,12 @@ class _VisaApplicationFormPageState
   // Portrait photo
   File? _photoFile;
   Uint8List? _photoBytes;
+  String? _existingPhotoUrl;
 
   // Passport scan photo
   File? _passportScanFile;
   Uint8List? _passportScanBytes;
+  String? _existingPassportScanUrl;
 
   // Submission state
   bool _isSubmitting = false;
@@ -348,11 +350,13 @@ class _VisaApplicationFormPageState
       _availableCities = [];
     }
 
-    // Reset photo/scan state for new visa
+    // Reset photo/scan state for new visa and load existing URLs
     _photoFile = null;
     _photoBytes = null;
+    _existingPhotoUrl = visa['photo_url'] as String?;
     _passportScanFile = null;
     _passportScanBytes = null;
+    _existingPassportScanUrl = visa['passport_scan_url'] as String?;
     _confirmationChecked = false;
 
     // Pre-fill from participant data if visa fields are empty
@@ -701,6 +705,7 @@ class _VisaApplicationFormPageState
     setState(() {
       _photoFile = null;
       _photoBytes = null;
+      _existingPhotoUrl = null;
     });
   }
 
@@ -733,6 +738,7 @@ class _VisaApplicationFormPageState
     setState(() {
       _passportScanFile = null;
       _passportScanBytes = null;
+      _existingPassportScanUrl = null;
     });
   }
 
@@ -920,6 +926,7 @@ class _VisaApplicationFormPageState
       } catch (_) {}
 
       if (!mounted) return;
+      ref.invalidate(visaListProvider(widget.eventId));
       AppSnackBar.showSuccess(context, 'Visa application submitted successfully');
     } catch (e) {
       if (mounted) {
@@ -2344,7 +2351,7 @@ class _VisaApplicationFormPageState
         children: [
           _buildPhotoBox(
             width: 123, height: 154, label: 'Portrait photo',
-            hasImage: kIsWeb ? _photoBytes != null : _photoFile != null,
+            hasImage: (kIsWeb ? _photoBytes != null : _photoFile != null) || _existingPhotoUrl != null,
             imageWidget: _buildPortraitImage(),
             previewAsset: 'assets/visa_application/profile_preview.jpg',
             onUpload: _pickImage, onDelete: _deletePhoto,
@@ -2352,7 +2359,7 @@ class _VisaApplicationFormPageState
           const SizedBox(width: 16),
           _buildPhotoBox(
             width: 216, height: 154, label: 'Passport scan',
-            hasImage: kIsWeb ? _passportScanBytes != null : _passportScanFile != null,
+            hasImage: (kIsWeb ? _passportScanBytes != null : _passportScanFile != null) || _existingPassportScanUrl != null,
             imageWidget: _buildPassportScanImage(),
             previewAsset: 'assets/visa_application/visa_preview.png',
             onUpload: _pickPassportScan, onDelete: _deletePassportScan,
@@ -2459,6 +2466,10 @@ class _VisaApplicationFormPageState
     if (!kIsWeb && _photoFile != null) {
       return Image.file(_photoFile!, fit: BoxFit.cover);
     }
+    if (_existingPhotoUrl != null && _existingPhotoUrl!.isNotEmpty) {
+      return Image.network(_existingPhotoUrl!, fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => const SizedBox.shrink());
+    }
     return const SizedBox.shrink();
   }
 
@@ -2468,6 +2479,10 @@ class _VisaApplicationFormPageState
     }
     if (!kIsWeb && _passportScanFile != null) {
       return Image.file(_passportScanFile!, fit: BoxFit.cover);
+    }
+    if (_existingPassportScanUrl != null && _existingPassportScanUrl!.isNotEmpty) {
+      return Image.network(_existingPassportScanUrl!, fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => const SizedBox.shrink());
     }
     return const SizedBox.shrink();
   }
