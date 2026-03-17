@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -7,10 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 
-import '../../../core/config/app_config.dart';
 import '../../../core/providers/reference_data_provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_snackbar.dart';
@@ -20,6 +17,7 @@ import '../../../core/widgets/website_input_field.dart';
 import '../../../shared/widgets/country_city_picker.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../models/social_network.dart';
+import '../providers/profile_providers.dart';
 
 class ProfilePage extends ConsumerStatefulWidget {
   final String? returnTo;
@@ -151,32 +149,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     if (_selectedImageBytes == null) return null;
 
     try {
-      final token = await ref.read(authNotifierProvider.notifier).getToken();
-
-      var request = http.MultipartRequest(
-        'POST',
-        Uri.parse('${AppConfig.b2cApiBaseUrl}/api/v1/files/upload'),
-      );
-
-      request.headers['Authorization'] = 'Bearer $token';
-      request.files.add(
-        http.MultipartFile.fromBytes(
-          'file',
-          _selectedImageBytes!,
-          filename:
-              'profile_photo_${DateTime.now().millisecondsSinceEpoch}.jpg',
-        ),
-      );
-
-      final response = await request.send();
-      final responseBody = await response.stream.bytesToString();
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final data = jsonDecode(responseBody);
-        return data['url'] ?? data['file_url'];
-      } else {
-        throw Exception('Upload failed: ${response.statusCode}');
-      }
+      final profileService = ref.read(profileServiceProvider);
+      return await profileService.uploadProfilePhoto(_selectedImageBytes!);
     } catch (e) {
       if (mounted) {
         AppSnackBar.showError(context, 'Photo upload failed: $e');
@@ -340,36 +314,20 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                     }
 
                     try {
-                      final token = await ref
-                          .read(authNotifierProvider.notifier)
-                          .getToken();
-                      final response = await http.patch(
-                        Uri.parse(
-                          '${AppConfig.b2cApiBaseUrl}/api/v1/users/me/password',
-                        ),
-                        headers: {
-                          'Authorization': 'Bearer $token',
-                          'Content-Type': 'application/json',
-                        },
-                        body: jsonEncode({
-                          'current_password': currentPasswordController.text,
-                          'new_password': newPasswordController.text,
-                        }),
+                      final profileService =
+                          ref.read(profileServiceProvider);
+                      final error = await profileService.changePassword(
+                        currentPassword: currentPasswordController.text,
+                        newPassword: newPasswordController.text,
                       );
 
-                      if (response.statusCode == 200) {
-                        if (!this.context.mounted) return;
+                      if (!this.context.mounted) return;
+                      if (error == null) {
                         Navigator.pop(dialogContext);
                         AppSnackBar.showSuccess(
                             this.context, 'Password changed successfully!');
                       } else {
-                        final error = jsonDecode(response.body);
-                        if (!this.context.mounted) return;
-                        AppSnackBar.showError(
-                            this.context,
-                            error['message'] ??
-                                error['detail'] ??
-                                'Failed to change password');
+                        AppSnackBar.showError(this.context, error);
                       }
                     } catch (e) {
                       if (!this.context.mounted) return;

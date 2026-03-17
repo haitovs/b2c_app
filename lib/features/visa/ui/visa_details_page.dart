@@ -331,7 +331,7 @@ class VisaDetailsPage extends ConsumerWidget {
                         height: 48,
                         child: OutlinedButton(
                           onPressed: () {
-                            // TODO: Navigate to contact support
+                            context.go('/events/$eventId/hotline');
                           },
                           style: OutlinedButton.styleFrom(
                             side: const BorderSide(color: Color(0xFF3C4494)),
