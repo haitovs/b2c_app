@@ -268,7 +268,10 @@ class _VisaApplicationFormPageState
     _educationController.text = visa['education_level'] ?? '';
     _placeOfStudyController.text = visa['place_of_study'] ?? '';
     _specialtyController.text = visa['specialty'] ?? '';
-    _jobTitleController.text = visa['job_title'] ?? '';
+    final jobTitle = visa['job_title'];
+    _jobTitleController.text = jobTitle is List
+        ? (jobTitle.isNotEmpty ? jobTitle.first.toString() : '')
+        : (jobTitle?.toString() ?? '');
     _employerNameController.text = visa['employer_name'] ?? '';
 
     // Residential
@@ -393,7 +396,9 @@ class _VisaApplicationFormPageState
       'education_level': _educationController.text.trim(),
       'place_of_study': _placeOfStudyController.text.trim(),
       'specialty': _specialtyController.text.trim(),
-      'job_title': _jobTitleController.text.trim(),
+      'job_title': _jobTitleController.text.trim().isNotEmpty
+          ? [_jobTitleController.text.trim()]
+          : <String>[],
       'employer_name': _employerNameController.text.trim(),
       'home_address': _homeAddressController.text.trim(),
       'planned_residential_address':

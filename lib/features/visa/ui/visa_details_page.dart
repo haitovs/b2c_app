@@ -288,7 +288,9 @@ class VisaDetailsPage extends ConsumerWidget {
                     ),
                     _buildDetailRow(
                       'Job Title',
-                      visa['job_title']?.toString() ?? 'N/A',
+                      visa['job_title'] is List
+                          ? (visa['job_title'] as List).join(', ')
+                          : (visa['job_title']?.toString() ?? 'N/A'),
                     ),
                     _buildDetailRow(
                       'Marital Status',
