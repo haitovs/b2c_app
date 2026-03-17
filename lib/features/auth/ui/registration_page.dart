@@ -1,23 +1,24 @@
 import 'package:b2c_app/l10n/generated/app_localizations.dart';
 import 'package:country_code_picker/country_code_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/app_theme.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/app_snackbar.dart';
 import '../../../core/widgets/app_text_field.dart';
-import '../services/auth_service.dart';
-import 'verification_code_page.dart';
+import '../providers/auth_provider.dart';
 import 'widgets/auth_page_layout.dart';
 import 'widgets/auth_button.dart';
 
-class RegistrationPage extends StatefulWidget {
+class RegistrationPage extends ConsumerStatefulWidget {
   const RegistrationPage({super.key});
 
   @override
-  State<RegistrationPage> createState() => _RegistrationPageState();
+  ConsumerState<RegistrationPage> createState() => _RegistrationPageState();
 }
 
-class _RegistrationPageState extends State<RegistrationPage> {
+class _RegistrationPageState extends ConsumerState<RegistrationPage> {
   final _nameController = TextEditingController();
   final _surnameController = TextEditingController();
   final _emailController = TextEditingController();
@@ -29,8 +30,6 @@ class _RegistrationPageState extends State<RegistrationPage> {
   bool _isLoading = false;
 
   String _countryCode = "+993";
-
-  final _authService = AuthService();
 
   @override
   Widget build(BuildContext context) {
@@ -329,7 +328,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
     try {
       final fullMobile = "$_countryCode${_mobileController.text.trim()}";
 
-      final errorMessage = await _authService.register(
+      final errorMessage = await ref.read(authNotifierProvider.notifier).register(
         email: _emailController.text.trim(),
         password: _passwordController.text,
         firstName: _nameController.text.trim(),
@@ -346,24 +345,11 @@ class _RegistrationPageState extends State<RegistrationPage> {
       if (!mounted) return;
 
       if (errorMessage == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              "Registration successful! Please check your email to verify your account.",
-            ),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 4),
-          ),
-        );
+        AppSnackBar.showSuccess(context, "Registration successful! Please check your email to verify your account.");
 
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (_) => VerificationCodePage(
-              email: _emailController.text.trim(),
-              password: _passwordController.text,
-            ),
-          ),
-        );
+        final email = Uri.encodeComponent(_emailController.text.trim());
+        final password = Uri.encodeComponent(_passwordController.text);
+        context.go('/verify-code?email=$email&password=$password');
       } else {
         final cleanError = errorMessage.replaceFirst(
           RegExp(r'^(?:Error\s*)?\d+\s*:\s*'),
@@ -383,13 +369,6 @@ class _RegistrationPageState extends State<RegistrationPage> {
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-        duration: const Duration(seconds: 4),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    AppSnackBar.showError(context, message);
   }
 }

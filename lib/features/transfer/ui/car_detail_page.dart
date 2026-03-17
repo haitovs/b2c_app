@@ -12,39 +12,20 @@ class CarDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF3C4494),
-      body: CustomScrollView(
-        slivers: [
-          // App Bar with image
-          SliverAppBar(
-            expandedHeight: 280,
-            pinned: true,
-            backgroundColor: const Color(0xFF3C4494),
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
-              onPressed: () => Navigator.pop(context),
-            ),
-            flexibleSpace: FlexibleSpaceBar(
-              background: Stack(
-                fit: StackFit.expand,
-                children: [
-                  car.imageUrl != null
-                      ? Image.network(
-                          car.imageUrl!,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(
-                            color: const Color(0xFF3C4494),
-                            child: const Center(
-                              child: Icon(
-                                Icons.directions_car,
-                                size: 80,
-                                color: Colors.white54,
-                              ),
-                            ),
-                          ),
-                        )
-                      : Container(
+    return CustomScrollView(
+      slivers: [
+        // Image header
+        SliverToBoxAdapter(
+          child: SizedBox(
+            height: 280,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                car.imageUrl != null
+                    ? Image.network(
+                        car.imageUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
                           color: const Color(0xFF3C4494),
                           child: const Center(
                             child: Icon(
@@ -54,32 +35,47 @@ class CarDetailPage extends StatelessWidget {
                             ),
                           ),
                         ),
-                  // Gradient overlay
-                  Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          Colors.black.withValues(alpha: 0.5),
-                        ],
+                      )
+                    : Container(
+                        color: const Color(0xFF3C4494),
+                        child: const Center(
+                          child: Icon(
+                            Icons.directions_car,
+                            size: 80,
+                            color: Colors.white54,
+                          ),
+                        ),
                       ),
+                // Gradient overlay
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.transparent,
+                        Colors.black.withValues(alpha: 0.5),
+                      ],
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
-          // Content
-          SliverToBoxAdapter(
+        ),
+        // Content
+        SliverToBoxAdapter(
             child: Container(
               decoration: const BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
-              child: Padding(
-                padding: const EdgeInsets.all(24),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                final isMobile = constraints.maxWidth < 600;
+                final contentPadding = isMobile ? 16.0 : 24.0;
+                return Padding(
+                padding: EdgeInsets.all(contentPadding),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -90,8 +86,8 @@ class CarDetailPage extends StatelessWidget {
                         Expanded(
                           child: Text(
                             car.name,
-                            style: const TextStyle(
-                              fontSize: 24,
+                            style: TextStyle(
+                              fontSize: isMobile ? 20 : 24,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -101,10 +97,10 @@ class CarDetailPage extends StatelessWidget {
                           children: [
                             Text(
                               car.priceDisplay,
-                              style: const TextStyle(
-                                fontSize: 22,
+                              style: TextStyle(
+                                fontSize: isMobile ? 18 : 22,
                                 fontWeight: FontWeight.bold,
-                                color: Color(0xFF3C4494),
+                                color: const Color(0xFF3C4494),
                               ),
                             ),
                             if (car.pricePerHour != null)
@@ -253,11 +249,12 @@ class CarDetailPage extends StatelessWidget {
                     const SizedBox(height: 24),
                   ],
                 ),
+              );
+                },
               ),
             ),
           ),
         ],
-      ),
     );
   }
 

@@ -1,5 +1,4 @@
-import '../../features/auth/services/auth_service.dart';
-import '../services/api_client.dart';
+import 'api_client.dart';
 
 /// Legal document model
 class LegalDocument {
@@ -29,7 +28,7 @@ class LegalDocument {
 class LegalService {
   final ApiClient _api;
 
-  LegalService(AuthService authService) : _api = ApiClient(authService);
+  LegalService(this._api);
 
   /// Fetch a legal document by type.
   /// [docType] should be one of: TERMS, PRIVACY, REFUND, COOKIES

@@ -1,144 +1,63 @@
-import 'dart:convert';
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../../../core/config/app_config.dart';
-import '../../auth/services/auth_service.dart';
+import '../../../core/services/api_client.dart';
+import '../../../core/services/token_provider.dart';
 
 /// Service for handling visa application API operations
 class VisaService {
-  final AuthService authService;
+  final ApiClient _api;
+  final TokenProvider _tokenProvider;
 
-  VisaService(this.authService);
-
-  String get _baseUrl => '${AppConfig.b2cApiBaseUrl}/api/v1/visas';
-
-  Future<String> _getToken() async {
-    final token = await authService.getToken();
-    if (token == null) throw Exception('Not authenticated');
-    return token;
-  }
-
-  Map<String, String> _authHeaders(String token) => {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      };
+  VisaService(this._api, this._tokenProvider);
 
   /// Build query parameters from optional participantId and eventId
-  String _buildQueryParams({String? participantId, int? eventId}) {
+  Map<String, String>? _buildQueryParams({String? participantId, int? eventId}) {
     final params = <String, String>{};
     if (participantId != null) params['participant_id'] = participantId;
     if (eventId != null) params['event_id'] = eventId.toString();
-    if (params.isEmpty) return '';
-    return '?${params.entries.map((e) => '${e.key}=${e.value}').join('&')}';
-  }
-
-  /// Parse error from response body, handling CORS-blocked empty bodies
-  String _parseError(http.Response response, String fallback) {
-    try {
-      if (response.body.isEmpty) return fallback;
-      final error = jsonDecode(response.body);
-      if (error is Map<String, dynamic>) {
-        return error['message'] ?? error['detail'] ?? fallback;
-      }
-      return fallback;
-    } catch (_) {
-      return fallback;
-    }
-  }
-
-  /// Execute request with automatic token refresh on 401/403
-  Future<http.Response> _withRetry(
-    Future<http.Response> Function(String token) request,
-  ) async {
-    var token = await _getToken();
-    var response = await request(token);
-
-    if (response.statusCode == 401 || response.statusCode == 403) {
-      final refreshed = await authService.tryRefreshToken();
-      if (refreshed) {
-        token = await _getToken();
-        response = await request(token);
-      }
-    }
-
-    return response;
+    return params.isNotEmpty ? params : null;
   }
 
   /// List all visa applications for the current user and event.
   Future<List<Map<String, dynamic>>> listMyVisas({int? eventId}) async {
-    final query = _buildQueryParams(eventId: eventId);
-
-    final response = await _withRetry(
-      (token) => http.get(
-        Uri.parse('$_baseUrl/my-visas$query'),
-        headers: _authHeaders(token),
-      ),
+    final result = await _api.get<List<dynamic>>(
+      '/api/v1/visas/my-visas',
+      queryParams: _buildQueryParams(eventId: eventId),
     );
 
-    if (response.statusCode == 200) {
-      final list = jsonDecode(response.body) as List<dynamic>;
-      return list.cast<Map<String, dynamic>>();
+    if (result.isSuccess && result.data != null) {
+      return result.data!.cast<Map<String, dynamic>>();
     }
-
-    throw Exception(_parseError(response, 'Failed to list visa applications'));
+    throw result.error ?? Exception('Failed to list visa applications');
   }
 
   /// Create a new blank visa application.
   Future<Map<String, dynamic>> createMyVisa({int? eventId}) async {
-    final query = _buildQueryParams(eventId: eventId);
-
-    final response = await _withRetry(
-      (token) => http.post(
-        Uri.parse('$_baseUrl/my-visa/create$query'),
-        headers: _authHeaders(token),
-      ),
+    final result = await _api.post<Map<String, dynamic>>(
+      '/api/v1/visas/my-visa/create',
+      queryParams: _buildQueryParams(eventId: eventId),
     );
 
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body) as Map<String, dynamic>;
+    if (result.isSuccess && result.data != null) {
+      return result.data!;
     }
-
-    throw Exception(_parseError(response, 'Failed to create visa application'));
+    throw result.error ?? Exception('Failed to create visa application');
   }
 
   /// Get a specific visa application by ID.
   Future<Map<String, dynamic>> getMyVisaById(String visaId) async {
-    final response = await _withRetry(
-      (token) => http.get(
-        Uri.parse('$_baseUrl/my-visa/$visaId'),
-        headers: _authHeaders(token),
-      ),
+    final result = await _api.get<Map<String, dynamic>>(
+      '/api/v1/visas/my-visa/$visaId',
     );
 
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body) as Map<String, dynamic>;
+    if (result.isSuccess && result.data != null) {
+      return result.data!;
     }
-
-    throw Exception(_parseError(response, 'Failed to load visa application'));
-  }
-
-  /// Get or create visa application for the current user (backward compat).
-  Future<Map<String, dynamic>> getMyVisa({
-    String? participantId,
-    int? eventId,
-  }) async {
-    final query =
-        _buildQueryParams(participantId: participantId, eventId: eventId);
-
-    final response = await _withRetry(
-      (token) => http.get(
-        Uri.parse('$_baseUrl/my-visa$query'),
-        headers: _authHeaders(token),
-      ),
-    );
-
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body) as Map<String, dynamic>;
-    }
-
-    throw Exception(_parseError(response, 'Failed to load visa application'));
+    throw result.error ?? Exception('Failed to load visa application');
   }
 
   /// Update a specific visa application by ID.
@@ -146,85 +65,88 @@ class VisaService {
     required String visaId,
     required Map<String, dynamic> data,
   }) async {
-    final response = await _withRetry(
-      (token) => http.put(
-        Uri.parse('$_baseUrl/my-visa/$visaId'),
-        headers: _authHeaders(token),
-        body: jsonEncode(data),
-      ),
+    final result = await _api.put<Map<String, dynamic>>(
+      '/api/v1/visas/my-visa/$visaId',
+      body: data,
     );
 
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body) as Map<String, dynamic>;
+    if (result.isSuccess && result.data != null) {
+      return result.data!;
     }
-
-    throw Exception(
-        _parseError(response, 'Failed to update visa application'));
+    throw result.error ?? Exception('Failed to update visa application');
   }
 
-  /// Update visa application with form data (backward compat).
+  /// Submit a specific visa application by ID for review.
+  Future<Map<String, dynamic>> submitMyVisaById(String visaId) async {
+    final result = await _api.post<Map<String, dynamic>>(
+      '/api/v1/visas/my-visa/$visaId/submit',
+    );
+
+    if (result.isSuccess && result.data != null) {
+      return result.data!;
+    }
+    throw result.error ?? Exception('Failed to submit visa application');
+  }
+
+  /// Delete a specific visa application by ID.
+  Future<void> deleteMyVisaById(String visaId) async {
+    final result = await _api.delete<Map<String, dynamic>>(
+      '/api/v1/visas/my-visa/$visaId',
+    );
+
+    if (!result.isSuccess) {
+      throw result.error ?? Exception('Failed to delete visa application');
+    }
+  }
+
+  /// Get or create visa application for the current user (backward compat).
+  Future<Map<String, dynamic>> getMyVisa({
+    String? participantId,
+    int? eventId,
+  }) async {
+    final result = await _api.get<Map<String, dynamic>>(
+      '/api/v1/visas/my-visa',
+      queryParams: _buildQueryParams(participantId: participantId, eventId: eventId),
+    );
+
+    if (result.isSuccess && result.data != null) {
+      return result.data!;
+    }
+    throw result.error ?? Exception('Failed to load visa application');
+  }
+
+  /// Update visa application with form data
   Future<Map<String, dynamic>> updateMyVisa({
     String? participantId,
     int? eventId,
     required Map<String, dynamic> data,
   }) async {
-    final query =
-        _buildQueryParams(participantId: participantId, eventId: eventId);
-
-    final response = await _withRetry(
-      (token) => http.put(
-        Uri.parse('$_baseUrl/my-visa$query'),
-        headers: _authHeaders(token),
-        body: jsonEncode(data),
-      ),
+    final result = await _api.put<Map<String, dynamic>>(
+      '/api/v1/visas/my-visa',
+      queryParams: _buildQueryParams(participantId: participantId, eventId: eventId),
+      body: data,
     );
 
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body) as Map<String, dynamic>;
+    if (result.isSuccess && result.data != null) {
+      return result.data!;
     }
-
-    throw Exception(
-        _parseError(response, 'Failed to update visa application'));
+    throw result.error ?? Exception('Failed to update visa application');
   }
 
-  /// Submit a specific visa application by ID for review.
-  Future<Map<String, dynamic>> submitMyVisaById(String visaId) async {
-    final response = await _withRetry(
-      (token) => http.post(
-        Uri.parse('$_baseUrl/my-visa/$visaId/submit'),
-        headers: _authHeaders(token),
-      ),
-    );
-
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body) as Map<String, dynamic>;
-    }
-
-    throw Exception(
-        _parseError(response, 'Failed to submit visa application'));
-  }
-
-  /// Submit visa application for review (backward compat).
+  /// Submit visa application for review
   Future<Map<String, dynamic>> submitMyVisa({
     String? participantId,
     int? eventId,
   }) async {
-    final query =
-        _buildQueryParams(participantId: participantId, eventId: eventId);
-
-    final response = await _withRetry(
-      (token) => http.post(
-        Uri.parse('$_baseUrl/my-visa/submit$query'),
-        headers: _authHeaders(token),
-      ),
+    final result = await _api.post<Map<String, dynamic>>(
+      '/api/v1/visas/my-visa/submit',
+      queryParams: _buildQueryParams(participantId: participantId, eventId: eventId),
     );
 
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body) as Map<String, dynamic>;
+    if (result.isSuccess && result.data != null) {
+      return result.data!;
     }
-
-    throw Exception(
-        _parseError(response, 'Failed to submit visa application'));
+    throw result.error ?? Exception('Failed to submit visa application');
   }
 
   /// Validate visa application without submitting
@@ -232,30 +154,25 @@ class VisaService {
     String? participantId,
     int? eventId,
   }) async {
-    final query =
-        _buildQueryParams(participantId: participantId, eventId: eventId);
-
-    final response = await _withRetry(
-      (token) => http.get(
-        Uri.parse('$_baseUrl/my-visa/validate$query'),
-        headers: _authHeaders(token),
-      ),
+    final result = await _api.get<Map<String, dynamic>>(
+      '/api/v1/visas/my-visa/validate',
+      queryParams: _buildQueryParams(participantId: participantId, eventId: eventId),
     );
 
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body) as Map<String, dynamic>;
+    if (result.isSuccess && result.data != null) {
+      return result.data!;
     }
-
-    throw Exception(
-        _parseError(response, 'Failed to validate visa application'));
+    throw result.error ?? Exception('Failed to validate visa application');
   }
 
   /// Upload visa photo to server
+  /// Returns photo URL on success
   Future<String> uploadPhoto({
     String? participantId,
     required dynamic photoData, // File for mobile, Uint8List for web
   }) async {
-    final token = await _getToken();
+    final token = await _tokenProvider.getToken();
+    if (token == null) throw Exception('Not authenticated');
 
     final request = http.MultipartRequest(
       'POST',
@@ -269,14 +186,9 @@ class VisaService {
         ? 'photo_$participantId.jpg'
         : 'photo_${DateTime.now().millisecondsSinceEpoch}.jpg';
 
-    // Handle both File (mobile) and Uint8List (web)
     if (kIsWeb && photoData is Uint8List) {
       request.files.add(
-        http.MultipartFile.fromBytes(
-          'file',
-          photoData,
-          filename: filename,
-        ),
+        http.MultipartFile.fromBytes('file', photoData, filename: filename),
       );
     } else if (photoData is File) {
       request.files.add(
@@ -294,6 +206,16 @@ class VisaService {
       return data['url'] as String;
     }
 
-    throw Exception('Failed to upload photo');
+    // Safe error parsing — responseData may be empty if CORS blocked the body
+    String errorMsg = 'Failed to upload photo';
+    try {
+      if (responseData.isNotEmpty) {
+        final error = jsonDecode(responseData);
+        if (error is Map<String, dynamic>) {
+          errorMsg = error['message'] ?? error['detail'] ?? errorMsg;
+        }
+      }
+    } catch (_) {}
+    throw Exception(errorMsg);
   }
 }

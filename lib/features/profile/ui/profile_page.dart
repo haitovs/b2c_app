@@ -1,64 +1,53 @@
 import 'dart:io';
-import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:csc_picker_plus/csc_picker_plus.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
-import 'package:provider/provider.dart';
 
-import '../../../core/config/app_config.dart';
+import '../../../core/providers/reference_data_provider.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/app_snackbar.dart';
+import '../../../core/widgets/app_text_field.dart';
 import '../../../core/widgets/phone_input_field.dart';
-import '../../../shared/widgets/legal_bottom_sheet.dart';
-import '../../auth/services/auth_service.dart';
+import '../../../core/widgets/website_input_field.dart';
+import '../../../shared/widgets/country_city_picker.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../models/social_network.dart';
+import '../providers/profile_providers.dart';
 
-class ProfilePage extends StatefulWidget {
-  final int initialTab;
+class ProfilePage extends ConsumerStatefulWidget {
   final String? returnTo;
-  final bool highlightConfirmButton;
 
   const ProfilePage({
     super.key,
-    this.initialTab = 1,
     this.returnTo,
-    this.highlightConfirmButton = false,
   });
 
   @override
-  State<ProfilePage> createState() => _ProfilePageState();
+  ConsumerState<ProfilePage> createState() => _ProfilePageState();
 }
 
-class _ProfilePageState extends State<ProfilePage>
-    with SingleTickerProviderStateMixin {
-  late int _currentTab;
+class _ProfilePageState extends ConsumerState<ProfilePage> {
   bool _isEditing = false;
-  bool _agreedToTerms = false;
+  bool _hasPopulatedControllers = false;
   XFile? _selectedImage;
-  Uint8List? _selectedImageBytes; // Store image bytes for upload
-  String? _profilePhotoUrl; // Profile photo URL from user data
-  String _mobileE164 = ''; // Store mobile in E.164 format (e.g., +99361444555)
-
-  // Button highlight animation
-  late AnimationController _highlightController;
-  late Animation<double> _highlightAnimation;
-  bool _showHighlight = false;
-
-  // Scroll controller for auto-scroll to button
-  final ScrollController _scrollController = ScrollController();
+  Uint8List? _selectedImageBytes;
+  String? _profilePhotoUrl;
+  String _mobileE164 = '';
 
   // Controllers
   late TextEditingController _nameController;
   late TextEditingController _surnameController;
   late TextEditingController _emailController;
-  late TextEditingController _mobileController;
 
-  String _selectedCountry = '';
-  String _selectedCity = '';
+  String _selectedGender = '';
+  String? _selectedCountry;
+  String? _selectedCity;
+  String? _selectedNationality;
 
   late TextEditingController _companyNameController;
   late TextEditingController _websiteController;
@@ -69,56 +58,10 @@ class _ProfilePageState extends State<ProfilePage>
   @override
   void initState() {
     super.initState();
-    _currentTab = widget.initialTab.clamp(0, 2); // Ensure valid tab index
-
-    // Setup highlight animation
-    _highlightController = AnimationController(
-      duration: const Duration(milliseconds: 1500),
-      vsync: this,
-    );
-    _highlightAnimation = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _highlightController, curve: Curves.easeInOut),
-    );
-
-    // Start highlight animation if coming from agreement dialog
-    if (widget.highlightConfirmButton && widget.initialTab == 0) {
-      _showHighlight = true;
-      // Start animation after widget is built
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        int cycles = 0;
-        void listener(AnimationStatus status) {
-          if (status == AnimationStatus.completed ||
-              status == AnimationStatus.dismissed) {
-            cycles++;
-            if (cycles >= 4) {
-              // 2 full cycles (forward+reverse each)
-              _highlightController.removeStatusListener(listener);
-              _highlightController.stop();
-              if (mounted) setState(() => _showHighlight = false);
-            }
-          }
-        }
-
-        _highlightController.addStatusListener(listener);
-        _highlightController.repeat(reverse: true);
-
-        // Auto-scroll to checkbox area
-        Future.delayed(const Duration(milliseconds: 300), () {
-          if (mounted && _scrollController.hasClients) {
-            _scrollController.animateTo(
-              _scrollController.position.maxScrollExtent,
-              duration: const Duration(milliseconds: 600),
-              curve: Curves.easeOut,
-            );
-          }
-        });
-      });
-    }
 
     _nameController = TextEditingController();
     _surnameController = TextEditingController();
     _emailController = TextEditingController();
-    _mobileController = TextEditingController();
 
     _companyNameController = TextEditingController();
     _websiteController = TextEditingController();
@@ -127,12 +70,9 @@ class _ProfilePageState extends State<ProfilePage>
 
   @override
   void dispose() {
-    _highlightController.dispose();
-    _scrollController.dispose();
     _nameController.dispose();
     _surnameController.dispose();
     _emailController.dispose();
-    _mobileController.dispose();
     _companyNameController.dispose();
     _websiteController.dispose();
     _positionController.dispose();
@@ -145,35 +85,32 @@ class _ProfilePageState extends State<ProfilePage>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final user = context.read<AuthService>().currentUser;
+    if (_hasPopulatedControllers) return;
+    final user = ref.read(authNotifierProvider).currentUser;
     if (user != null) {
+      _hasPopulatedControllers = true;
       _nameController.text = user['first_name'] ?? '';
       _surnameController.text = user['last_name'] ?? '';
       _emailController.text = user['email'] ?? '';
-      // Load profile photo URL and trigger rebuild
       _profilePhotoUrl = user['photo_url'];
-      if (mounted) {
-        setState(() {});
-      }
+      if (mounted) setState(() {});
 
-      // Store mobile in E.164 format for PhoneInputField
       _mobileE164 = user['mobile'] ?? '';
 
-      _selectedCountry = user['country'] ?? '';
-      _selectedCity = user['city'] ?? '';
+      _selectedGender = user['gender'] ?? '';
+      _selectedNationality =
+          (user['nationality'] ?? '').toString().isNotEmpty ? user['nationality'] : null;
+      _selectedCountry =
+          (user['country'] ?? '').toString().isNotEmpty ? user['country'] : null;
+      _selectedCity =
+          (user['city'] ?? '').toString().isNotEmpty ? user['city'] : null;
 
       _companyNameController.text = user['company_name'] ?? '';
       _websiteController.text = user['website'] ?? '';
       _positionController.text = user['position'] ?? '';
 
-      // Set agreement checkbox from user's saved status
-      if (user['has_agreed_terms'] == true) {
-        _agreedToTerms = true;
-      }
-
       // Load social links
       if (user['social_links'] != null) {
-        // Dispose old entries first
         for (final entry in _socialLinks) {
           entry.dispose();
         }
@@ -208,65 +145,69 @@ class _ProfilePageState extends State<ProfilePage>
     }
   }
 
-  /// Upload profile photo to server and return URL
   Future<String?> _uploadProfilePhoto() async {
     if (_selectedImageBytes == null) return null;
 
     try {
-      final authService = context.read<AuthService>();
-      final token = await authService.getToken();
-
-      var request = http.MultipartRequest(
-        'POST',
-        Uri.parse('${AppConfig.b2cApiBaseUrl}/api/v1/files/upload'),
-      );
-
-      request.headers['Authorization'] = 'Bearer $token';
-      request.files.add(
-        http.MultipartFile.fromBytes(
-          'file',
-          _selectedImageBytes!,
-          filename:
-              'profile_photo_${DateTime.now().millisecondsSinceEpoch}.jpg',
-        ),
-      );
-
-      final response = await request.send();
-      final responseBody = await response.stream.bytesToString();
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final data = jsonDecode(responseBody);
-        return data['url'] ?? data['file_url'];
-      } else {
-        throw Exception('Upload failed: ${response.statusCode}');
-      }
+      final profileService = ref.read(profileServiceProvider);
+      return await profileService.uploadProfilePhoto(_selectedImageBytes!);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Photo upload failed: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppSnackBar.showError(context, 'Photo upload failed: $e');
       }
       return null;
     }
   }
 
-  /// Show password change dialog
+  Future<void> _saveProfile() async {
+    // Upload photo if selected
+    String? photoUrl;
+    if (_selectedImageBytes != null) {
+      photoUrl = await _uploadProfilePhoto();
+    }
+
+    final updates = {
+      'first_name': _nameController.text,
+      'last_name': _surnameController.text,
+      'mobile': _mobileE164,
+      'gender': _selectedGender.isNotEmpty ? _selectedGender : null,
+      'nationality': _selectedNationality,
+      'country': _selectedCountry,
+      'city': _selectedCity,
+      'company_name': _companyNameController.text,
+      'website': _websiteController.text,
+      'position': _positionController.text,
+      if (photoUrl != null) 'photo_url': photoUrl,
+      'social_links': _socialLinks
+          .where((e) => e.controller.text.isNotEmpty)
+          .map((e) => e.toJson())
+          .toList(),
+    };
+
+    final error = await ref
+        .read(authNotifierProvider.notifier)
+        .updateProfile(updates);
+    if (!mounted) return;
+    if (error != null) {
+      AppSnackBar.showInfo(context, error);
+      return;
+    }
+    setState(() => _isEditing = false);
+  }
+
   Future<void> _showChangePasswordDialog() async {
     final currentPasswordController = TextEditingController();
     final newPasswordController = TextEditingController();
     final confirmPasswordController = TextEditingController();
-    bool obscureCurrentPassword = true;
-    bool obscureNewPassword = true;
-    bool obscureConfirmPassword = true;
+    bool obscureCurrent = true;
+    bool obscureNew = true;
+    bool obscureConfirm = true;
 
     return showDialog(
       context: context,
       builder: (dialogContext) {
         return StatefulBuilder(
-          builder: (context, setState) {
+          builder: (context, setDialogState) {
             return AlertDialog(
               title: Text(
                 "Change Password",
@@ -280,69 +221,64 @@ class _ProfilePageState extends State<ProfilePage>
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Current Password
                     TextField(
                       controller: currentPasswordController,
-                      obscureText: obscureCurrentPassword,
+                      obscureText: obscureCurrent,
                       decoration: InputDecoration(
                         labelText: "Current Password",
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(5),
+                          borderRadius: BorderRadius.circular(8),
                         ),
                         suffixIcon: IconButton(
                           icon: Icon(
-                            obscureCurrentPassword
+                            obscureCurrent
                                 ? Icons.visibility_off
                                 : Icons.visibility,
                           ),
-                          onPressed: () => setState(
-                            () => obscureCurrentPassword =
-                                !obscureCurrentPassword,
+                          onPressed: () => setDialogState(
+                            () => obscureCurrent = !obscureCurrent,
                           ),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 20),
-                    // New Password
+                    const SizedBox(height: 16),
                     TextField(
                       controller: newPasswordController,
-                      obscureText: obscureNewPassword,
+                      obscureText: obscureNew,
                       decoration: InputDecoration(
                         labelText: "New Password (min 8 characters)",
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(5),
+                          borderRadius: BorderRadius.circular(8),
                         ),
                         suffixIcon: IconButton(
                           icon: Icon(
-                            obscureNewPassword
+                            obscureNew
                                 ? Icons.visibility_off
                                 : Icons.visibility,
                           ),
-                          onPressed: () => setState(
-                            () => obscureNewPassword = !obscureNewPassword,
+                          onPressed: () => setDialogState(
+                            () => obscureNew = !obscureNew,
                           ),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 20),
-                    // Confirm Password
+                    const SizedBox(height: 16),
                     TextField(
                       controller: confirmPasswordController,
-                      obscureText: obscureConfirmPassword,
+                      obscureText: obscureConfirm,
                       decoration: InputDecoration(
                         labelText: "Confirm New Password",
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(5),
+                          borderRadius: BorderRadius.circular(8),
                         ),
                         suffixIcon: IconButton(
                           icon: Icon(
-                            obscureConfirmPassword
+                            obscureConfirm
                                 ? Icons.visibility_off
                                 : Icons.visibility,
                           ),
-                          onPressed: () => setState(
-                            () => obscureConfirmPassword =
-                                !obscureConfirmPassword,
+                          onPressed: () => setDialogState(
+                            () => obscureConfirm = !obscureConfirm,
                           ),
                         ),
                       ),
@@ -360,82 +296,46 @@ class _ProfilePageState extends State<ProfilePage>
                 ),
                 ElevatedButton(
                   onPressed: () async {
-                    // Validation
                     if (currentPasswordController.text.isEmpty) {
-                      ScaffoldMessenger.of(this.context).showSnackBar(
-                        const SnackBar(
-                          content: Text("Current password is required"),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
+                      AppSnackBar.showError(
+                          this.context, 'Current password is required');
                       return;
                     }
                     if (newPasswordController.text.length < 8) {
-                      ScaffoldMessenger.of(this.context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            "New password must be at least 8 characters",
-                          ),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
+                      AppSnackBar.showError(this.context,
+                          'New password must be at least 8 characters');
                       return;
                     }
                     if (newPasswordController.text !=
                         confirmPasswordController.text) {
-                      ScaffoldMessenger.of(this.context).showSnackBar(
-                        const SnackBar(
-                          content: Text("Passwords do not match"),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
+                      AppSnackBar.showError(
+                          this.context, 'Passwords do not match');
                       return;
                     }
 
-                    // Call API
                     try {
-                      final authService = this.context.read<AuthService>();
-                      final token = await authService.getToken();
-                      final response = await http.patch(
-                        Uri.parse(
-                          '${AppConfig.b2cApiBaseUrl}/api/v1/users/me/password?current_password=${Uri.encodeComponent(currentPasswordController.text)}&new_password=${Uri.encodeComponent(newPasswordController.text)}',
-                        ),
-                        headers: {'Authorization': 'Bearer $token'},
+                      final profileService =
+                          ref.read(profileServiceProvider);
+                      final error = await profileService.changePassword(
+                        currentPassword: currentPasswordController.text,
+                        newPassword: newPasswordController.text,
                       );
 
-                      if (response.statusCode == 200) {
-                        if (!this.context.mounted) return;
+                      if (!this.context.mounted) return;
+                      if (error == null) {
                         Navigator.pop(dialogContext);
-                        ScaffoldMessenger.of(this.context).showSnackBar(
-                          const SnackBar(
-                            content: Text("Password changed successfully!"),
-                            backgroundColor: Colors.green,
-                          ),
-                        );
+                        AppSnackBar.showSuccess(
+                            this.context, 'Password changed successfully!');
                       } else {
-                        final error = jsonDecode(response.body);
-                        if (!this.context.mounted) return;
-                        ScaffoldMessenger.of(this.context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              error['message'] ?? error['detail'] ?? 'Failed to change password',
-                            ),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
+                        AppSnackBar.showError(this.context, error);
                       }
                     } catch (e) {
                       if (!this.context.mounted) return;
-                      ScaffoldMessenger.of(this.context).showSnackBar(
-                        SnackBar(
-                          content: Text('Error: $e'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
+                      AppSnackBar.showError(this.context, 'Error: $e');
                     }
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF3C4494),
+                    backgroundColor: AppColors.gradientStart,
                   ),
                   child: Text(
                     "Change Password",
@@ -450,53 +350,32 @@ class _ProfilePageState extends State<ProfilePage>
     );
   }
 
-  /// Builds a ripple ring that expands and fades out
-  Widget _buildRippleRing(double progress, Color color, double maxSize) {
-    final size = 24.0 + (maxSize - 24.0) * progress;
-    final opacity = (1.0 - progress).clamp(0.0, 1.0);
-
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        border: Border.all(
-          color: color.withValues(alpha: opacity * 0.6),
-          width: 2,
-        ),
-        borderRadius: BorderRadius.circular(size / 4),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF3C4494),
-      body: LayoutBuilder(
+    return Container(
+      color: AppColors.gradientStart,
+      child: LayoutBuilder(
         builder: (context, constraints) {
           final isMobile = constraints.maxWidth < 1000;
 
           return Column(
             children: [
-              // Header
               _buildHeader(isMobile),
-              // Tabs
-              _buildTabBar(isMobile),
-              // Content
               Expanded(
                 child: Container(
                   width: double.infinity,
                   decoration: const BoxDecoration(
-                    color: Color(0xFFF1F1F6),
+                    color: AppColors.cardBackground,
                     borderRadius: BorderRadius.only(
                       topLeft: Radius.circular(20),
                       topRight: Radius.circular(20),
                     ),
                   ),
                   child: SingleChildScrollView(
-                    controller: _scrollController,
                     padding: EdgeInsets.all(isMobile ? 20 : 50),
-                    child: _buildCurrentTabContent(isMobile),
+                    child: isMobile
+                        ? _buildMobileLayout()
+                        : _buildDesktopLayout(),
                   ),
                 ),
               ),
@@ -516,7 +395,6 @@ class _ProfilePageState extends State<ProfilePage>
       child: SafeArea(
         child: Row(
           children: [
-            // Back button
             IconButton(
               icon: Icon(
                 Icons.arrow_back,
@@ -524,44 +402,24 @@ class _ProfilePageState extends State<ProfilePage>
                 size: isMobile ? 24 : 28,
               ),
               onPressed: () {
-                // Use returnTo if available, otherwise go to home
                 if (widget.returnTo != null && widget.returnTo!.isNotEmpty) {
                   context.go(widget.returnTo!);
                 } else if (context.canPop()) {
                   context.pop();
                 } else {
-                  context.go('/'); // Go to home (event calendar)
+                  context.go('/');
                 }
               },
             ),
             const SizedBox(width: 12),
-            // Title
             Text(
-              "My profile",
+              "Profile",
               style: GoogleFonts.montserrat(
                 color: Colors.white,
                 fontSize: isMobile ? 22 : 32,
                 fontWeight: FontWeight.w600,
+                decoration: TextDecoration.none,
               ),
-            ),
-            const Spacer(),
-            // Icons
-            IconButton(
-              icon: Icon(
-                Icons.notifications_outlined,
-                color: Colors.white,
-                size: isMobile ? 22 : 24,
-              ),
-              onPressed: () {},
-            ),
-            const SizedBox(width: 6),
-            IconButton(
-              icon: Icon(
-                Icons.person_outline,
-                color: Colors.white,
-                size: isMobile ? 22 : 24,
-              ),
-              onPressed: () {},
             ),
           ],
         ),
@@ -569,389 +427,7 @@ class _ProfilePageState extends State<ProfilePage>
     );
   }
 
-  Widget _buildTabBar(bool isMobile) {
-    final tabs = ["Agreement process", "My profile"];
-
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: isMobile ? 10 : 50),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: List.generate(tabs.length, (index) {
-            final isActive = _currentTab == index;
-            return Padding(
-              padding: EdgeInsets.only(right: isMobile ? 15 : 40),
-              child: GestureDetector(
-                onTap: () => setState(() => _currentTab = index),
-                child: Column(
-                  children: [
-                    Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: isMobile ? 12 : 20,
-                        vertical: isMobile ? 8 : 12,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isActive
-                            ? const Color(0xFFF1F1F6)
-                            : Colors.transparent,
-                        borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(10),
-                          topRight: Radius.circular(10),
-                        ),
-                      ),
-                      child: Text(
-                        tabs[index],
-                        style: GoogleFonts.montserrat(
-                          fontSize: isMobile ? 14 : 25,
-                          fontWeight: FontWeight.w600,
-                          color: isActive
-                              ? const Color(0xFF3C4494)
-                              : const Color.fromRGBO(255, 255, 255, 0.7),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCurrentTabContent(bool isMobile) {
-    switch (_currentTab) {
-      case 0:
-        return _buildAgreementProcess();
-      case 1:
-        return isMobile ? _buildMobileLayout() : _buildDesktopLayout();
-      default:
-        return const SizedBox();
-    }
-  }
-
-  // ============== Agreement Process Tab ==============
-
-  Widget _buildAgreementProcess() {
-    return Container(
-      constraints: const BoxConstraints(maxWidth: 1240),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      padding: const EdgeInsets.all(40),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Title
-          Text(
-            "Participation Agreement Process",
-            style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 20),
-          ),
-          const SizedBox(height: 20),
-          // Description
-          Text(
-            'You are at the final stage of registration. Please carefully review the terms and conditions for participating in the "Future of Tech 2026" Forum and confirm your agreement to gain full access.',
-            style: GoogleFonts.roboto(
-              fontSize: 18,
-              height: 1.39,
-              color: const Color.fromRGBO(21, 25, 56, 0.85),
-            ),
-          ),
-          const SizedBox(height: 50),
-
-          // Step 1: Document Review
-          Text(
-            "Step 1: Document Review",
-            style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 20),
-          ),
-          const SizedBox(height: 20),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final isMobile = constraints.maxWidth < 600;
-              if (isMobile) {
-                // Stack vertically on mobile
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "To proceed, please read the following documents:",
-                      style: GoogleFonts.roboto(
-                        fontSize: 16,
-                        color: const Color.fromRGBO(21, 25, 56, 0.85),
-                      ),
-                    ),
-                    const SizedBox(height: 15),
-                    _buildDocumentLink("Terms and Conditions", "TERMS"),
-                    const SizedBox(height: 10),
-                    _buildDocumentLink("Privacy Policy", "PRIVACY"),
-                    const SizedBox(height: 10),
-                    _buildDocumentLink("Refund Policy", "REFUND"),
-                  ],
-                );
-              } else {
-                // Side by side on desktop
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      flex: 2,
-                      child: Text(
-                        "To proceed, please read the following documents:",
-                        style: GoogleFonts.roboto(
-                          fontSize: 18,
-                          color: const Color.fromRGBO(21, 25, 56, 0.85),
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      flex: 3,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildDocumentLink(
-                            "Terms and Conditions (ToS)",
-                            "TERMS",
-                          ),
-                          const SizedBox(height: 15),
-                          _buildDocumentLink("Privacy Policy", "PRIVACY"),
-                          const SizedBox(height: 15),
-                          _buildDocumentLink("Refund Policy", "REFUND"),
-                        ],
-                      ),
-                    ),
-                  ],
-                );
-              }
-            },
-          ),
-          const SizedBox(height: 50),
-
-          // Divider
-          const Divider(color: Color(0xFFD2D2D2), thickness: 1),
-          const SizedBox(height: 40),
-
-          // Step 2: Final Agreement
-          Text(
-            "Step 2: Final Agreement",
-            style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 20),
-          ),
-          const SizedBox(height: 20),
-          // Checkbox row
-          Row(
-            children: [
-              // Animated checkbox with ripple ring effect - fixed size to prevent layout shift
-              SizedBox(
-                width: 40,
-                height: 40,
-                child: AnimatedBuilder(
-                  animation: _highlightAnimation,
-                  builder: (context, _) {
-                    // Elastic bounce effect
-                    final bounce = _showHighlight
-                        ? 1.0 +
-                              0.1 *
-                                  Curves.elasticOut.transform(
-                                    (_highlightAnimation.value * 2).clamp(
-                                      0.0,
-                                      1.0,
-                                    ),
-                                  )
-                        : 1.0;
-
-                    return Stack(
-                      alignment: Alignment.center,
-                      clipBehavior: Clip.none,
-                      children: [
-                        // Ripple rings (expanding circles that fade)
-                        if (_showHighlight) ...[
-                          // First ring
-                          _buildRippleRing(
-                            _highlightAnimation.value,
-                            const Color(0xFF3C4494),
-                            32,
-                          ),
-                          // Second ring (delayed)
-                          _buildRippleRing(
-                            (_highlightAnimation.value - 0.3).clamp(0.0, 1.0),
-                            const Color(0xFF3C4494),
-                            32,
-                          ),
-                        ],
-                        // The checkbox
-                        Transform.scale(
-                          scale: bounce,
-                          child: GestureDetector(
-                            onTap: () {
-                              // Only allow toggling if user hasn't already confirmed
-                              final hasConfirmed = context
-                                  .read<AuthService>()
-                                  .hasAgreedTerms;
-                              if (!hasConfirmed) {
-                                setState(
-                                  () => _agreedToTerms = !_agreedToTerms,
-                                );
-                              }
-                            },
-                            child: Container(
-                              width: 24,
-                              height: 24,
-                              decoration: BoxDecoration(
-                                border: Border.all(
-                                  color: _showHighlight || _agreedToTerms
-                                      ? const Color(0xFF3C4494)
-                                      : const Color(0xFFB7B7B7),
-                                  width: 2,
-                                ),
-                                borderRadius: BorderRadius.circular(6),
-                                color: _agreedToTerms
-                                    ? const Color(0xFF3C4494)
-                                    : Colors.white,
-                                boxShadow: _showHighlight
-                                    ? [
-                                        BoxShadow(
-                                          color: const Color(
-                                            0xFF3C4494,
-                                          ).withValues(alpha: 0.3),
-                                          blurRadius: 8,
-                                          spreadRadius: 1,
-                                        ),
-                                      ]
-                                    : null,
-                              ),
-                              child: _agreedToTerms
-                                  ? const Icon(
-                                      Icons.check,
-                                      size: 18,
-                                      color: Colors.white,
-                                    )
-                                  : null,
-                            ),
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(width: 15),
-              Flexible(
-                child: Text(
-                  "I have read and agree to the Terms and Conditions and the Privacy Policy.",
-                  style: GoogleFonts.roboto(
-                    fontSize: 18,
-                    color: const Color.fromRGBO(21, 25, 56, 0.85),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 80),
-
-          // Confirm Button
-          SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton(
-              // Only enable if checkbox is checked AND user hasn't already confirmed
-              onPressed:
-                  (_agreedToTerms &&
-                      !context.read<AuthService>().hasAgreedTerms)
-                  ? () async {
-                      // Save agreement to API
-                      final error = await context
-                          .read<AuthService>()
-                          .updateProfile({'has_agreed_terms': true});
-                      if (!mounted) return;
-                      if (error != null) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(error),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                        return;
-                      }
-
-                      // Show success message
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            "Agreement confirmed! You now have full access.",
-                          ),
-                          backgroundColor: Colors.green,
-                          duration: Duration(seconds: 3),
-                        ),
-                      );
-
-                      // Redirect to returnTo URL if available, otherwise switch to My Profile tab
-                      if (widget.returnTo != null &&
-                          widget.returnTo!.isNotEmpty) {
-                        context.go(widget.returnTo!);
-                      } else {
-                        // Stay on profile page but switch to My Profile tab
-                        setState(() => _currentTab = 1);
-                      }
-                    }
-                  : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF3C4494),
-                disabledBackgroundColor: const Color(0xFFD9D9D9),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-              ),
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  "Confirm and Complete Registration",
-                  style: GoogleFonts.roboto(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: const Color(0xFFF1F1F6),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDocumentLink(String title, String docType) {
-    return GestureDetector(
-      onTap: () => LegalBottomSheet.show(context, docType),
-      child: Wrap(
-        children: [
-          Text(
-            title,
-            style: GoogleFonts.inter(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              decoration: TextDecoration.underline,
-              color: const Color(0xFF3C4494),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            "(View)",
-            style: GoogleFonts.roboto(
-              fontSize: 16,
-              color: const Color.fromRGBO(21, 25, 56, 0.85),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ============== Company Profile Tab ==============
+  // ============== Layouts ==============
 
   Widget _buildDesktopLayout() {
     return Row(
@@ -968,7 +444,7 @@ class _ProfilePageState extends State<ProfilePage>
     return Column(
       children: [
         _buildProfilePhoto(),
-        const SizedBox(height: 30),
+        const SizedBox(height: 32),
         _buildFormContainer(),
       ],
     );
@@ -981,48 +457,44 @@ class _ProfilePageState extends State<ProfilePage>
           width: 300,
           height: 351,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(12),
             color: Colors.grey[300],
           ),
           clipBehavior: Clip.hardEdge,
           child: _selectedImage != null
               ? (kIsWeb
-                    ? Image.network(_selectedImage!.path, fit: BoxFit.cover)
-                    : Image.file(File(_selectedImage!.path), fit: BoxFit.cover))
+                  ? Image.network(_selectedImage!.path, fit: BoxFit.cover)
+                  : Image.file(File(_selectedImage!.path), fit: BoxFit.cover))
               : (_profilePhotoUrl != null && _profilePhotoUrl!.isNotEmpty)
-              ? Image.network(
-                  _profilePhotoUrl!,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    // Fallback to placeholder if image fails to load
-                    return const Icon(
-                      Icons.person,
-                      size: 80,
-                      color: Color(0xFF979797),
-                    );
-                  },
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
-                    return const Center(
-                      child: CircularProgressIndicator(
-                        color: Color(0xFF3C4494),
-                      ),
-                    );
-                  },
-                )
-              : const Icon(Icons.person, size: 80, color: Color(0xFF979797)),
+                  ? Image.network(
+                      _profilePhotoUrl!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return const Icon(Icons.person,
+                            size: 80, color: Color(0xFF979797));
+                      },
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return const Center(
+                          child: CircularProgressIndicator(
+                            color: AppColors.gradientStart,
+                          ),
+                        );
+                      },
+                    )
+                  : const Icon(Icons.person, size: 80, color: Color(0xFF979797)),
         ),
-        // Upload photo button - only visible in edit mode
         if (_isEditing) ...[
-          const SizedBox(height: 15),
+          const SizedBox(height: 16),
           ElevatedButton.icon(
             onPressed: _pickImage,
             icon: const Icon(Icons.upload, size: 18),
             label: const Text("Upload Photo (5:6)"),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF3C4494),
+              backgroundColor: AppColors.gradientStart,
               foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
@@ -1033,399 +505,513 @@ class _ProfilePageState extends State<ProfilePage>
     );
   }
 
+  // ============== Form Container ==============
+
   Widget _buildFormContainer() {
-    return Container(
-      constraints: const BoxConstraints(maxWidth: 890),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      padding: const EdgeInsets.all(30),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Flexible(
-                child: Text(
-                  "Profile Information",
-                  style: GoogleFonts.inter(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 20,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: () async {
-                    if (_isEditing) {
-                      // Upload photo if selected
-                      String? photoUrl;
-                      if (_selectedImageBytes != null) {
-                        photoUrl = await _uploadProfilePhoto();
-                      }
-
-                      final updates = {
-                        'first_name': _nameController.text,
-                        'last_name': _surnameController.text,
-                        'mobile': _mobileE164,
-                        'country': _selectedCountry,
-                        'city': _selectedCity,
-                        'company_name': _companyNameController.text,
-                        'website': _websiteController.text,
-                        'position': _positionController.text,
-                        if (photoUrl != null) 'photo_url': photoUrl,
-                        'social_links': _socialLinks
-                            .where((e) => e.controller.text.isNotEmpty)
-                            .map((e) => e.toJson())
-                            .toList(),
-                      };
-
-                      final error = await context
-                          .read<AuthService>()
-                          .updateProfile(updates);
-                      if (!mounted) return;
-                      if (error != null) {
-                        ScaffoldMessenger.of(
-                          context,
-                        ).showSnackBar(SnackBar(content: Text(error)));
-                        return;
-                      }
-                    }
-                    setState(() {
-                      _isEditing = !_isEditing;
-                    });
-                  },
-                  borderRadius: BorderRadius.circular(50),
-                  child: Container(
-                    width: 85,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      border: Border.all(
-                        color: _isEditing
-                            ? const Color(0xFF008000)
-                            : const Color(0xFFD9D9D9),
-                      ),
-                      borderRadius: BorderRadius.circular(50),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          _isEditing ? "Save" : "Edit",
-                          style: GoogleFonts.inter(
-                            fontSize: 16,
-                            color: _isEditing
-                                ? const Color(0xFF008000)
-                                : const Color.fromRGBO(0, 0, 0, 0.5),
-                          ),
-                        ),
-                        const SizedBox(width: 5),
-                        Icon(
-                          _isEditing ? Icons.check : Icons.edit,
-                          size: 14,
-                          color: _isEditing
-                              ? const Color(0xFF008000)
-                              : const Color.fromRGBO(0, 0, 0, 0.5),
-                        ),
-                      ],
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 890),
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header row
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Flexible(
+                  child: Text(
+                    "Profile Information",
+                    style: GoogleFonts.montserrat(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 20,
                     ),
                   ),
                 ),
-              ),
-            ],
-          ),
+                const SizedBox(width: 12),
+                _buildEditSaveButton(),
+              ],
+            ),
 
-          const SizedBox(height: 30),
+            const SizedBox(height: 24),
 
-          // Personal info fields
-          Wrap(
-            spacing: 20,
-            runSpacing: 30,
-            children: [
-              _buildField("Name", _nameController),
-              _buildField("Surname", _surnameController),
-              _buildField("E-mail address", _emailController),
+            // Name / Surname
+            _buildTwoColumnRow(
+              _buildTextField("Name:", _nameController),
+              _buildTextField("Surname:", _surnameController),
+            ),
+            const SizedBox(height: 16),
+
+            // Email / Mobile
+            _buildTwoColumnRow(
+              _buildTextField("E-mail address:", _emailController,
+                  keyboardType: TextInputType.emailAddress),
               _buildMobilePhoneField(),
-            ],
-          ),
+            ),
+            const SizedBox(height: 16),
 
-          const SizedBox(height: 30),
+            // Gender / Nationality
+            _buildTwoColumnRow(
+              _buildGenderField(),
+              _buildNationalityField(),
+            ),
+            const SizedBox(height: 16),
 
-          // Country / City (city depends on selected country)
-          _buildCountryCitySection(),
+            // Country / City
+            _buildCountryCitySection(),
+            const SizedBox(height: 16),
 
-          const SizedBox(height: 30),
+            // Company Name / Website
+            _buildTwoColumnRow(
+              _buildTextField("Company Name:", _companyNameController),
+              _buildWebsiteField(),
+            ),
+            const SizedBox(height: 16),
 
-          // Company info fields
-          Wrap(
-            spacing: 20,
-            runSpacing: 30,
-            children: [
-              _buildField("Company Name", _companyNameController),
-              _buildField("Company Website", _websiteController),
-              _buildField("Position", _positionController),
-            ],
-          ),
+            // Position (single column)
+            SizedBox(
+              width: 394,
+              child: _buildTextField("Position:", _positionController),
+            ),
 
-          const SizedBox(height: 50),
+            const SizedBox(height: 32),
 
-          Text(
-            "Follow Me:",
-            style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 20),
-          ),
-
-          const SizedBox(height: 30),
-
-          _buildSocialLinksSection(),
-
-          const SizedBox(height: 50),
-
-          // Security Section
-          Text(
-            "Security:",
-            style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 20),
-          ),
-
-          const SizedBox(height: 20),
-
-          SizedBox(
-            width: 394,
-            child: ElevatedButton.icon(
-              onPressed: _showChangePasswordDialog,
-              icon: const Icon(Icons.lock_outline, color: Colors.white),
-              label: Text(
-                "Change Password",
-                style: GoogleFonts.inter(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.white,
-                ),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF3C4494),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 15,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(5),
-                ),
+            // Social links
+            Text(
+              "Follow Me:",
+              style: GoogleFonts.montserrat(
+                fontWeight: FontWeight.w600,
+                fontSize: 20,
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
+            const SizedBox(height: 16),
+            _buildSocialLinksSection(),
 
-  Widget _buildField(String label, TextEditingController controller) {
-    return SizedBox(
-      width: 394,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            "$label:",
-            style: GoogleFonts.inter(
-              fontWeight: FontWeight.w500,
-              fontSize: 18,
-              color: Colors.black,
+            const SizedBox(height: 32),
+
+            // Security
+            Text(
+              "Security:",
+              style: GoogleFonts.montserrat(
+                fontWeight: FontWeight.w600,
+                fontSize: 20,
+              ),
             ),
-          ),
-          const SizedBox(height: 15),
-          Container(
-            height: 50,
-            decoration: BoxDecoration(
-              border: Border.all(color: const Color(0xFFB7B7B7)),
-              borderRadius: BorderRadius.circular(5),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            alignment: Alignment.centerLeft,
-            child: _isEditing
-                ? TextField(
-                    controller: controller,
-                    decoration: const InputDecoration(
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      isDense: true,
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                    style: GoogleFonts.inter(fontSize: 16),
-                  )
-                : Text(
-                    controller.text,
-                    style: GoogleFonts.inter(
-                      fontSize: 16,
-                      color: const Color.fromRGBO(0, 0, 0, 0.5),
-                    ),
-                    overflow: TextOverflow.ellipsis,
+            const SizedBox(height: 16),
+            SizedBox(
+              width: 394,
+              child: ElevatedButton.icon(
+                onPressed: _showChangePasswordDialog,
+                icon: const Icon(Icons.lock_outline, color: Colors.white),
+                label: Text(
+                  "Change Password",
+                  style: GoogleFonts.inter(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.white,
                   ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Custom mobile phone field that supports edit/view modes
-  Widget _buildMobilePhoneField() {
-    return SizedBox(
-      width: 394,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            "Mobile number:",
-            style: GoogleFonts.inter(
-              fontWeight: FontWeight.w500,
-              fontSize: 18,
-              color: Colors.black,
-            ),
-          ),
-          const SizedBox(height: 15),
-          if (_isEditing)
-            // Editable mode: Use PhoneInputField
-            PhoneInputField(
-              initialPhone: _mobileE164,
-              onChanged: (e164Phone) {
-                _mobileE164 = e164Phone;
-              },
-              hintText: "61444555",
-            )
-          else
-            // View mode: Display formatted phone number
-            Container(
-              height: 50,
-              decoration: BoxDecoration(
-                border: Border.all(color: const Color(0xFFB7B7B7)),
-                borderRadius: BorderRadius.circular(5),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              alignment: Alignment.centerLeft,
-              child: Text(
-                _mobileE164.isNotEmpty ? _mobileE164 : '',
-                style: GoogleFonts.inter(
-                  fontSize: 16,
-                  color: const Color.fromRGBO(0, 0, 0, 0.5),
                 ),
-                overflow: TextOverflow.ellipsis,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.gradientStart,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 20, vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
               ),
             ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  // ============== Country / City Section ==============
+  // ============== Edit/Save Button ==============
 
-  Widget _buildCountryCitySection() {
+  Widget _buildEditSaveButton() {
+    return InkWell(
+      onTap: () async {
+        if (_isEditing) {
+          await _saveProfile();
+        } else {
+          setState(() => _isEditing = true);
+        }
+      },
+      borderRadius: BorderRadius.circular(50),
+      child: Container(
+        width: 85,
+        height: 36,
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: _isEditing
+                ? const Color(0xFF008000)
+                : AppColors.inputBorder,
+          ),
+          borderRadius: BorderRadius.circular(50),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              _isEditing ? "Save" : "Edit",
+              style: GoogleFonts.inter(
+                fontSize: 16,
+                color: _isEditing
+                    ? const Color(0xFF008000)
+                    : AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              _isEditing ? Icons.check : Icons.edit,
+              size: 14,
+              color: _isEditing
+                  ? const Color(0xFF008000)
+                  : AppColors.textSecondary,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ============== Two-Column Row Helper ==============
+
+  Widget _buildTwoColumnRow(Widget left, Widget right) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 600) {
+          return Column(
+            children: [
+              left,
+              const SizedBox(height: 16),
+              right,
+            ],
+          );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: left),
+            const SizedBox(width: 16),
+            Expanded(child: right),
+          ],
+        );
+      },
+    );
+  }
+
+  // ============== Text Field (using AppTextField) ==============
+
+  Widget _buildTextField(
+    String label,
+    TextEditingController controller, {
+    TextInputType? keyboardType,
+  }) {
     if (_isEditing) {
-      return CSCPickerPlus(
-        showStates: false,
-        showCities: true,
-        currentCountry: _selectedCountry.isNotEmpty ? _selectedCountry : null,
-        currentCity: _selectedCity.isNotEmpty ? _selectedCity : null,
-        countryDropdownLabel: _selectedCountry.isNotEmpty
-            ? _selectedCountry
-            : 'Select Country',
-        cityDropdownLabel:
-            _selectedCity.isNotEmpty ? _selectedCity : 'Select City',
-        dropdownDecoration: BoxDecoration(
-          border: Border.all(color: const Color(0xFFB7B7B7)),
-          borderRadius: BorderRadius.circular(5),
-        ),
-        disabledDropdownDecoration: BoxDecoration(
-          border: Border.all(color: const Color(0xFFE0E0E0)),
-          borderRadius: BorderRadius.circular(5),
-          color: const Color(0xFFF5F5F5),
-        ),
-        selectedItemStyle: GoogleFonts.inter(fontSize: 16),
-        dropdownHeadingStyle: GoogleFonts.inter(
-          fontWeight: FontWeight.w500,
-          fontSize: 18,
-          color: Colors.black,
-        ),
-        onCountryChanged: (country) {
-          setState(() {
-            _selectedCountry = country;
-            _selectedCity = '';
-          });
-        },
-        onStateChanged: (_) {},
-        onCityChanged: (city) {
-          setState(() {
-            _selectedCity = city ?? '';
-          });
-        },
+      return AppTextField(
+        labelText: label,
+        controller: controller,
+        keyboardType: keyboardType,
       );
     }
 
-    // View mode: show as read-only text fields
-    return Wrap(
-      spacing: 20,
-      runSpacing: 30,
+    return _buildReadOnlyField(label, controller.text);
+  }
+
+  // ============== Mobile Phone Field ==============
+
+  Widget _buildMobilePhoneField() {
+    if (_isEditing) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6, left: 4),
+            child: Text("Mobile number:", style: AppTextStyles.label),
+          ),
+          PhoneInputField(
+            initialPhone: _mobileE164,
+            onChanged: (e164Phone) {
+              _mobileE164 = e164Phone;
+            },
+            hintText: "61444555",
+          ),
+        ],
+      );
+    }
+
+    return _buildReadOnlyField('Mobile number:', _mobileE164);
+  }
+
+  // ============== Gender Field ==============
+
+  Widget _buildGenderField() {
+    if (_isEditing) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6, left: 4),
+            child: Text("Gender:", style: AppTextStyles.label),
+          ),
+          SizedBox(
+            height: 48,
+            child: DropdownButtonFormField<String>(
+              initialValue: _selectedGender.isNotEmpty ? _selectedGender : null,
+              hint: Text('Select gender', style: AppTextStyles.placeholder),
+              isExpanded: true,
+              icon: const Icon(Icons.keyboard_arrow_down),
+              style: AppTextStyles.inputText.copyWith(color: Colors.black87),
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: Colors.white,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide:
+                      const BorderSide(color: AppColors.inputBorder, width: 1),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide:
+                      const BorderSide(color: AppColors.inputBorder, width: 1),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(
+                      color: AppColors.buttonBackground, width: 2),
+                ),
+              ),
+              items: ['Male', 'Female'].map((g) {
+                return DropdownMenuItem(
+                  value: g,
+                  child: Text(g),
+                );
+              }).toList(),
+              onChanged: (value) {
+                if (value != null) setState(() => _selectedGender = value);
+              },
+            ),
+          ),
+        ],
+      );
+    }
+
+    return _buildReadOnlyField(
+      'Gender:',
+      _selectedGender.isNotEmpty ? _selectedGender : '',
+    );
+  }
+
+  // ============== Nationality Field (using countriesProvider) ==============
+
+  Widget _buildNationalityField() {
+    if (!_isEditing) {
+      return _buildReadOnlyField(
+        'Nationality:',
+        _selectedNationality ?? '',
+      );
+    }
+
+    final countriesAsync = ref.watch(countriesProvider);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        _buildReadOnlyField('Country', _selectedCountry),
-        _buildReadOnlyField('City', _selectedCity),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 6, left: 4),
+          child: Text("Nationality:", style: AppTextStyles.label),
+        ),
+        countriesAsync.when(
+          loading: () => _buildLoadingBox(),
+          error: (_, __) => _buildErrorBox('Failed to load'),
+          data: (countries) => Autocomplete<String>(
+            initialValue:
+                TextEditingValue(text: _selectedNationality ?? ''),
+            optionsBuilder: (textEditingValue) {
+              if (textEditingValue.text.isEmpty) return countries;
+              final query = textEditingValue.text.toLowerCase();
+              return countries
+                  .where((c) => c.toLowerCase().contains(query))
+                  .toList();
+            },
+            onSelected: (selection) {
+              setState(() => _selectedNationality = selection);
+            },
+            fieldViewBuilder:
+                (context, textController, focusNode, onFieldSubmitted) {
+              return SizedBox(
+                height: 48,
+                child: TextFormField(
+                  controller: textController,
+                  focusNode: focusNode,
+                  style: AppTextStyles.inputText,
+                  decoration: InputDecoration(
+                    hintText: 'Search nationality...',
+                    hintStyle: AppTextStyles.placeholder,
+                    filled: true,
+                    fillColor: Colors.white,
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 12),
+                    suffixIcon: Icon(Icons.keyboard_arrow_down,
+                        color: Colors.grey.shade600),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(
+                          color: AppColors.inputBorder, width: 1),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(
+                          color: AppColors.inputBorder, width: 1),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(
+                          color: AppColors.buttonBackground, width: 2),
+                    ),
+                  ),
+                  onFieldSubmitted: (_) => onFieldSubmitted(),
+                  onChanged: (val) {
+                    if (val.isEmpty) {
+                      setState(() => _selectedNationality = null);
+                    }
+                  },
+                ),
+              );
+            },
+            optionsViewBuilder: (context, onSel, options) {
+              return Align(
+                alignment: Alignment.topLeft,
+                child: Material(
+                  elevation: 4,
+                  borderRadius: BorderRadius.circular(8),
+                  child: ConstrainedBox(
+                    constraints:
+                        const BoxConstraints(maxHeight: 240, maxWidth: 400),
+                    child: ListView.builder(
+                      padding: EdgeInsets.zero,
+                      shrinkWrap: true,
+                      itemCount: options.length,
+                      itemBuilder: (context, index) {
+                        final option = options.elementAt(index);
+                        return InkWell(
+                          onTap: () => onSel(option),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 12),
+                            child: Text(
+                              option,
+                              style: GoogleFonts.inter(
+                                  fontSize: 14, color: Colors.black87),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
       ],
     );
   }
 
-  Widget _buildReadOnlyField(String label, String value) {
-    return SizedBox(
-      width: 394,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            "$label:",
-            style: GoogleFonts.inter(
-              fontWeight: FontWeight.w500,
-              fontSize: 18,
-              color: Colors.black,
-            ),
-          ),
-          const SizedBox(height: 15),
-          Container(
-            height: 50,
-            decoration: BoxDecoration(
-              border: Border.all(color: const Color(0xFFB7B7B7)),
-              borderRadius: BorderRadius.circular(5),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            alignment: Alignment.centerLeft,
-            child: Text(
-              value,
-              style: GoogleFonts.inter(
-                fontSize: 16,
-                color: const Color.fromRGBO(0, 0, 0, 0.5),
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ),
+  // ============== Country / City (using CountryCityPicker) ==============
+
+  Widget _buildCountryCitySection() {
+    if (_isEditing) {
+      return CountryCityPicker(
+        selectedCountry: _selectedCountry,
+        selectedCity: _selectedCity,
+        onCountryChanged: (country) {
+          setState(() {
+            _selectedCountry = country;
+            _selectedCity = null;
+          });
+        },
+        onCityChanged: (city) {
+          setState(() => _selectedCity = city);
+        },
+      );
+    }
+
+    return _buildTwoColumnRow(
+      _buildReadOnlyField('Country:', _selectedCountry ?? ''),
+      _buildReadOnlyField('City:', _selectedCity ?? ''),
     );
   }
 
-  // ============== Dynamic Social Links Section ==============
+  // ============== Website Field (using WebsiteInputField) ==============
+
+  Widget _buildWebsiteField() {
+    if (_isEditing) {
+      return WebsiteInputField(
+        labelText: 'Company Website:',
+        controller: _websiteController,
+        hintText: 'example.com',
+      );
+    }
+
+    return _buildReadOnlyField('Company Website:', _websiteController.text);
+  }
+
+  // ============== Read-only field (view mode) ==============
+
+  Widget _buildReadOnlyField(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 6, left: 4),
+          child: Text(label, style: AppTextStyles.label),
+        ),
+        Container(
+          height: 48,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: Colors.grey.shade50,
+            border: Border.all(color: AppColors.inputBorder),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          alignment: Alignment.centerLeft,
+          child: Text(
+            value,
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              color: AppColors.textSecondary,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ============== Social Links ==============
 
   Widget _buildSocialLinksSection() {
     if (_isEditing) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Existing social link entries
           ..._socialLinks.asMap().entries.map((mapEntry) {
             final index = mapEntry.key;
             final entry = mapEntry.value;
             return Padding(
-              padding: const EdgeInsets.only(bottom: 20),
+              padding: const EdgeInsets.only(bottom: 16),
               child: SizedBox(
                 width: 394,
                 child: Column(
@@ -1434,16 +1020,10 @@ class _ProfilePageState extends State<ProfilePage>
                     Row(
                       children: [
                         Icon(entry.network.icon,
-                            size: 20, color: const Color(0xFF3C4494)),
+                            size: 20, color: AppColors.gradientStart),
                         const SizedBox(width: 8),
-                        Text(
-                          entry.network.label,
-                          style: GoogleFonts.inter(
-                            fontWeight: FontWeight.w500,
-                            fontSize: 18,
-                            color: Colors.black,
-                          ),
-                        ),
+                        Text(entry.network.label,
+                            style: AppTextStyles.label),
                         const Spacer(),
                         IconButton(
                           icon: const Icon(Icons.close,
@@ -1456,31 +1036,10 @@ class _ProfilePageState extends State<ProfilePage>
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    Container(
-                      height: 50,
-                      decoration: BoxDecoration(
-                        border: Border.all(color: const Color(0xFFB7B7B7)),
-                        borderRadius: BorderRadius.circular(5),
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                      alignment: Alignment.centerLeft,
-                      child: TextField(
-                        controller: entry.controller,
-                        decoration: InputDecoration(
-                          border: InputBorder.none,
-                          enabledBorder: InputBorder.none,
-                          focusedBorder: InputBorder.none,
-                          isDense: true,
-                          contentPadding: EdgeInsets.zero,
-                          hintText: entry.network.hintText,
-                          hintStyle: GoogleFonts.inter(
-                            fontSize: 16,
-                            color: const Color.fromRGBO(0, 0, 0, 0.25),
-                          ),
-                        ),
-                        style: GoogleFonts.inter(fontSize: 16),
-                      ),
+                    const SizedBox(height: 4),
+                    AppTextField(
+                      controller: entry.controller,
+                      hintText: entry.network.hintText,
                     ),
                   ],
                 ),
@@ -1502,7 +1061,7 @@ class _ProfilePageState extends State<ProfilePage>
                         child: Row(
                           children: [
                             Icon(network.icon,
-                                size: 20, color: const Color(0xFF3C4494)),
+                                size: 20, color: AppColors.gradientStart),
                             const SizedBox(width: 10),
                             Text(network.label),
                           ],
@@ -1511,22 +1070,22 @@ class _ProfilePageState extends State<ProfilePage>
                   .toList(),
               child: Container(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
-                  border: Border.all(color: const Color(0xFF3C4494)),
-                  borderRadius: BorderRadius.circular(5),
+                  border: Border.all(color: AppColors.gradientStart),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     const Icon(Icons.add,
-                        size: 18, color: Color(0xFF3C4494)),
+                        size: 18, color: AppColors.gradientStart),
                     const SizedBox(width: 6),
                     Text(
                       "Add New",
                       style: GoogleFonts.inter(
                         fontSize: 16,
-                        color: const Color(0xFF3C4494),
+                        color: AppColors.gradientStart,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -1538,22 +1097,22 @@ class _ProfilePageState extends State<ProfilePage>
       );
     }
 
-    // View mode: only show social links that have values
+    // View mode
     final filledLinks =
         _socialLinks.where((e) => e.controller.text.isNotEmpty).toList();
     if (filledLinks.isEmpty) {
       return Text(
         'No social links added.',
         style: GoogleFonts.inter(
-          fontSize: 16,
-          color: const Color.fromRGBO(0, 0, 0, 0.5),
+          fontSize: 14,
+          color: AppColors.textSecondary,
         ),
       );
     }
 
     return Wrap(
-      spacing: 20,
-      runSpacing: 30,
+      spacing: 16,
+      runSpacing: 16,
       children: filledLinks.map((entry) {
         return SizedBox(
           width: 394,
@@ -1563,36 +1122,13 @@ class _ProfilePageState extends State<ProfilePage>
               Row(
                 children: [
                   Icon(entry.network.icon,
-                      size: 20, color: const Color(0xFF3C4494)),
+                      size: 20, color: AppColors.gradientStart),
                   const SizedBox(width: 8),
-                  Text(
-                    entry.network.label,
-                    style: GoogleFonts.inter(
-                      fontWeight: FontWeight.w500,
-                      fontSize: 18,
-                      color: Colors.black,
-                    ),
-                  ),
+                  Text(entry.network.label, style: AppTextStyles.label),
                 ],
               ),
-              const SizedBox(height: 15),
-              Container(
-                height: 50,
-                decoration: BoxDecoration(
-                  border: Border.all(color: const Color(0xFFB7B7B7)),
-                  borderRadius: BorderRadius.circular(5),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  entry.controller.text,
-                  style: GoogleFonts.inter(
-                    fontSize: 16,
-                    color: const Color.fromRGBO(0, 0, 0, 0.5),
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
+              const SizedBox(height: 6),
+              _buildReadOnlyField('', entry.controller.text),
             ],
           ),
         );
@@ -1600,11 +1136,54 @@ class _ProfilePageState extends State<ProfilePage>
     );
   }
 
-  /// Networks not yet added to the social links list
   List<SocialNetwork> get _availableNetworks {
     final usedKeys = _socialLinks.map((e) => e.network).toSet();
     return SocialNetwork.values
         .where((n) => !usedKeys.contains(n))
         .toList();
+  }
+
+  // ============== Helpers ==============
+
+  Widget _buildLoadingBox() {
+    return Container(
+      height: 48,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.inputBorder),
+      ),
+      child: const Align(
+        alignment: Alignment.centerLeft,
+        child: SizedBox(
+          width: 18,
+          height: 18,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: AppColors.gradientStart,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorBox(String message) {
+    return Container(
+      height: 48,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.red),
+      ),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Text(
+          message,
+          style: GoogleFonts.inter(fontSize: 13, color: Colors.red),
+        ),
+      ),
+    );
   }
 }

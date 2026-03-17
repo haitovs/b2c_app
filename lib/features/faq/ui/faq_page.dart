@@ -1,24 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
-import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:provider/provider.dart' as legacy_provider;
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../auth/services/auth_service.dart';
+import '../../../core/theme/app_theme.dart';
 import '../models/faq_item.dart';
+import '../providers/faq_providers.dart';
 import '../services/faq_service.dart';
 
-class FAQPage extends StatefulWidget {
+class FAQPage extends ConsumerStatefulWidget {
   final String eventId;
 
   const FAQPage({super.key, required this.eventId});
 
   @override
-  State<FAQPage> createState() => _FAQPageState();
+  ConsumerState<FAQPage> createState() => _FAQPageState();
 }
 
-class _FAQPageState extends State<FAQPage> {
+class _FAQPageState extends ConsumerState<FAQPage> {
   late final FAQService _service;
   final TextEditingController _searchController = TextEditingController();
 
@@ -30,11 +30,7 @@ class _FAQPageState extends State<FAQPage> {
   @override
   void initState() {
     super.initState();
-    final authService = legacy_provider.Provider.of<AuthService>(
-      context,
-      listen: false,
-    );
-    _service = FAQService(authService);
+    _service = ref.read(faqServiceProvider);
     _loadFAQs();
   }
 
@@ -63,11 +59,12 @@ class _FAQPageState extends State<FAQPage> {
     if (query.isEmpty) {
       setState(() => _filteredFaqs = _faqs);
     } else {
+      final lower = query.toLowerCase();
       final filtered = _faqs
           .where(
             (faq) =>
-                faq.question.toLowerCase().contains(query.toLowerCase()) ||
-                faq.answer.toLowerCase().contains(query.toLowerCase()),
+                faq.question.toLowerCase().contains(lower) ||
+                faq.answer.toLowerCase().contains(lower),
           )
           .toList();
       setState(() => _filteredFaqs = filtered);
@@ -76,11 +73,7 @@ class _FAQPageState extends State<FAQPage> {
 
   void _toggleExpanded(int index) {
     setState(() {
-      if (_expandedIndex == index) {
-        _expandedIndex = null;
-      } else {
-        _expandedIndex = index;
-      }
+      _expandedIndex = _expandedIndex == index ? null : index;
     });
   }
 
@@ -88,326 +81,257 @@ class _FAQPageState extends State<FAQPage> {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
-    final horizontalPadding = isMobile ? 20.0 : 50.0;
+    final padding = isMobile ? 16.0 : 32.0;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF3C4494),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Header
-            Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: horizontalPadding,
-                vertical: 20,
-              ),
-              child: Row(
-                children: [
-                  // Back button
-                  IconButton(
-                    onPressed: () {
-                      // Navigate back to menu
-                      context.go('/events/${widget.eventId}/menu');
-                    },
-                    icon: const Icon(
-                      Icons.arrow_back,
-                      color: Color(0xFFF1F1F6),
-                      size: 28,
-                    ),
+    return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header + Search
+          Padding(
+            padding: EdgeInsets.fromLTRB(padding, padding, padding, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'FAQ',
+                  style: GoogleFonts.montserrat(
+                    fontSize: isMobile ? 18 : 22,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.primaryColor,
                   ),
-                  const SizedBox(width: 15),
-                  // Title
-                  Text(
-                    'FAQ',
-                    style: GoogleFonts.montserrat(
-                      fontWeight: FontWeight.w600,
-                      fontSize: isMobile ? 28 : 40,
-                      color: const Color(0xFFF1F1F6),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // Search bar
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-              child: Container(
-                height: isMobile ? 46 : 56,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF1F1F6).withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(12),
                 ),
-                alignment: Alignment.center,
-                child: TextField(
+                const SizedBox(height: 16),
+                // Search bar
+                TextField(
                   controller: _searchController,
                   onChanged: _filterFAQs,
-                  cursorColor: const Color(0xFFF1F1F6),
-                  style: GoogleFonts.roboto(
-                    fontSize: isMobile ? 16 : 18,
-                    color: const Color(0xFFF1F1F6),
-                    fontWeight: FontWeight.w500,
-                  ),
-                  textAlignVertical: TextAlignVertical.center,
+                  style: GoogleFonts.inter(fontSize: 14),
                   decoration: InputDecoration(
-                    isDense: true,
-                    filled: false,
-                    prefixIcon: Icon(
-                      Icons.search,
-                      color: const Color(0xFFF1F1F6),
-                      size: isMobile ? 24 : 28,
-                    ),
                     hintText: 'Search questions...',
-                    hintStyle: GoogleFonts.roboto(
-                      fontWeight: FontWeight.w500,
-                      fontSize: isMobile ? 16 : 18,
-                      color: const Color(0xFFF1F1F6),
+                    hintStyle: GoogleFonts.inter(fontSize: 14, color: Colors.grey),
+                    prefixIcon: const Icon(Icons.search, size: 20),
+                    filled: true,
+                    fillColor: Colors.white,
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
                     ),
-                    border: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    disabledBorder: InputBorder.none,
-                    contentPadding: EdgeInsets.zero,
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide:
+                          const BorderSide(color: AppTheme.primaryColor, width: 2),
+                    ),
                   ),
                 ),
-              ),
+              ],
             ),
+          ),
 
-            const SizedBox(height: 30),
+          const SizedBox(height: 20),
 
-            // Content area
-            Expanded(
-              child: Container(
-                margin: EdgeInsets.symmetric(horizontal: horizontalPadding),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: _isLoading
-                    ? const Center(
-                        child: CircularProgressIndicator(
-                          color: Color(0xFF3C4494),
-                        ),
-                      )
-                    : SingleChildScrollView(
-                        padding: const EdgeInsets.all(20),
+          // FAQ list
+          Expanded(
+            child: _isLoading
+                ? const Center(
+                    child:
+                        CircularProgressIndicator(color: AppTheme.primaryColor),
+                  )
+                : _filteredFaqs.isEmpty
+                    ? Center(
                         child: Column(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            // Header section
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 40,
-                                horizontal: 20,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFDFE1ED),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Column(
-                                children: [
-                                  Text(
-                                    'Have any questions?',
-                                    style: GoogleFonts.montserrat(
-                                      fontWeight: FontWeight.w500,
-                                      fontSize: isMobile ? 32 : 50,
-                                      color: Colors.black,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                  const SizedBox(height: 15),
-                                  Text(
-                                    'Let us answer the questions for you.',
-                                    style: GoogleFonts.roboto(
-                                      fontWeight: FontWeight.w400,
-                                      fontSize: isMobile ? 18 : 25,
-                                      color: Colors.black,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ],
+                            Icon(Icons.search_off,
+                                size: 48, color: Colors.grey.shade400),
+                            const SizedBox(height: 12),
+                            Text(
+                              _searchController.text.isNotEmpty
+                                  ? 'No results for "${_searchController.text}"'
+                                  : 'No FAQs available',
+                              style: GoogleFonts.inter(
+                                fontSize: 16,
+                                color: Colors.grey.shade500,
                               ),
                             ),
-
-                            const SizedBox(height: 30),
-
-                            // FAQ items
-                            if (_filteredFaqs.isEmpty)
-                              Padding(
-                                padding: const EdgeInsets.all(40),
-                                child: Text(
-                                  'No FAQs found',
-                                  style: GoogleFonts.roboto(
-                                    fontSize: 18,
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                              )
-                            else
-                              ..._filteredFaqs.asMap().entries.map((entry) {
-                                final index = entry.key;
-                                final faq = entry.value;
-                                final isExpanded = _expandedIndex == index;
-
-                                return _buildFAQItem(
-                                  faq,
-                                  index,
-                                  isExpanded,
-                                  isMobile,
-                                );
-                              }),
-
-                            const SizedBox(height: 20),
                           ],
                         ),
+                      )
+                    : ListView.separated(
+                        padding: EdgeInsets.fromLTRB(
+                            padding, 0, padding, padding),
+                        itemCount: _filteredFaqs.length,
+                        separatorBuilder: (_, __) =>
+                            const SizedBox(height: 12),
+                        itemBuilder: (context, index) {
+                          final faq = _filteredFaqs[index];
+                          final isExpanded = _expandedIndex == index;
+                          return _FAQAccordionItem(
+                            faq: faq,
+                            isExpanded: isExpanded,
+                            isMobile: isMobile,
+                            onTap: () => _toggleExpanded(index),
+                          );
+                        },
                       ),
-              ),
-            ),
-
-            const SizedBox(height: 20),
-          ],
-        ),
-      ),
-    );
+          ),
+        ],
+      );
   }
+}
 
-  Widget _buildFAQItem(FAQItem faq, int index, bool isExpanded, bool isMobile) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(10),
-          boxShadow: isExpanded
-              ? [
-                  const BoxShadow(
-                    color: Color(0x1A000000),
-                    blurRadius: 8,
-                    offset: Offset(0, 4),
-                  ),
-                ]
-              : [],
+// =============================================================================
+// FAQ Accordion Item
+// =============================================================================
+
+class _FAQAccordionItem extends StatelessWidget {
+  final FAQItem faq;
+  final bool isExpanded;
+  final bool isMobile;
+  final VoidCallback onTap;
+
+  const _FAQAccordionItem({
+    required this.faq,
+    required this.isExpanded,
+    required this.isMobile,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeInOut,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isExpanded
+              ? AppTheme.primaryColor.withValues(alpha: 0.3)
+              : Colors.grey.shade200,
         ),
-        child: Column(
-          children: [
-            // Question header
-            Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: () => _toggleExpanded(index),
-                borderRadius: BorderRadius.circular(10),
-                child: Container(
-                  width: double.infinity,
-                  padding: EdgeInsets.symmetric(
-                    horizontal: isMobile ? 20 : 30,
-                    vertical: isMobile ? 20 : 25,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFDCDEEB).withValues(alpha: 0.85),
-                    borderRadius: isExpanded
-                        ? const BorderRadius.only(
-                            topLeft: Radius.circular(10),
-                            topRight: Radius.circular(10),
-                          )
-                        : BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          faq.question,
-                          style: GoogleFonts.roboto(
-                            fontWeight: FontWeight.w400,
-                            fontSize: isMobile ? 18 : 28,
-                            color: const Color(0xFF151938),
-                          ),
+        boxShadow: isExpanded
+            ? [
+                BoxShadow(
+                  color: AppTheme.primaryColor.withValues(alpha: 0.08),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : [],
+      ),
+      child: Column(
+        children: [
+          // Question header
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onTap,
+              borderRadius: isExpanded
+                  ? const BorderRadius.only(
+                      topLeft: Radius.circular(12),
+                      topRight: Radius.circular(12),
+                    )
+                  : BorderRadius.circular(12),
+              child: Container(
+                width: double.infinity,
+                padding: EdgeInsets.symmetric(
+                  horizontal: isMobile ? 16 : 24,
+                  vertical: isMobile ? 16 : 20,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8E9F3),
+                  borderRadius: isExpanded
+                      ? const BorderRadius.only(
+                          topLeft: Radius.circular(12),
+                          topRight: Radius.circular(12),
+                        )
+                      : BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        faq.question,
+                        style: GoogleFonts.inter(
+                          fontWeight: FontWeight.w500,
+                          fontSize: isMobile ? 15 : 16,
+                          color: const Color(0xFF151938),
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      AnimatedRotation(
-                        turns: isExpanded ? 0.5 : 0,
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeInOut,
-                        child: Icon(
-                          Icons.keyboard_arrow_down,
-                          color: Colors.black,
-                          size: isMobile ? 28 : 36,
-                        ),
+                    ),
+                    const SizedBox(width: 12),
+                    AnimatedRotation(
+                      turns: isExpanded ? 0.5 : 0,
+                      duration: const Duration(milliseconds: 250),
+                      curve: Curves.easeInOut,
+                      child: Icon(
+                        Icons.keyboard_arrow_down,
+                        color: AppTheme.primaryColor,
+                        size: isMobile ? 26 : 28,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),
+          ),
 
-            // Answer (expandable)
-            AnimatedSize(
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-              child: isExpanded
-                  ? Container(
-                      width: double.infinity,
-                      padding: EdgeInsets.all(isMobile ? 20 : 30),
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.only(
-                          bottomLeft: Radius.circular(10),
-                          bottomRight: Radius.circular(10),
+          // Answer (expandable)
+          AnimatedSize(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeInOut,
+            child: isExpanded
+                ? Container(
+                    width: double.infinity,
+                    padding: EdgeInsets.all(isMobile ? 16 : 24),
+                    child: MarkdownBody(
+                      data: faq.answer,
+                      selectable: true,
+                      styleSheet: MarkdownStyleSheet(
+                        p: GoogleFonts.inter(
+                          fontSize: isMobile ? 14 : 15,
+                          height: 1.6,
+                          color: Colors.black87,
+                        ),
+                        listBullet: GoogleFonts.inter(
+                          fontSize: isMobile ? 14 : 15,
+                          color: Colors.black87,
+                        ),
+                        a: GoogleFonts.inter(
+                          fontSize: isMobile ? 14 : 15,
+                          color: AppTheme.primaryColor,
+                          decoration: TextDecoration.underline,
+                        ),
+                        strong: GoogleFonts.inter(
+                          fontSize: isMobile ? 14 : 15,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                        em: GoogleFonts.inter(
+                          fontSize: isMobile ? 14 : 15,
+                          fontStyle: FontStyle.italic,
+                          color: Colors.black87,
                         ),
                       ),
-                      child: MarkdownBody(
-                        data: faq.answer,
-                        selectable: true,
-                        styleSheet: MarkdownStyleSheet(
-                          p: GoogleFonts.roboto(
-                            fontSize: isMobile ? 16 : 20,
-                            height: 1.6,
-                            color: const Color(
-                              0xFF151938,
-                            ).withValues(alpha: 0.85),
-                          ),
-                          listBullet: GoogleFonts.roboto(
-                            fontSize: isMobile ? 16 : 20,
-                            color: const Color(
-                              0xFF151938,
-                            ).withValues(alpha: 0.85),
-                          ),
-                          a: GoogleFonts.roboto(
-                            fontSize: isMobile ? 16 : 20,
-                            color: const Color(0xFF3C4494),
-                            decoration: TextDecoration.underline,
-                          ),
-                          strong: GoogleFonts.roboto(
-                            fontSize: isMobile ? 16 : 20,
-                            fontWeight: FontWeight.bold,
-                            color: const Color(
-                              0xFF151938,
-                            ).withValues(alpha: 0.85),
-                          ),
-                          em: GoogleFonts.roboto(
-                            fontSize: isMobile ? 16 : 20,
-                            fontStyle: FontStyle.italic,
-                            color: const Color(
-                              0xFF151938,
-                            ).withValues(alpha: 0.85),
-                          ),
-                        ),
-                        onTapLink: (text, href, title) async {
-                          if (href != null) {
-                            final uri = Uri.parse(href);
-                            if (await canLaunchUrl(uri)) {
-                              await launchUrl(uri);
-                            }
+                      onTapLink: (text, href, title) async {
+                        if (href != null) {
+                          final uri = Uri.parse(href);
+                          if (await canLaunchUrl(uri)) {
+                            await launchUrl(uri);
                           }
-                        },
-                      ),
-                    )
-                  : const SizedBox.shrink(),
-            ),
-          ],
-        ),
+                        }
+                      },
+                    ),
+                  )
+                : const SizedBox.shrink(),
+          ),
+        ],
       ),
     );
   }

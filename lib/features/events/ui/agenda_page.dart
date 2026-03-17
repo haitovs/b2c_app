@@ -1,19 +1,14 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
-import 'package:provider/provider.dart' as legacy_provider;
-
 import '../../../../core/config/app_config.dart';
-import '../../../../core/services/event_context_service.dart';
-import '../../../../core/widgets/custom_app_bar.dart';
-import '../../auth/services/auth_service.dart';
-import '../../notifications/services/notification_service.dart';
-import '../../notifications/ui/notification_drawer.dart';
-import 'widgets/profile_dropdown.dart';
+import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/widgets/app_cached_image.dart';
 
 class AgendaPage extends ConsumerStatefulWidget {
   final String eventId;
@@ -24,81 +19,41 @@ class AgendaPage extends ConsumerStatefulWidget {
 }
 
 class _AgendaPageState extends ConsumerState<AgendaPage> {
-  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  bool _isProfileOpen = false;
-
-  // Tab state
-  final bool _isProgramSelected = true;
+  bool _isProgramSelected = true;
   int _selectedDayIndex = 0;
-  // String _selectedFilter = 'All'; // Commented out - filters hidden for now
   String _searchQuery = '';
+  String _selectedLocation = 'All';
   int? _expandedCardIndex;
+  bool _showSortDropdown = false;
 
-  // Data
   List<Map<String, dynamic>> _days = [];
   List<Map<String, dynamic>> _episodes = [];
   final Set<int> _favoriteIds = {};
   bool _isLoadingDays = true;
   bool _isLoadingEpisodes = true;
 
-  // Filters - commented out for now
-  // final List<String> _filters = [
-  //   'All',
-  //   'Forum Hall',
-  //   'Presentation Hall',
-  //   'Hall 50A',
-  //   'Hall 50B',
-  // ];
+  List<String> get _availableLocations {
+    final locations = <String>{'All'};
+    for (final ep in _episodes) {
+      final loc = ep['location'] as String? ?? '';
+      if (loc.isNotEmpty) locations.add(loc);
+    }
+    return locations.toList();
+  }
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _initializeAndFetch();
-      _loadNotificationCount();
+      _fetchAgendaDays();
     });
-  }
-
-  int _unreadNotificationCount = 0;
-
-  Future<void> _loadNotificationCount() async {
-    try {
-      final authService = legacy_provider.Provider.of<AuthService>(
-        context,
-        listen: false,
-      );
-      final notificationService = NotificationService(authService);
-      final notifications = await notificationService.getNotifications();
-      if (mounted) {
-        setState(() {
-          _unreadNotificationCount = notifications
-              .where((n) => !n.isRead)
-              .length;
-        });
-      }
-    } catch (e) {
-      // Silently fail
-    }
-  }
-
-  Future<void> _initializeAndFetch() async {
-    // Ensure the event context is loaded for this event
-    final eventId = int.tryParse(widget.eventId);
-    if (eventId != null) {
-      await eventContextService.ensureEventContext(eventId);
-    }
-    _fetchAgendaDays();
   }
 
   Future<void> _fetchAgendaDays() async {
     try {
-      // Use EventContextService for site_id
-      final siteId = eventContextService.siteId;
-      final uri = siteId != null
-          ? Uri.parse(
-              '${AppConfig.tourismApiBaseUrl}/agenda/days?site_id=$siteId',
-            )
-          : Uri.parse('${AppConfig.tourismApiBaseUrl}/agenda/days');
+      final eventId = widget.eventId;
+      final uri = Uri.parse(
+          '${AppConfig.b2cApiBaseUrl}/api/v1/agenda/days?event_id=$eventId');
       final response = await http.get(uri);
 
       if (response.statusCode == 200) {
@@ -112,7 +67,7 @@ class _AgendaPageState extends ConsumerState<AgendaPage> {
                 'date': d['date'],
                 'label': d['label'],
                 'day': date?.day ?? 0,
-                'weekday': _getWeekdayName(date?.weekday ?? 1),
+                'weekday': _getWeekdayShort(date?.weekday ?? 1),
               };
             }).toList();
             _isLoadingDays = false;
@@ -126,7 +81,7 @@ class _AgendaPageState extends ConsumerState<AgendaPage> {
         if (mounted) setState(() => _isLoadingDays = false);
       }
     } catch (e) {
-      debugPrint('Error fetching agenda days: $e');
+      if (kDebugMode) debugPrint('Error fetching agenda days: $e');
       if (mounted) setState(() => _isLoadingDays = false);
     }
   }
@@ -135,15 +90,8 @@ class _AgendaPageState extends ConsumerState<AgendaPage> {
     setState(() => _isLoadingEpisodes = true);
 
     try {
-      // Use EventContextService for site_id
-      final siteId = eventContextService.siteId;
-      final uri = siteId != null
-          ? Uri.parse(
-              '${AppConfig.tourismApiBaseUrl}/agenda/day/$dayId/episodes?site_id=$siteId',
-            )
-          : Uri.parse(
-              '${AppConfig.tourismApiBaseUrl}/agenda/day/$dayId/episodes',
-            );
+      final uri = Uri.parse(
+          '${AppConfig.b2cApiBaseUrl}/api/v1/agenda/day/$dayId/episodes');
       final response = await http.get(uri);
 
       if (response.statusCode == 200) {
@@ -158,107 +106,83 @@ class _AgendaPageState extends ConsumerState<AgendaPage> {
         if (mounted) setState(() => _isLoadingEpisodes = false);
       }
     } catch (e) {
-      debugPrint('Error fetching episodes: $e');
+      if (kDebugMode) debugPrint('Error fetching episodes: $e');
       if (mounted) setState(() => _isLoadingEpisodes = false);
     }
   }
 
-  /// Build full image URL from relative path
   String _buildImageUrl(String? path) {
     if (path == null || path.isEmpty) return '';
     if (path.startsWith('http')) return path;
-    // Prepend tourism base URL for relative paths
-    return '${AppConfig.tourismApiBaseUrl}$path';
+    return '${AppConfig.b2cApiBaseUrl}$path';
   }
 
   Map<String, dynamic> _parseEpisode(Map<String, dynamic> e) {
     final startTime = DateTime.tryParse(e['start_time'] ?? '');
     final endTime = DateTime.tryParse(e['end_time'] ?? '');
 
-    String timeStr = '';
-    if (startTime != null && endTime != null) {
-      timeStr = '${_formatTime(startTime)}-${_formatTime(endTime)}';
-    }
+    String startStr = '';
+    String endStr = '';
+    if (startTime != null) startStr = _formatTime(startTime);
+    if (endTime != null) endStr = _formatTime(endTime);
 
-    // Parse sponsors
     List<Map<String, dynamic>> sponsors = [];
     if (e['sponsors'] != null) {
       sponsors = (e['sponsors'] as List)
-          .map(
-            (s) => {
-              'id': s['id'],
-              'name': s['name'] ?? '',
-              'logo': _buildImageUrl(s['logo'] ?? s['logo_url']),
-              'tier': s['tier'] ?? 'general',
-            },
-          )
+          .map((s) => {
+                'id': s['id'],
+                'name': s['name'] ?? '',
+                'logo': _buildImageUrl(s['logo'] ?? s['logo_url']),
+                'tier': (s['tier'] ?? 'general').toString().toLowerCase(),
+              })
           .toList();
     }
 
-    // Parse speakers
     List<Map<String, dynamic>> speakers = [];
     if (e['speakers'] != null) {
       speakers = (e['speakers'] as List)
-          .map(
-            (s) => {
-              'id': s['id'],
-              'name': s['fullname'] ?? s['name'] ?? '',
-              'title': s['position'] ?? '',
-              'company': s['company'] ?? '',
-              'photo': _buildImageUrl(s['photo'] ?? s['photo_url']),
-            },
-          )
+          .map((s) => {
+                'id': s['id'],
+                'name': s['fullname'] ?? s['name'] ?? '',
+                'position': s['position'] ?? '',
+                'company': s['company'] ?? '',
+                'country': s['country'] ?? '',
+                'photo': _buildImageUrl(s['photo'] ?? s['photo_url']),
+              })
           .toList();
     }
 
-    // Parse moderators
     List<Map<String, dynamic>> moderators = [];
     if (e['moderators'] != null) {
       moderators = (e['moderators'] as List)
-          .map(
-            (m) => {
-              'id': m['id'],
-              'name': m['fullname'] ?? m['name'] ?? '',
-              'title': m['position'] ?? '',
-              'company': m['company'] ?? '',
-              'photo': _buildImageUrl(m['photo'] ?? m['photo_url']),
-            },
-          )
+          .map((m) => {
+                'id': m['id'],
+                'name': m['fullname'] ?? m['name'] ?? '',
+                'position': m['position'] ?? '',
+                'company': m['company'] ?? '',
+                'photo': _buildImageUrl(m['photo'] ?? m['photo_url']),
+              })
           .toList();
     }
 
     return {
       'id': e['id'],
-      'time': timeStr,
+      'startTime': startStr,
+      'endTime': endStr,
       'title': e['title'] ?? '',
       'date': _formatDate(startTime),
       'location': e['location'] ?? '',
       'description': e['description_md'] ?? '',
-      'sponsor': sponsors.isNotEmpty
-          ? {
-              'name': sponsors[0]['name'],
-              'tier': _getTierLabel(sponsors[0]['tier']),
-              'logo': sponsors[0]['logo'],
-            }
-          : null,
+      'speech_theme': e['speech_theme'] ?? '',
+      'sponsor': sponsors.isNotEmpty ? sponsors[0] : null,
       'speakers': speakers,
       'moderator': moderators.isNotEmpty ? moderators[0] : null,
       'isFavorite': _favoriteIds.contains(e['id']),
-      'hall': e['location'] ?? '',
     };
   }
 
-  String _getWeekdayName(int weekday) {
-    const names = [
-      '',
-      'Monday',
-      'Tuesday',
-      'Wednesday',
-      'Thursday',
-      'Friday',
-      'Saturday',
-      'Sunday',
-    ];
+  String _getWeekdayShort(int weekday) {
+    const names = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     return names[weekday.clamp(1, 7)];
   }
 
@@ -269,40 +193,10 @@ class _AgendaPageState extends ConsumerState<AgendaPage> {
   String _formatDate(DateTime? dt) {
     if (dt == null) return '';
     const months = [
-      '',
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
+      '', 'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December',
     ];
-    return '${dt.day} ${months[dt.month]} ${dt.year}';
-  }
-
-  String _getTierLabel(String tier) {
-    final t = tier.toLowerCase();
-    if (t == 'gold') return 'Gold Sponsor';
-    if (t == 'silver') return 'Silver Sponsor';
-    if (t == 'bronze') return 'Bronze Sponsor';
-    if (t == 'platinum') return 'Platinum Sponsor';
-    if (t == 'diamond') return 'Diamond Sponsor';
-    if (t == 'premier') return 'Premier Sponsor';
-    return 'Sponsor';
-  }
-
-  void _toggleProfile() {
-    setState(() => _isProfileOpen = !_isProfileOpen);
-  }
-
-  void _closeProfile() {
-    if (_isProfileOpen) setState(() => _isProfileOpen = false);
+    return '${dt.day} ${months[dt.month].substring(0, 3).toLowerCase()} ${dt.year}';
   }
 
   void _toggleFavorite(int id) {
@@ -338,23 +232,16 @@ class _AgendaPageState extends ConsumerState<AgendaPage> {
 
   List<Map<String, dynamic>> get _filteredItems {
     return _episodes.where((item) {
-      // Filter by favorites
       if (!_isProgramSelected && !item['isFavorite']) return false;
-
-      // Filter by hall - commented out for now
-      // if (_selectedFilter != 'All') {
-      //   final hall = (item['hall'] ?? '').toString().toLowerCase();
-      //   final filter = _selectedFilter.toLowerCase();
-      //   if (!hall.contains(filter.replaceAll(' hall', ''))) return false;
-      // }
-
-      // Filter by search
+      if (_selectedLocation != 'All') {
+        final loc = item['location'] as String? ?? '';
+        if (loc != _selectedLocation) return false;
+      }
       if (_searchQuery.isNotEmpty) {
         final query = _searchQuery.toLowerCase();
         return (item['title'] as String).toLowerCase().contains(query) ||
             (item['description'] as String).toLowerCase().contains(query);
       }
-
       return true;
     }).toList();
   }
@@ -363,135 +250,193 @@ class _AgendaPageState extends ConsumerState<AgendaPage> {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
-    final horizontalPadding = isMobile ? 12.0 : 50.0;
+    final hPad = isMobile ? 16.0 : 32.0;
 
-    return Scaffold(
-      key: _scaffoldKey,
-      backgroundColor: const Color(0xFF3C4494),
-      endDrawer: const NotificationDrawer(),
-      body: GestureDetector(
-        onTap: _closeProfile,
-        behavior: HitTestBehavior.translucent,
-        child: Stack(
-          children: [
-            CustomScrollView(
-              slivers: [
-                // Header
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: EdgeInsets.only(
-                      left: horizontalPadding,
-                      right: horizontalPadding,
-                      top: isMobile ? 12 : 20,
-                    ),
-                    child: _buildHeader(isMobile),
-                  ),
-                ),
-
-                // Search Bar
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: horizontalPadding,
-                      vertical: isMobile ? 12 : 20,
-                    ),
-                    child: _buildSearchBar(isMobile),
-                  ),
-                ),
-
-                // Filter Chips - Commented out for now
-                // SliverToBoxAdapter(
-                //   child: Padding(
-                //     padding: EdgeInsets.only(
-                //       left: horizontalPadding,
-                //       right: horizontalPadding,
-                //       bottom: 10,
-                //     ),
-                //     child: _buildFilterChips(isMobile),
-                //   ),
-                // ),
-
-                // Day Tabs
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: horizontalPadding,
-                      vertical: 10,
-                    ),
-                    child: _isLoadingDays
-                        ? const Center(
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                            ),
-                          )
-                        : _buildDayTabs(isMobile),
-                  ),
-                ),
-
-                // Agenda Items
-                if (_isLoadingEpisodes)
-                  const SliverToBoxAdapter(
-                    child: Padding(
-                      padding: EdgeInsets.all(40),
-                      child: Center(
-                        child: CircularProgressIndicator(color: Colors.white),
-                      ),
-                    ),
-                  )
-                else if (_filteredItems.isEmpty)
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.all(40),
-                      child: Center(
-                        child: Text(
-                          'No agenda items found',
-                          style: GoogleFonts.roboto(
-                            fontSize: 18,
-                            color: Colors.white70,
-                          ),
-                        ),
-                      ),
-                    ),
-                  )
-                else
-                  SliverPadding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: horizontalPadding,
-                      vertical: 15,
-                    ),
-                    sliver: SliverList(
-                      delegate: SliverChildBuilderDelegate((context, index) {
-                        final item = _filteredItems[index];
-                        final isExpanded = _expandedCardIndex == index;
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 20),
-                          child: _buildAgendaCard(
-                            item,
-                            index,
-                            isExpanded,
-                            isMobile,
-                          ),
-                        );
-                      }, childCount: _filteredItems.length),
-                    ),
-                  ),
-              ],
+    return GestureDetector(
+      onTap: () {
+        if (_showSortDropdown) setState(() => _showSortDropdown = false);
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: CustomScrollView(
+          slivers: [
+            // Top divider
+            SliverToBoxAdapter(
+              child: Container(
+                height: 1,
+                color: const Color(0xFFCACACA),
+              ),
             ),
 
-            // Profile Dropdown
-            if (_isProfileOpen)
-              Positioned(
-                top: isMobile ? 55 : 70,
-                right: horizontalPadding,
-                child: ProfileDropdown(
-                  onClose: _closeProfile,
-                  onLogout: () {
-                    if (context.canPop()) {
-                      context.pop();
-                    } else {
-                      context.go('/');
-                    }
-                  },
+            // Title + Toggle Row
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(hPad, 24, hPad, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (isMobile) ...[
+                      Text(
+                        'Event Agenda',
+                        style: GoogleFonts.montserrat(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.primaryColor,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      const Divider(color: Color(0xFFCACACA), height: 1),
+                      const SizedBox(height: 16),
+                      _ProgramToggle(
+                        isProgramSelected: _isProgramSelected,
+                        isMobile: isMobile,
+                        onProgramTap: () =>
+                            setState(() => _isProgramSelected = true),
+                        onFavouriteTap: () =>
+                            setState(() => _isProgramSelected = false),
+                      ),
+                    ] else ...[
+                      Row(
+                        children: [
+                          Text(
+                            'Event Agenda',
+                            style: GoogleFonts.montserrat(
+                              fontSize: 30,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.primaryColor,
+                            ),
+                          ),
+                          const Spacer(),
+                          SizedBox(
+                            width: 430,
+                            child: _ProgramToggle(
+                              isProgramSelected: _isProgramSelected,
+                              isMobile: isMobile,
+                              onProgramTap: () =>
+                                  setState(() => _isProgramSelected = true),
+                              onFavouriteTap: () =>
+                                  setState(() => _isProgramSelected = false),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      const Divider(color: Color(0xFFCACACA), height: 1),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+
+            // Search + Sort Row
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 0),
+                child: _SearchSortRow(
+                  isMobile: isMobile,
+                  selectedLocation: _selectedLocation,
+                  locations: _availableLocations,
+                  showDropdown: _showSortDropdown,
+                  onSearchChanged: (v) => setState(() => _searchQuery = v),
+                  onSortTap: () =>
+                      setState(() => _showSortDropdown = !_showSortDropdown),
+                  onLocationSelected: (loc) => setState(() {
+                    _selectedLocation = loc;
+                    _showSortDropdown = false;
+                  }),
+                ),
+              ),
+            ),
+
+            // Day Selector
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(hPad, 16, hPad, 0),
+                child: _isLoadingDays
+                    ? const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(20),
+                          child: CircularProgressIndicator(
+                            color: AppTheme.primaryColor,
+                          ),
+                        ),
+                      )
+                    : isMobile
+                        ? _MobileDaySelector(
+                            days: _days,
+                            selectedIndex: _selectedDayIndex,
+                            onDaySelected: _selectDay,
+                          )
+                        : _StepperDaySelector(
+                            days: _days,
+                            selectedIndex: _selectedDayIndex,
+                            onDaySelected: _selectDay,
+                          ),
+              ),
+            ),
+
+            // Agenda Items
+            if (_isLoadingEpisodes)
+              const SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.all(40),
+                  child: Center(
+                    child: CircularProgressIndicator(
+                        color: AppTheme.primaryColor),
+                  ),
+                ),
+              )
+            else if (_filteredItems.isEmpty)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.all(40),
+                  child: Center(
+                    child: Text(
+                      _isProgramSelected
+                          ? 'No agenda items found'
+                          : 'No favourited items yet',
+                      style: GoogleFonts.roboto(
+                        fontSize: 16,
+                        color: const Color(0xFF757A8A),
+                      ),
+                    ),
+                  ),
+                ),
+              )
+            else
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(hPad, 20, hPad, 32),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final item = _filteredItems[index];
+                      final isExpanded = _expandedCardIndex == index;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: isMobile
+                            ? _MobileEpisodeCard(
+                                item: item,
+                                isExpanded: isExpanded,
+                                onToggleExpand: () => _toggleExpand(index),
+                                onToggleFavorite: () =>
+                                    _toggleFavorite(item['id']),
+                                eventId: widget.eventId,
+                              )
+                            : _DesktopEpisodeRow(
+                                item: item,
+                                isExpanded: isExpanded,
+                                onToggleExpand: () => _toggleExpand(index),
+                                onToggleFavorite: () =>
+                                    _toggleFavorite(item['id']),
+                                eventId: widget.eventId,
+                              ),
+                      );
+                    },
+                    childCount: _filteredItems.length,
+                  ),
                 ),
               ),
           ],
@@ -499,125 +444,279 @@ class _AgendaPageState extends ConsumerState<AgendaPage> {
       ),
     );
   }
+}
 
-  Widget _buildHeader(bool isMobile) {
-    return Row(
-      children: [
-        // Back button
-        IconButton(
-          icon: Icon(
-            Icons.arrow_back,
-            color: Colors.white,
-            size: isMobile ? 24 : 28,
-          ),
-          onPressed: () => context.go('/events/${widget.eventId}/menu'),
-        ),
-        const SizedBox(width: 8),
-        // Title
-        Text(
-          'Agenda',
-          style: GoogleFonts.montserrat(
-            fontSize: isMobile ? 24 : 28,
-            fontWeight: FontWeight.w600,
-            color: Colors.white,
-          ),
-        ),
-        const Spacer(),
-        // Custom App Bar with notifications and profile
-        CustomAppBar(
-          onProfileTap: _toggleProfile,
-          onNotificationTap: () {
-            _closeProfile();
-            _scaffoldKey.currentState?.openEndDrawer();
-          },
-          isMobile: isMobile,
-          unreadNotificationCount: _unreadNotificationCount,
-        ),
-      ],
-    );
-  }
+// =============================================================================
+// Program Toggle
+// =============================================================================
 
-  Widget _buildSearchBar(bool isMobile) {
-    return Container(
-      height: isMobile ? 45 : 64,
-      padding: EdgeInsets.symmetric(horizontal: isMobile ? 14 : 24),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF1F1F6).withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(20),
-      ),
+class _ProgramToggle extends StatelessWidget {
+  final bool isProgramSelected;
+  final bool isMobile;
+  final VoidCallback onProgramTap;
+  final VoidCallback onFavouriteTap;
+
+  const _ProgramToggle({
+    required this.isProgramSelected,
+    required this.isMobile,
+    required this.onProgramTap,
+    required this.onFavouriteTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final height = isMobile ? 40.0 : 43.0;
+
+    return SizedBox(
+      height: height,
       child: Row(
         children: [
-          Icon(
-            Icons.search,
-            color: const Color(0xFFF1F1F6),
-            size: isMobile ? 22 : 36,
+          _toggleButton(
+            label: 'Event Program',
+            isActive: isProgramSelected,
+            onTap: onProgramTap,
+            borderRadius: const BorderRadius.horizontal(left: Radius.circular(5)),
           ),
-          SizedBox(width: isMobile ? 10 : 20),
-          Expanded(
-            child: TextField(
-              onChanged: (value) => setState(() => _searchQuery = value),
-              style: GoogleFonts.roboto(
-                fontSize: isMobile ? 14 : 20,
-                color: const Color(0xFFF1F1F6),
-              ),
-              decoration: InputDecoration(
-                hintText: 'Search by event name',
-                hintStyle: GoogleFonts.roboto(
-                  fontSize: isMobile ? 14 : 20,
-                  fontWeight: FontWeight.w500,
-                  color: const Color(0xFFF1F1F6),
-                ),
-                border: InputBorder.none,
-              ),
-            ),
+          _toggleButton(
+            label: 'My Program',
+            isActive: !isProgramSelected,
+            onTap: onFavouriteTap,
+            borderRadius:
+                const BorderRadius.horizontal(right: Radius.circular(5)),
           ),
         ],
       ),
     );
   }
 
-  // Filter chips - commented out for now
-  // Widget _buildFilterChips(bool isMobile) {
-  //   return SingleChildScrollView(
-  //     scrollDirection: Axis.horizontal,
-  //     child: Row(
-  //       children: _filters.map((filter) {
-  //         final isSelected = _selectedFilter == filter;
-  //         return Padding(
-  //           padding: const EdgeInsets.only(right: 8),
-  //           child: GestureDetector(
-  //             onTap: () => setState(() => _selectedFilter = filter),
-  //             child: Container(
-  //               padding: EdgeInsets.symmetric(
-  //                 horizontal: isMobile ? 16 : 47,
-  //                 vertical: isMobile ? 8 : 14,
-  //               ),
-  //               decoration: BoxDecoration(
-  //                 color: isSelected ? const Color(0xFF151A4A) : const Color(0xFF9CA4CC),
-  //                 borderRadius: BorderRadius.circular(41.5),
-  //               ),
-  //               child: Text(
-  //                 filter,
-  //                 style: GoogleFonts.roboto(
-  //                   fontSize: isMobile ? 14 : 33,
-  //                   fontWeight: FontWeight.w500,
-  //                   color: Colors.white,
-  //                 ),
-  //               ),
-  //             ),
-  //           ),
-  //         );
-  //       }).toList(),
-  //     ),
-  //   );
-  // }
+  Widget _toggleButton({
+    required String label,
+    required bool isActive,
+    required VoidCallback onTap,
+    required BorderRadius borderRadius,
+  }) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          decoration: BoxDecoration(
+            color: isActive ? AppTheme.primaryColor : const Color(0xFFE6E7F2),
+            borderRadius: borderRadius,
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: GoogleFonts.montserrat(
+              fontSize: isMobile ? 16 : 20,
+              fontWeight: FontWeight.w600,
+              color: isActive ? Colors.white : AppTheme.primaryColor,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
-  Widget _buildDayTabs(bool isMobile) {
-    if (_days.isEmpty) {
+// =============================================================================
+// Search + Sort Row
+// =============================================================================
+
+class _SearchSortRow extends StatelessWidget {
+  final bool isMobile;
+  final String selectedLocation;
+  final List<String> locations;
+  final bool showDropdown;
+  final ValueChanged<String> onSearchChanged;
+  final VoidCallback onSortTap;
+  final ValueChanged<String> onLocationSelected;
+
+  const _SearchSortRow({
+    required this.isMobile,
+    required this.selectedLocation,
+    required this.locations,
+    required this.showDropdown,
+    required this.onSearchChanged,
+    required this.onSortTap,
+    required this.onLocationSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Row(
+          children: [
+            // Search bar
+            Expanded(
+              child: TextField(
+                onChanged: onSearchChanged,
+                style: GoogleFonts.inter(fontSize: 14),
+                decoration: InputDecoration(
+                  hintText: 'Search by event name or ID',
+                  hintStyle: GoogleFonts.inter(fontSize: 14, color: Colors.grey),
+                  prefixIcon: const Icon(Icons.search, size: 20),
+                  filled: true,
+                  fillColor: Colors.white,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(5),
+                    borderSide: const BorderSide(color: Color(0xFFCBCBCB)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(5),
+                    borderSide: const BorderSide(color: Color(0xFFCBCBCB)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(5),
+                    borderSide: const BorderSide(color: AppTheme.primaryColor, width: 2),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            // Sort button
+            if (isMobile)
+              GestureDetector(
+                onTap: onSortTap,
+                child: Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(5),
+                    border: Border.all(color: const Color(0xFFCACACA)),
+                  ),
+                  child: const Icon(
+                    Icons.filter_list,
+                    size: 20,
+                    color: Color(0xFF757A8A),
+                  ),
+                ),
+              )
+            else
+              GestureDetector(
+                onTap: onSortTap,
+                child: Container(
+                  height: 48,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(5),
+                    border: Border.all(color: const Color(0xFFCACACA)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Sort by: $selectedLocation',
+                        style: GoogleFonts.roboto(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: const Color(0xFF757A8A),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(
+                        Icons.keyboard_arrow_down,
+                        size: 18,
+                        color: Color(0xFF757A8A),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+        // Dropdown overlay
+        if (showDropdown)
+          Positioned(
+            top: 52,
+            right: 0,
+            child: Container(
+              width: isMobile ? 200 : 240,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFB5B5B5).withValues(alpha: 0.5),
+                    blurRadius: 20,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: locations.map((loc) {
+                  final isSelected = selectedLocation == loc;
+                  return InkWell(
+                    onTap: () => onLocationSelected(loc),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
+                      child: Row(
+                        children: [
+                          Icon(
+                            isSelected
+                                ? Icons.check_box
+                                : Icons.check_box_outline_blank,
+                            size: 18,
+                            color: isSelected
+                                ? AppTheme.primaryColor
+                                : const Color(0xFF757A8A),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              loc,
+                              style: GoogleFonts.inter(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                                color: isSelected
+                                    ? AppTheme.primaryColor
+                                    : const Color(0xFF292D32),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+// =============================================================================
+// Mobile Day Selector (horizontal scroll pills)
+// =============================================================================
+
+class _MobileDaySelector extends StatelessWidget {
+  final List<Map<String, dynamic>> days;
+  final int selectedIndex;
+  final ValueChanged<int> onDaySelected;
+
+  const _MobileDaySelector({
+    required this.days,
+    required this.selectedIndex,
+    required this.onDaySelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (days.isEmpty) {
       return Center(
         child: Text(
           'No agenda days available',
-          style: GoogleFonts.roboto(fontSize: 16, color: Colors.white70),
+          style: GoogleFonts.roboto(fontSize: 14, color: const Color(0xFF757A8A)),
         ),
       );
     }
@@ -625,66 +724,59 @@ class _AgendaPageState extends ConsumerState<AgendaPage> {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
-        children: List.generate(_days.length, (index) {
-          final day = _days[index];
-          final isSelected = _selectedDayIndex == index;
-          return Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: GestureDetector(
-              onTap: () => _selectDay(index),
-              child: Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: isMobile ? 10 : 20,
-                  vertical: isMobile ? 10 : 16,
+        children: List.generate(days.length, (index) {
+          final isSelected = selectedIndex == index;
+          final prevSelected = index > 0 && selectedIndex == index - 1;
+          final isFirst = index == 0;
+          return GestureDetector(
+            onTap: () => onDaySelected(index),
+            child: SizedBox(
+              width: 110,
+              height: 36,
+              child: CustomPaint(
+                painter: _ArrowTabPainter(
+                  isSelected: isSelected,
+                  isFirst: isFirst,
+                  prevSelected: prevSelected,
                 ),
-                decoration: BoxDecoration(
-                  color: isSelected ? const Color(0xFF151A4A) : Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                  boxShadow: isSelected
-                      ? [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.25),
-                            blurRadius: 4,
-                            offset: const Offset(0, 4),
+                child: Center(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 18,
+                        height: 18,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: isSelected
+                              ? Colors.white
+                              : const Color(0xFFCED4E3),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          '${index + 1}',
+                          style: GoogleFonts.roboto(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: isSelected
+                                ? AppTheme.primaryColor
+                                : const Color(0xFF345790),
                           ),
-                        ]
-                      : null,
-                ),
-                child: Row(
-                  children: [
-                    Text(
-                      '${day['day']}',
-                      style: GoogleFonts.roboto(
-                        fontSize: isMobile ? 16 : 25,
-                        fontWeight: isSelected
-                            ? FontWeight.w700
-                            : FontWeight.w600,
-                        color: isSelected
-                            ? const Color(0xFFF4F4F2)
-                            : const Color(0xFF20306C),
+                        ),
                       ),
-                    ),
-                    Container(
-                      width: 2,
-                      height: isMobile ? 25 : 45,
-                      margin: const EdgeInsets.symmetric(horizontal: 6),
-                      color: isSelected
-                          ? const Color(0xFFF4F4F2)
-                          : const Color(0xFF20306C),
-                    ),
-                    Text(
-                      day['weekday'],
-                      style: GoogleFonts.roboto(
-                        fontSize: isMobile ? 16 : 25,
-                        fontWeight: isSelected
-                            ? FontWeight.w700
-                            : FontWeight.w600,
-                        color: isSelected
-                            ? const Color(0xFFF4F4F2)
-                            : const Color(0xFF20306C),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Day ${index + 1}',
+                        style: GoogleFonts.roboto(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w400,
+                          color: isSelected
+                              ? Colors.white
+                              : const Color(0xFF345790),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -693,52 +785,727 @@ class _AgendaPageState extends ConsumerState<AgendaPage> {
       ),
     );
   }
+}
 
-  Widget _buildAgendaCard(
-    Map<String, dynamic> item,
-    int index,
-    bool isExpanded,
-    bool isMobile,
-  ) {
+// =============================================================================
+// Desktop Stepper Day Selector
+// =============================================================================
+
+class _StepperDaySelector extends StatelessWidget {
+  final List<Map<String, dynamic>> days;
+  final int selectedIndex;
+  final ValueChanged<int> onDaySelected;
+
+  const _StepperDaySelector({
+    required this.days,
+    required this.selectedIndex,
+    required this.onDaySelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (days.isEmpty) {
+      return Center(
+        child: Text(
+          'No agenda days available',
+          style: GoogleFonts.roboto(fontSize: 14, color: const Color(0xFF757A8A)),
+        ),
+      );
+    }
+
+    return Container(
+      height: 43,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(5),
+        border: Border.all(color: const Color(0xFFD4D4D4)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: List.generate(days.length, (index) {
+          final isSelected = selectedIndex == index;
+          final prevSelected = index > 0 && selectedIndex == index - 1;
+          final isFirst = index == 0;
+
+          return GestureDetector(
+            onTap: () => onDaySelected(index),
+            child: SizedBox(
+              width: 120,
+              child: CustomPaint(
+                painter: _ArrowTabPainter(
+                  isSelected: isSelected,
+                  isFirst: isFirst,
+                  prevSelected: prevSelected,
+                ),
+                child: Center(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 21,
+                        height: 21,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: isSelected
+                              ? Colors.white
+                              : const Color(0xFFCED4E3),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          '${index + 1}',
+                          style: GoogleFonts.roboto(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: isSelected
+                                ? AppTheme.primaryColor
+                                : const Color(0xFF345790),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Day ${index + 1}',
+                        style: GoogleFonts.roboto(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w400,
+                          color: isSelected
+                              ? Colors.white
+                              : const Color(0xFF345790),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+}
+
+/// Custom painter for arrow/chevron day tabs.
+///
+/// Selected tab: solid blue arrow shape (full rectangle + arrow tip on right,
+/// left side has inward notch if previous tab exists).
+///
+/// Unselected tab: transparent, only draws the chevron divider line on right
+/// (unless previous tab was selected — then left side gets a notch cutout).
+class _ArrowTabPainter extends CustomPainter {
+  final bool isSelected;
+  final bool isFirst;
+  final bool prevSelected;
+
+  static const _arrow = 12.0;
+  static const _primaryColor = AppTheme.primaryColor;
+  static const _dividerColor = Color(0xFFD4D4D4);
+
+  _ArrowTabPainter({
+    required this.isSelected,
+    required this.isFirst,
+    required this.prevSelected,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final h = size.height;
+    final w = size.width;
+
+    if (isSelected) {
+      final paint = Paint()
+        ..color = _primaryColor
+        ..style = PaintingStyle.fill;
+      final whitePaint = Paint()
+        ..color = Colors.white
+        ..style = PaintingStyle.fill;
+
+      // Fill entire rectangle blue
+      canvas.drawRect(Rect.fromLTWH(0, 0, w, h), paint);
+
+      // Cut out white notch on left (inward arrow) if not first tab
+      if (!isFirst) {
+        final leftNotch = Path()
+          ..moveTo(0, 0)
+          ..lineTo(_arrow, h / 2)
+          ..lineTo(0, h)
+          ..close();
+        canvas.drawPath(leftNotch, whitePaint);
+      }
+
+      // Cut out white triangles on right to form the arrow tip
+      // Top-right triangle
+      final topRight = Path()
+        ..moveTo(w - _arrow, 0)
+        ..lineTo(w, 0)
+        ..lineTo(w, h / 2)
+        ..close();
+      canvas.drawPath(topRight, whitePaint);
+
+      // Bottom-right triangle
+      final bottomRight = Path()
+        ..moveTo(w - _arrow, h)
+        ..lineTo(w, h)
+        ..lineTo(w, h / 2)
+        ..close();
+      canvas.drawPath(bottomRight, whitePaint);
+    } else {
+      // --- UNSELECTED: transparent background ---
+
+      // If previous tab was selected, paint white over the left notch area
+      // to cover the blue rectangle that bleeds from the previous tab
+      if (prevSelected) {
+        final whitePaint = Paint()
+          ..color = Colors.white
+          ..style = PaintingStyle.fill;
+        final notch = Path()
+          ..moveTo(0, 0)
+          ..lineTo(_arrow, h / 2)
+          ..lineTo(0, h)
+          ..close();
+        canvas.drawPath(notch, whitePaint);
+      }
+
+      // Draw chevron divider line on the right
+      final linePaint = Paint()
+        ..color = _dividerColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.0;
+
+      final line = Path()
+        ..moveTo(w - _arrow, 0)
+        ..lineTo(w, h / 2)
+        ..lineTo(w - _arrow, h);
+      canvas.drawPath(line, linePaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ArrowTabPainter oldDelegate) {
+    return oldDelegate.isSelected != isSelected ||
+        oldDelegate.isFirst != isFirst ||
+        oldDelegate.prevSelected != prevSelected;
+  }
+}
+
+// =============================================================================
+// Desktop Episode Row (time LEFT, card RIGHT)
+// =============================================================================
+
+class _DesktopEpisodeRow extends StatelessWidget {
+  final Map<String, dynamic> item;
+  final bool isExpanded;
+  final VoidCallback onToggleExpand;
+  final VoidCallback onToggleFavorite;
+  final String eventId;
+
+  const _DesktopEpisodeRow({
+    required this.item,
+    required this.isExpanded,
+    required this.onToggleExpand,
+    required this.onToggleFavorite,
+    required this.eventId,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Time Badge - 86px width for mobile
-        Container(
-          width: isMobile ? 86 : 236,
-          padding: EdgeInsets.symmetric(
-            vertical: isMobile ? 12 : 22,
-            horizontal: isMobile ? 8 : 20,
-          ),
-          decoration: BoxDecoration(
-            color: const Color(0xFF9CA4CC),
-            borderRadius: BorderRadius.circular(isMobile ? 12 : 20),
-          ),
-          child: Center(
-            child: Text(
-              item['time'],
-              textAlign: TextAlign.center,
-              style: GoogleFonts.roboto(
-                fontSize: isMobile ? 12 : 33,
-                fontWeight: FontWeight.w700,
-                color: const Color(0xFFF1F1F6),
+        // Time column — single line, no wrap
+        SizedBox(
+          width: 160,
+          child: Padding(
+            padding: const EdgeInsets.only(top: 16),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                '${item['startTime']} - ${item['endTime']}',
+                maxLines: 1,
+                style: GoogleFonts.montserrat(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.primaryColor,
+                ),
               ),
             ),
           ),
         ),
-        SizedBox(width: isMobile ? 8 : 31),
-        // Card Content - clickable to expand/collapse
+        const SizedBox(width: 16),
+        // Card
         Expanded(
           child: GestureDetector(
-            onTap: () => _toggleExpand(index),
+            onTap: onToggleExpand,
+            child: AnimatedSize(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+              alignment: Alignment.topCenter,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.06),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Stack(
+                children: [
+                  isExpanded
+                      ? _ExpandedCardContent(
+                          item: item,
+                          isMobile: false,
+                          onToggleFavorite: onToggleFavorite,
+                          eventId: eventId,
+                        )
+                      : _CollapsedCardContent(
+                          item: item,
+                          isMobile: false,
+                          onToggleFavorite: onToggleFavorite,
+                          eventId: eventId,
+                        ),
+                  if (isExpanded)
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      bottom: 0,
+                      child: Container(
+                        width: 6,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF9CA4CC),
+                          borderRadius: BorderRadius.horizontal(
+                            left: Radius.circular(100),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// =============================================================================
+// Mobile Episode Card (time above, card below)
+// =============================================================================
+
+class _MobileEpisodeCard extends StatelessWidget {
+  final Map<String, dynamic> item;
+  final bool isExpanded;
+  final VoidCallback onToggleExpand;
+  final VoidCallback onToggleFavorite;
+  final String eventId;
+
+  const _MobileEpisodeCard({
+    required this.item,
+    required this.isExpanded,
+    required this.onToggleExpand,
+    required this.onToggleFavorite,
+    required this.eventId,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Time
+        Text(
+          '${item['startTime']} - ${item['endTime']}',
+          style: GoogleFonts.montserrat(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: AppTheme.primaryColor,
+          ),
+        ),
+        const SizedBox(height: 8),
+        // Card
+        GestureDetector(
+          onTap: onToggleExpand,
+          child: AnimatedSize(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+            alignment: Alignment.topCenter,
             child: Container(
+              width: double.infinity,
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(isMobile ? 12 : 20),
+                borderRadius: BorderRadius.circular(5),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.primaryColor.withValues(alpha: 0.5),
+                    blurRadius: 3.4,
+                  ),
+                ],
               ),
-              child: isExpanded
-                  ? _buildExpandedCard(item, index, isMobile)
-                  : _buildCollapsedCard(item, index, isMobile),
+              child: Stack(
+                children: [
+                  isExpanded
+                      ? _ExpandedCardContent(
+                          item: item,
+                          isMobile: true,
+                          onToggleFavorite: onToggleFavorite,
+                          eventId: eventId,
+                        )
+                      : _CollapsedCardContent(
+                          item: item,
+                          isMobile: true,
+                          onToggleFavorite: onToggleFavorite,
+                          eventId: eventId,
+                        ),
+                  if (isExpanded)
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      bottom: 0,
+                      child: Container(
+                        width: 4,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF9CA4CC),
+                          borderRadius: BorderRadius.horizontal(
+                            left: Radius.circular(100),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// =============================================================================
+// Collapsed Card Content
+// =============================================================================
+
+class _CollapsedCardContent extends StatelessWidget {
+  final Map<String, dynamic> item;
+  final bool isMobile;
+  final VoidCallback onToggleFavorite;
+  final String eventId;
+
+  const _CollapsedCardContent({
+    required this.item,
+    required this.isMobile,
+    required this.onToggleFavorite,
+    required this.eventId,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final sponsor = item['sponsor'] as Map<String, dynamic>?;
+
+    return Padding(
+      padding: EdgeInsets.all(isMobile ? 12 : 20),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Main content
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Badges
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: [
+                    if ((item['date'] as String?)?.isNotEmpty == true)
+                      _MetaBadge(
+                        icon: Icons.calendar_today_outlined,
+                        text: item['date'],
+                        isMobile: isMobile,
+                      ),
+                    if ((item['location'] as String?)?.isNotEmpty == true)
+                      _MetaBadge(
+                        icon: Icons.location_on_outlined,
+                        text: item['location'],
+                        isMobile: isMobile,
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+
+                // Title
+                Text(
+                  item['title'] ?? '',
+                  style: GoogleFonts.montserrat(
+                    fontSize: isMobile ? 16 : 20,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF151838),
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                // Description (truncated to 3 lines)
+                Text(
+                  item['description'] ?? '',
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.roboto(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w400,
+                    color: Colors.black,
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                // Read more
+                Row(
+                  children: [
+                    Text(
+                      'Read more',
+                      style: GoogleFonts.roboto(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w400,
+                        color: const Color(0xFF9CA4CC),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(
+                      Icons.arrow_forward,
+                      size: 14,
+                      color: Color(0xFF9CA4CC),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(width: 12),
+
+          // Right column: star + sponsor
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              // Favorite star
+              GestureDetector(
+                onTap: onToggleFavorite,
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Icon(
+                    item['isFavorite'] == true
+                        ? Icons.star
+                        : Icons.star_border,
+                    size: isMobile ? 22 : 28,
+                    color: item['isFavorite'] == true
+                        ? Colors.amber
+                        : const Color(0xFF939393),
+                  ),
+                ),
+              ),
+              // Sponsor below star
+              if (sponsor != null)
+                _SponsorWidget(sponsor: sponsor, isMobile: isMobile, eventId: eventId),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// =============================================================================
+// Expanded Card Content
+// =============================================================================
+
+class _ExpandedCardContent extends StatelessWidget {
+  final Map<String, dynamic> item;
+  final bool isMobile;
+  final VoidCallback onToggleFavorite;
+  final String eventId;
+
+  const _ExpandedCardContent({
+    required this.item,
+    required this.isMobile,
+    required this.onToggleFavorite,
+    required this.eventId,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final speakers = (item['speakers'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final moderator = item['moderator'] as Map<String, dynamic>?;
+    final sponsor = item['sponsor'] as Map<String, dynamic>?;
+    final speechTheme = item['speech_theme'] as String? ?? '';
+
+    if (isMobile) {
+      return _buildMobileLayout(speakers, moderator, sponsor, speechTheme);
+    }
+    return _buildDesktopLayout(
+        context, speakers, moderator, sponsor, speechTheme);
+  }
+
+  Widget _buildDesktopLayout(
+    BuildContext context,
+    List<Map<String, dynamic>> speakers,
+    Map<String, dynamic>? moderator,
+    Map<String, dynamic>? sponsor,
+    String speechTheme,
+  ) {
+    return Stack(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(20),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Left: main content
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Badges
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: [
+                        if ((item['date'] as String?)?.isNotEmpty == true)
+                          _MetaBadge(
+                            icon: Icons.calendar_today_outlined,
+                            text: item['date'],
+                            isMobile: false,
+                          ),
+                        if ((item['location'] as String?)?.isNotEmpty == true)
+                          _MetaBadge(
+                            icon: Icons.location_on_outlined,
+                            text: item['location'],
+                            isMobile: false,
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Title
+                    Text(
+                      item['title'] ?? '',
+                      style: GoogleFonts.montserrat(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF151938),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Description
+                    Text(
+                      item['description'] ?? '',
+                      style: GoogleFonts.roboto(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w400,
+                        color: Colors.black,
+                        height: 1.6,
+                      ),
+                    ),
+
+                    // Topic
+                    if (speechTheme.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      Text(
+                        'Topic: $speechTheme',
+                        style: GoogleFonts.montserrat(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF151938),
+                        ),
+                      ),
+                    ],
+
+                    // Speakers
+                    if (speakers.isNotEmpty) ...[
+                      const SizedBox(height: 20),
+                      Text(
+                        'Speakers:',
+                        style: GoogleFonts.montserrat(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF151938),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _SpeakerCarouselDesktop(
+                          speakers: speakers, eventId: eventId),
+                    ],
+
+                    // Collapse hint
+                    const SizedBox(height: 16),
+                    Center(
+                      child: Icon(
+                        Icons.keyboard_arrow_up,
+                        size: 32,
+                        color: AppTheme.primaryColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Right: sponsor + moderator column
+              const SizedBox(width: 20),
+              SizedBox(
+                width: 160,
+                child: Column(
+                  children: [
+                    // Spacing to account for star in top-right
+                    const SizedBox(height: 40),
+
+                    // Sponsor
+                    if (sponsor != null) ...[
+                      _SponsorWidget(
+                          sponsor: sponsor, isMobile: false, eventId: eventId),
+                      const SizedBox(height: 20),
+                    ],
+
+                    // Moderator
+                    if (moderator != null) ...[
+                      Text(
+                        'Moderator',
+                        style: GoogleFonts.montserrat(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF151938),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _ModeratorCardCompact(
+                          moderator: moderator, eventId: eventId),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Favorite star — always top-right corner
+        Positioned(
+          top: 12,
+          right: 12,
+          child: GestureDetector(
+            onTap: onToggleFavorite,
+            child: Icon(
+              item['isFavorite'] == true
+                  ? Icons.star
+                  : Icons.star_border,
+              size: 28,
+              color: item['isFavorite'] == true
+                  ? Colors.amber
+                  : const Color(0xFF939393),
             ),
           ),
         ),
@@ -746,277 +1513,192 @@ class _AgendaPageState extends ConsumerState<AgendaPage> {
     );
   }
 
-  Widget _buildCollapsedCard(
-    Map<String, dynamic> item,
-    int index,
-    bool isMobile,
+  Widget _buildMobileLayout(
+    List<Map<String, dynamic>> speakers,
+    Map<String, dynamic>? moderator,
+    Map<String, dynamic>? sponsor,
+    String speechTheme,
   ) {
-    return Padding(
-      padding: EdgeInsets.all(isMobile ? 10 : 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header Row
-          Row(
+    return Stack(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 6,
-                  children: [
-                    _buildBadge(Icons.calendar_today, item['date'], isMobile),
-                    _buildBadge(
-                      Icons.location_on_outlined,
-                      item['location'],
-                      isMobile,
+              // Badges
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  if ((item['date'] as String?)?.isNotEmpty == true)
+                    _MetaBadge(
+                      icon: Icons.calendar_today_outlined,
+                      text: item['date'],
+                      isMobile: true,
                     ),
-                  ],
+                  if ((item['location'] as String?)?.isNotEmpty == true)
+                    _MetaBadge(
+                      icon: Icons.location_on_outlined,
+                      text: item['location'],
+                      isMobile: true,
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+
+              // Title
+              Padding(
+                padding: const EdgeInsets.only(right: 32),
+                child: Text(
+                  item['title'] ?? '',
+                  style: GoogleFonts.montserrat(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF151938),
+                  ),
                 ),
               ),
-              GestureDetector(
-                onTap: () => _toggleFavorite(item['id']),
-                child: Icon(
-                  item['isFavorite'] ? Icons.star : Icons.star_border,
-                  size: isMobile ? 22 : 30,
-                  color: item['isFavorite']
-                      ? Colors.amber
-                      : const Color(0xFF949494),
+              const SizedBox(height: 12),
+
+              // Description
+              Text(
+                item['description'] ?? '',
+                style: GoogleFonts.roboto(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w400,
+                  color: Colors.black,
+                  height: 1.6,
                 ),
               ),
-            ],
-          ),
-          SizedBox(height: isMobile ? 8 : 20),
-          // Title
-          Text(
-            item['title'],
-            style: GoogleFonts.montserrat(
-              fontSize: isMobile ? 16 : 35,
-              fontWeight: FontWeight.w600,
-              color: const Color(0xFF151938),
-            ),
-          ),
-          SizedBox(height: isMobile ? 6 : 15),
-          // Description
-          Text(
-            item['description'],
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.roboto(
-              fontSize: isMobile ? 12 : 14,
-              color: Colors.black,
-              height: 1.4,
-            ),
-          ),
-          // Sponsor
-          if (item['sponsor'] != null) ...[
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                const Spacer(),
-                Column(
-                  children: [
-                    Container(
-                      width: isMobile ? 60 : 120,
-                      height: isMobile ? 35 : 70,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[200],
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child:
-                          item['sponsor']['logo'] != null &&
-                              item['sponsor']['logo'].toString().isNotEmpty
-                          ? ClipRRect(
-                              borderRadius: BorderRadius.circular(6),
-                              child: Image.network(
-                                item['sponsor']['logo'],
-                                fit: BoxFit.contain,
-                                errorBuilder: (_, __, ___) => Center(
-                                  child: Text(
-                                    item['sponsor']['name'] ?? '',
-                                    textAlign: TextAlign.center,
-                                    style: GoogleFonts.roboto(
-                                      fontSize: isMobile ? 8 : 12,
-                                      color: Colors.black54,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            )
-                          : Center(
-                              child: Text(
-                                item['sponsor']['name'] ?? '',
-                                textAlign: TextAlign.center,
-                                style: GoogleFonts.roboto(
-                                  fontSize: isMobile ? 10 : 14,
-                                  color: Colors.black54,
-                                ),
-                              ),
-                            ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      item['sponsor']['tier'] ?? '',
-                      style: GoogleFonts.roboto(
-                        fontSize: isMobile ? 10 : 14,
-                        fontWeight: FontWeight.w600,
-                        color: const Color(0xFFDDAC17),
-                      ),
-                    ),
-                  ],
+
+              // Topic
+              if (speechTheme.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Text(
+                  'Topic: $speechTheme',
+                  style: GoogleFonts.montserrat(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF151938),
+                  ),
                 ),
               ],
-            ),
-          ],
-          // Expand hint
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.keyboard_arrow_down,
-                size: isMobile ? 20 : 28,
-                color: const Color(0xFF9CA4CC),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildExpandedCard(
-    Map<String, dynamic> item,
-    int index,
-    bool isMobile,
-  ) {
-    return Padding(
-      padding: EdgeInsets.all(isMobile ? 10 : 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
-          Row(
-            children: [
-              Expanded(
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 6,
-                  children: [
-                    _buildBadge(Icons.calendar_today, item['date'], isMobile),
-                    _buildBadge(
-                      Icons.location_on_outlined,
-                      item['location'],
-                      isMobile,
-                    ),
-                  ],
+              // Sponsor
+              if (sponsor != null) ...[
+                const SizedBox(height: 16),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: _SponsorWidget(
+                      sponsor: sponsor, isMobile: true, eventId: eventId),
                 ),
-              ),
-              GestureDetector(
-                onTap: () => _toggleFavorite(item['id']),
-                child: Icon(
-                  item['isFavorite'] ? Icons.star : Icons.star_border,
-                  size: 30,
-                  color: item['isFavorite']
-                      ? Colors.amber
-                      : const Color(0xFF949494),
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: isMobile ? 12 : 20),
-          // Title
-          Text(
-            item['title'],
-            style: GoogleFonts.montserrat(
-              fontSize: isMobile ? 18 : 35,
-              fontWeight: FontWeight.w600,
-              color: const Color(0xFF151938),
-            ),
-          ),
-          SizedBox(height: isMobile ? 12 : 20),
-          // Description
-          Text(
-            item['description'],
-            style: GoogleFonts.roboto(
-              fontSize: isMobile ? 14 : 20,
-              color: Colors.black,
-              height: 1.4,
-            ),
-          ),
-          const SizedBox(height: 20),
-          // Moderator & Sponsor Row
-          if (item['moderator'] != null || item['sponsor'] != null)
-            Wrap(
-              spacing: 20,
-              runSpacing: 20,
-              children: [
-                if (item['moderator'] != null)
-                  _buildModerator(item['moderator'], isMobile),
-                if (item['sponsor'] != null)
-                  _buildSponsor(item['sponsor'], isMobile),
               ],
-            ),
-          // Speakers Section - Carousel
-          if (item['speakers'] != null &&
-              (item['speakers'] as List).isNotEmpty) ...[
-            const SizedBox(height: 20),
-            Text(
-              'Speakers:',
-              style: GoogleFonts.montserrat(
-                fontSize: isMobile ? 16 : 25,
-                fontWeight: FontWeight.w600,
-                color: const Color(0xFF151938),
-              ),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              height: isMobile ? 160 : 250,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: (item['speakers'] as List).length,
-                itemBuilder: (context, speakerIndex) {
-                  final speaker = item['speakers'][speakerIndex];
-                  return _buildSpeakerCard(speaker, isMobile);
-                },
-              ),
-            ),
-          ],
-          const SizedBox(height: 15),
-          // Collapse hint
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.keyboard_arrow_up,
-                size: isMobile ? 28 : 46,
-                color: const Color(0xFF3C4494),
+
+              // Speakers
+              if (speakers.isNotEmpty) ...[
+                const SizedBox(height: 20),
+                Text(
+                  'Speakers:',
+                  style: GoogleFonts.montserrat(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF151938),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _SpeakerScrollMobile(speakers: speakers, eventId: eventId),
+              ],
+
+              // Moderator
+              if (moderator != null) ...[
+                const SizedBox(height: 20),
+                Text(
+                  'Moderator',
+                  style: GoogleFonts.montserrat(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF151938),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _ModeratorCard(
+                    moderator: moderator, isMobile: true, eventId: eventId),
+              ],
+
+              // Collapse hint
+              const SizedBox(height: 16),
+              Center(
+                child: Icon(
+                  Icons.keyboard_arrow_up,
+                  size: 24,
+                  color: AppTheme.primaryColor,
+                ),
               ),
             ],
           ),
-        ],
-      ),
+        ),
+
+        // Favorite star — always top-right corner
+        Positioned(
+          top: 8,
+          right: 8,
+          child: GestureDetector(
+            onTap: onToggleFavorite,
+            child: Icon(
+              item['isFavorite'] == true
+                  ? Icons.star
+                  : Icons.star_border,
+              size: 22,
+              color: item['isFavorite'] == true
+                  ? Colors.amber
+                  : const Color(0xFF939393),
+            ),
+          ),
+        ),
+      ],
     );
   }
+}
 
-  Widget _buildBadge(IconData icon, String text, bool isMobile) {
+// =============================================================================
+// Meta Badge (date / location pill)
+// =============================================================================
+
+class _MetaBadge extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final bool isMobile;
+
+  const _MetaBadge({
+    required this.icon,
+    required this.text,
+    required this.isMobile,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (text.isEmpty) return const SizedBox.shrink();
+
     return Container(
       padding: EdgeInsets.symmetric(
-        horizontal: isMobile ? 6 : 12,
-        vertical: isMobile ? 4 : 8,
+        horizontal: isMobile ? 8 : 12,
+        vertical: isMobile ? 4 : 6,
       ),
       decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(5),
         border: Border.all(color: const Color(0xFF9CA4CC)),
-        borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: isMobile ? 14 : 24, color: const Color(0xFF9CA4CC)),
+          Icon(icon, size: isMobile ? 12 : 16, color: const Color(0xFF9CA4CC)),
           const SizedBox(width: 4),
           Text(
             text,
             style: GoogleFonts.roboto(
-              fontSize: isMobile ? 10 : 16,
+              fontSize: isMobile ? 12 : 14,
+              fontWeight: FontWeight.w400,
               color: Colors.black,
             ),
           ),
@@ -1024,81 +1706,85 @@ class _AgendaPageState extends ConsumerState<AgendaPage> {
       ),
     );
   }
+}
 
-  Widget _buildModerator(Map<String, dynamic> moderator, bool isMobile) {
-    final photoUrl = moderator['photo']?.toString() ?? '';
+// =============================================================================
+// Sponsor Widget
+// =============================================================================
 
-    return Column(
+class _SponsorWidget extends StatelessWidget {
+  final Map<String, dynamic> sponsor;
+  final bool isMobile;
+  final String eventId;
+
+  const _SponsorWidget({required this.sponsor, required this.isMobile, required this.eventId});
+
+  @override
+  Widget build(BuildContext context) {
+    final logoUrl = sponsor['logo']?.toString() ?? '';
+    final tier = (sponsor['tier'] ?? 'general').toString().toLowerCase();
+    final tierLabel = _tierLabel(tier);
+    final tierBg = _tierBgColor(tier);
+    final tierText = _tierTextColor(tier);
+
+    return GestureDetector(
+      onTap: () {
+        final id = sponsor['id'];
+        if (id != null) context.push('/events/$eventId/participants/$id');
+      },
+      child: Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
+        // Tier badge on top
         Container(
-          width: isMobile ? 80 : 140,
-          height: isMobile ? 80 : 130,
+          width: isMobile ? 80 : 120,
+          padding: const EdgeInsets.symmetric(vertical: 4),
           decoration: BoxDecoration(
-            color: Colors.grey[300],
-            borderRadius: BorderRadius.circular(15),
+            color: tierBg,
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(5)),
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.primaryColor.withValues(alpha: 0.5),
+                blurRadius: 5,
+                offset: const Offset(0, -1),
+                spreadRadius: -1,
+              ),
+            ],
           ),
-          child: photoUrl.isNotEmpty
-              ? ClipRRect(
-                  borderRadius: BorderRadius.circular(15),
-                  child: Image.network(
-                    photoUrl,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) =>
-                        const Icon(Icons.person, size: 40, color: Colors.grey),
-                  ),
-                )
-              : const Icon(Icons.person, size: 40, color: Colors.grey),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Moderator',
-          style: GoogleFonts.montserrat(
-            fontSize: isMobile ? 14 : 22,
-            fontWeight: FontWeight.w600,
-            color: const Color(0xFF151938),
-          ),
-        ),
-        const SizedBox(height: 4),
-        SizedBox(
-          width: isMobile ? 100 : 200,
           child: Text(
-            moderator['name'] ?? '',
+            tierLabel,
             textAlign: TextAlign.center,
-            style: GoogleFonts.roboto(
-              fontSize: isMobile ? 11 : 18,
+            style: GoogleFonts.montserrat(
+              fontSize: isMobile ? 10 : 12,
               fontWeight: FontWeight.w500,
-              color: const Color(0xFF3C4494),
+              color: tierText,
             ),
           ),
         ),
-      ],
-    );
-  }
-
-  Widget _buildSponsor(Map<String, dynamic> sponsor, bool isMobile) {
-    final logoUrl = sponsor['logo']?.toString() ?? '';
-
-    return Column(
-      children: [
+        // Logo below tier
         Container(
-          width: isMobile ? 80 : 215,
-          height: isMobile ? 55 : 134,
+          width: isMobile ? 80 : 120,
+          height: isMobile ? 50 : 80,
           decoration: BoxDecoration(
             color: Colors.grey[200],
-            borderRadius: BorderRadius.circular(8),
+            borderRadius:
+                const BorderRadius.vertical(bottom: Radius.circular(5)),
+            border: Border.all(color: const Color(0xFFD9D9D9)),
           ),
           child: logoUrl.isNotEmpty
               ? ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.network(
-                    logoUrl,
+                  borderRadius:
+                      const BorderRadius.vertical(bottom: Radius.circular(4)),
+                  child: AppCachedImage(
+                    imageUrl: logoUrl,
                     fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => Center(
+                    placeholder: Center(
                       child: Text(
                         sponsor['name'] ?? '',
                         textAlign: TextAlign.center,
                         style: GoogleFonts.roboto(
-                          fontSize: isMobile ? 12 : 20,
+                          fontSize: isMobile ? 8 : 11,
                           color: Colors.black54,
                         ),
                       ),
@@ -1110,108 +1796,138 @@ class _AgendaPageState extends ConsumerState<AgendaPage> {
                     sponsor['name'] ?? '',
                     textAlign: TextAlign.center,
                     style: GoogleFonts.roboto(
-                      fontSize: isMobile ? 12 : 20,
+                      fontSize: isMobile ? 10 : 12,
                       color: Colors.black54,
                     ),
                   ),
                 ),
         ),
-        const SizedBox(height: 6),
-        Text(
-          sponsor['tier'] ?? '',
-          style: GoogleFonts.roboto(
-            fontSize: isMobile ? 12 : 18,
-            fontWeight: FontWeight.w600,
-            color: const Color(0xFFDDAC17),
-          ),
-        ),
       ],
+    ),
     );
   }
 
-  Widget _buildSpeakerCard(Map<String, dynamic> speaker, bool isMobile) {
-    final photoUrl = speaker['photo']?.toString() ?? '';
+  static String _tierLabel(String tier) {
+    switch (tier) {
+      case 'gold':
+        return 'Gold Sponsor';
+      case 'silver':
+        return 'Silver Sponsor';
+      case 'bronze':
+        return 'Bronze Sponsor';
+      case 'platinum':
+        return 'Platinum Sponsor';
+      case 'diamond':
+        return 'Diamond Sponsor';
+      default:
+        return 'Sponsor';
+    }
+  }
 
-    return Container(
-      width: isMobile ? 130 : 200,
-      margin: const EdgeInsets.only(right: 12),
+  static Color _tierBgColor(String tier) {
+    switch (tier) {
+      case 'gold':
+        return const Color(0xFFFDE875);
+      case 'silver':
+        return const Color(0xFFC0C0C0);
+      case 'bronze':
+        return const Color(0xFFECC5A0);
+      case 'platinum':
+        return const Color(0xFFE0E4E8);
+      case 'diamond':
+        return const Color(0xFFE0F7FA);
+      default:
+        return const Color(0xFFFDE875);
+    }
+  }
+
+  static Color _tierTextColor(String tier) {
+    switch (tier) {
+      case 'gold':
+        return const Color(0xFFAE7600);
+      case 'silver':
+        return const Color(0xFF6E6E6E);
+      case 'bronze':
+        return const Color(0xFF8B5E3C);
+      case 'platinum':
+        return const Color(0xFF607D8B);
+      case 'diamond':
+        return const Color(0xFF00838F);
+      default:
+        return const Color(0xFFAE7600);
+    }
+  }
+}
+
+// =============================================================================
+// Moderator Card
+// =============================================================================
+
+class _ModeratorCard extends StatelessWidget {
+  final Map<String, dynamic> moderator;
+  final bool isMobile;
+  final String eventId;
+
+  const _ModeratorCard({required this.moderator, required this.isMobile, required this.eventId});
+
+  @override
+  Widget build(BuildContext context) {
+    final photoUrl = moderator['photo']?.toString() ?? '';
+
+    return GestureDetector(
+      onTap: () {
+        final id = moderator['id'];
+        if (id != null) context.push('/events/$eventId/speakers/$id');
+      },
+      child: Container(
+      padding: EdgeInsets.all(isMobile ? 10 : 16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.15),
-            blurRadius: 5,
-            spreadRadius: 1,
-            offset: const Offset(0, 3),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(5),
+        border: Border.all(color: const Color(0xFFD9D9D9)),
       ),
-      child: Column(
+      child: Row(
         children: [
-          // Photo
-          Expanded(
-            flex: 3,
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(8),
-                ),
-              ),
-              child: photoUrl.isNotEmpty
-                  ? ClipRRect(
-                      borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(8),
-                      ),
-                      child: Image.network(
-                        photoUrl,
-                        fit: BoxFit.cover,
-                        width: double.infinity,
-                        errorBuilder: (_, __, ___) => const Center(
-                          child: Icon(
-                            Icons.person,
-                            size: 50,
-                            color: Colors.grey,
-                          ),
-                        ),
-                      ),
-                    )
-                  : const Center(
-                      child: Icon(Icons.person, size: 50, color: Colors.grey),
-                    ),
-            ),
-          ),
-          // Info - fixed height to prevent overflow
           Container(
-            height: isMobile ? 55 : 70,
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            width: isMobile ? 64 : 110,
+            height: isMobile ? 64 : 110,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(3),
+            ),
+            child: photoUrl.isNotEmpty
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(3),
+                    child: AppCachedImage(
+                      imageUrl: photoUrl,
+                      fit: BoxFit.cover,
+                      placeholder: const Icon(
+                          Icons.person, size: 32, color: Colors.grey),
+                    ),
+                  )
+                : const Center(
+                    child: Icon(Icons.person, size: 32, color: Colors.grey),
+                  ),
+          ),
+          SizedBox(width: isMobile ? 12 : 20),
+          Expanded(
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  speaker['name'] ?? '',
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  moderator['name'] ?? '',
                   style: GoogleFonts.roboto(
-                    fontSize: isMobile ? 11 : 14,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
                     color: Colors.black,
                   ),
                 ),
-                const SizedBox(height: 2),
-                Flexible(
-                  child: Text(
-                    speaker['title'] ?? '',
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.roboto(
-                      fontSize: isMobile ? 9 : 11,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.black54,
-                    ),
+                const SizedBox(height: 4),
+                Text(
+                  moderator['position'] ?? '',
+                  style: GoogleFonts.roboto(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w400,
+                    color: AppTheme.primaryColor,
                   ),
                 ),
               ],
@@ -1219,6 +1935,324 @@ class _AgendaPageState extends ConsumerState<AgendaPage> {
           ),
         ],
       ),
+    ),
+    );
+  }
+}
+
+class _ModeratorCardCompact extends StatelessWidget {
+  final Map<String, dynamic> moderator;
+  final String eventId;
+
+  const _ModeratorCardCompact({required this.moderator, required this.eventId});
+
+  @override
+  Widget build(BuildContext context) {
+    final photoUrl = moderator['photo']?.toString() ?? '';
+
+    return GestureDetector(
+      onTap: () {
+        final id = moderator['id'];
+        if (id != null) context.push('/events/$eventId/speakers/$id');
+      },
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(5),
+          border: Border.all(color: const Color(0xFFD9D9D9)),
+        ),
+        child: Column(
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(3),
+              ),
+              child: photoUrl.isNotEmpty
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(3),
+                      child: AppCachedImage(
+                        imageUrl: photoUrl,
+                        fit: BoxFit.cover,
+                        placeholder: const Icon(
+                            Icons.person, size: 32, color: Colors.grey),
+                      ),
+                    )
+                  : const Center(
+                      child: Icon(Icons.person, size: 32, color: Colors.grey),
+                    ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              moderator['position'] ?? '',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.roboto(
+                fontSize: 10,
+                fontWeight: FontWeight.w400,
+                color: AppTheme.primaryColor,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              moderator['name'] ?? '',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.roboto(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Colors.black,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// =============================================================================
+// Speaker Scroll (Mobile) -- horizontal scroll mini-cards
+// =============================================================================
+
+class _SpeakerScrollMobile extends StatelessWidget {
+  final List<Map<String, dynamic>> speakers;
+  final String eventId;
+
+  const _SpeakerScrollMobile({required this.speakers, required this.eventId});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 220,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: speakers.length,
+        itemBuilder: (context, index) {
+          return Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: _SpeakerMiniCard(
+              speaker: speakers[index],
+              width: 150,
+              eventId: eventId,
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+// =============================================================================
+// Speaker Carousel (Desktop) -- with chevron
+// =============================================================================
+
+class _SpeakerCarouselDesktop extends StatefulWidget {
+  final List<Map<String, dynamic>> speakers;
+  final String eventId;
+
+  const _SpeakerCarouselDesktop({required this.speakers, required this.eventId});
+
+  @override
+  State<_SpeakerCarouselDesktop> createState() =>
+      _SpeakerCarouselDesktopState();
+}
+
+class _SpeakerCarouselDesktopState extends State<_SpeakerCarouselDesktop> {
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollRight() {
+    _scrollController.animateTo(
+      _scrollController.offset + 200,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 246,
+      child: Row(
+        children: [
+          Expanded(
+            child: ListView.builder(
+              controller: _scrollController,
+              scrollDirection: Axis.horizontal,
+              itemCount: widget.speakers.length,
+              itemBuilder: (context, index) {
+                return Padding(
+                  padding: const EdgeInsets.only(right: 12),
+                  child: _SpeakerMiniCard(
+                    speaker: widget.speakers[index],
+                    width: 184,
+                    eventId: widget.eventId,
+                  ),
+                );
+              },
+            ),
+          ),
+          if (widget.speakers.length > 3)
+            GestureDetector(
+              onTap: _scrollRight,
+              child: Container(
+                width: 36,
+                height: 36,
+                margin: const EdgeInsets.only(left: 8),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white,
+                  border: Border.all(color: const Color(0xFFD9D9D9)),
+                ),
+                child: const Icon(
+                  Icons.chevron_right,
+                  color: AppTheme.primaryColor,
+                  size: 20,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// =============================================================================
+// Speaker Mini Card
+// =============================================================================
+
+class _SpeakerMiniCard extends StatelessWidget {
+  final Map<String, dynamic> speaker;
+  final double width;
+  final String eventId;
+
+  const _SpeakerMiniCard({required this.speaker, required this.width, required this.eventId});
+
+  @override
+  Widget build(BuildContext context) {
+    final photoUrl = speaker['photo']?.toString() ?? '';
+    final position = speaker['position'] ?? '';
+    final country = speaker['country'] ?? '';
+
+    return GestureDetector(
+      onTap: () {
+        final id = speaker['id'];
+        if (id != null) context.push('/events/$eventId/speakers/$id');
+      },
+      child: Container(
+      width: width,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.25),
+            blurRadius: 5,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Photo
+          Container(
+            height: width * 0.65,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(5)),
+            ),
+            child: photoUrl.isNotEmpty
+                ? ClipRRect(
+                    borderRadius:
+                        const BorderRadius.vertical(top: Radius.circular(5)),
+                    child: SizedBox.expand(
+                      child: AppCachedImage(
+                        imageUrl: photoUrl,
+                        fit: BoxFit.cover,
+                        placeholder: const Icon(
+                            Icons.person, size: 40, color: Colors.grey),
+                      ),
+                    ),
+                  )
+                : const Center(
+                    child: Icon(Icons.person, size: 40, color: Colors.grey),
+                  ),
+          ),
+          // Info
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    speaker['name'] ?? '',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.roboto(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.black,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    position,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.roboto(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w400,
+                      color: Colors.black,
+                    ),
+                  ),
+                  if (country.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      'Keynote \u2022 $country',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.roboto(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w400,
+                        color: Colors.black54,
+                      ),
+                    ),
+                  ],
+                  const Spacer(),
+                  Container(
+                    width: double.infinity,
+                    height: 25,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(5),
+                      border: Border.all(color: AppTheme.primaryColor),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      'View Profile',
+                      style: GoogleFonts.roboto(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: AppTheme.primaryColor,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
     );
   }
 }

@@ -1,24 +1,25 @@
 import 'package:b2c_app/l10n/generated/app_localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:provider/provider.dart';
 
-import '../../../core/app_theme.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/app_checkbox.dart';
+import '../../../core/widgets/app_snackbar.dart';
 import '../../../core/widgets/app_text_field.dart';
-import '../services/auth_service.dart';
-import 'verification_pending_page.dart';
+import '../providers/auth_provider.dart';
 import 'widgets/auth_page_layout.dart';
 import 'widgets/auth_button.dart';
 import 'widgets/hover_text.dart';
 
-class LoginPage extends StatefulWidget {
+class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
 
   @override
-  State<LoginPage> createState() => _LoginPageState();
+  ConsumerState<LoginPage> createState() => _LoginPageState();
 }
 
-class _LoginPageState extends State<LoginPage> {
+class _LoginPageState extends ConsumerState<LoginPage> {
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _rememberMe = false;
@@ -72,29 +73,11 @@ class _LoginPageState extends State<LoginPage> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   // Remember me
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SizedBox(
-                        width: 17,
-                        height: 18,
-                        child: Checkbox(
-                          value: _rememberMe,
-                          onChanged: (val) =>
-                              setState(() => _rememberMe = val!),
-                          activeColor: AppColors.checkboxActive,
-                          side: const BorderSide(
-                            color: AppColors.checkboxActive,
-                            width: 1.5,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        AppLocalizations.of(context)!.rememberMe,
-                        style: AppTextStyles.rememberMe.copyWith(fontSize: 14),
-                      ),
-                    ],
+                  AppCheckbox(
+                    value: _rememberMe,
+                    onChanged: (val) => setState(() => _rememberMe = val),
+                    label: AppLocalizations.of(context)!.rememberMe,
+                    size: 18,
                   ),
                   // Forgot Password
                   MouseRegion(
@@ -169,7 +152,7 @@ class _LoginPageState extends State<LoginPage> {
     setState(() => _isLoading = true);
 
     try {
-      final errorMessage = await context.read<AuthService>().login(
+      final errorMessage = await ref.read(authNotifierProvider.notifier).login(
         _usernameController.text.trim(),
         _passwordController.text,
         rememberMe: _rememberMe,
@@ -178,23 +161,12 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) return;
 
       if (errorMessage == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Login successful!"),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
-          ),
-        );
-        context.go('/');
+        AppSnackBar.showSuccess(context, "Login successful!");
+        // GoRouter redirect handles post-login navigation automatically
+        // (event menu if last-viewed event exists, otherwise event calendar)
       } else if (errorMessage == 'EMAIL_NOT_VERIFIED') {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => VerificationPendingPage(
-              email: _usernameController.text.trim(),
-            ),
-          ),
-        );
+        final email = Uri.encodeComponent(_usernameController.text.trim());
+        context.go('/verification-pending?email=$email');
       } else {
         _showError(errorMessage);
       }
@@ -210,13 +182,6 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-        duration: const Duration(seconds: 4),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    AppSnackBar.showError(context, message);
   }
 }

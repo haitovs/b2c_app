@@ -1,20 +1,18 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:http/http.dart' as http;
-import 'package:provider/provider.dart' as legacy_provider;
-
 import '../../../core/config/app_config.dart';
-import '../../../core/services/event_context_service.dart';
-import '../../../core/widgets/custom_app_bar.dart';
-import '../../auth/services/auth_service.dart';
-import '../../events/ui/widgets/profile_dropdown.dart';
-import '../../notifications/ui/notification_drawer.dart';
+import '../../../core/providers/event_context_provider.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../company/providers/company_providers.dart';
+import '../providers/meeting_providers.dart';
 
 /// New Meeting Page - Grid of participants/entities to select for meeting
+/// Rendered inside EventShellLayout (sidebar + top bar already provided)
 class NewMeetingPage extends ConsumerStatefulWidget {
   final String eventId;
   final bool initialIsB2G;
@@ -22,7 +20,7 @@ class NewMeetingPage extends ConsumerStatefulWidget {
   const NewMeetingPage({
     super.key,
     required this.eventId,
-    this.initialIsB2G = false, // Default to B2B
+    this.initialIsB2G = false,
   });
 
   @override
@@ -30,45 +28,30 @@ class NewMeetingPage extends ConsumerStatefulWidget {
 }
 
 class _NewMeetingPageState extends ConsumerState<NewMeetingPage> {
-  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  bool _isProfileOpen = false;
+  late bool _isB2B;
 
-  // Meeting type toggle - initialized from widget.initialIsB2G
-  late bool _isB2B; // true = B2B, false = B2G
-
-  // Filter state (will be used when filter chips are added)
-  // ignore: unused_field
-  final String _selectedDirectionFilter = 'all'; // all, sent, received
-  // ignore: unused_field
-  final String _selectedStatusFilter =
-      'all'; // all, approved, pending, declined
-
-  // Search
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  String _sortBy = 'all';
 
-  // Data
-  List<Map<String, dynamic>> _participants = []; // B2B participants
-  List<Map<String, dynamic>> _govEntities = []; // B2G gov entities
+  List<Map<String, dynamic>> _companies = [];
+  List<Map<String, dynamic>> _govEntities = [];
   List<Map<String, dynamic>> _filteredItems = [];
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    // Initialize from widget parameter (initialIsB2G = true means _isB2B = false)
     _isB2B = !widget.initialIsB2G;
-    debugPrint(
-      'NewMeetingPage initState: initialIsB2G=${widget.initialIsB2G}, _isB2B=$_isB2B',
-    );
     _initializeAndFetch();
   }
 
   Future<void> _initializeAndFetch() async {
-    // Ensure the event context is loaded for this event
     final eventId = int.tryParse(widget.eventId);
     if (eventId != null) {
-      await eventContextService.ensureEventContext(eventId);
+      await ref
+          .read(eventContextProvider.notifier)
+          .ensureEventContext(eventId);
     }
     _fetchData();
   }
@@ -78,8 +61,6 @@ class _NewMeetingPageState extends ConsumerState<NewMeetingPage> {
       _isB2B = isB2B;
       _applyFilters();
     });
-
-    // Lazy-load B2G data when switching to B2G tab
     if (!isB2B && _govEntities.isEmpty) {
       _fetchGovEntities();
     }
@@ -91,122 +72,83 @@ class _NewMeetingPageState extends ConsumerState<NewMeetingPage> {
     super.dispose();
   }
 
-  void _toggleProfile() {
-    setState(() {
-      _isProfileOpen = !_isProfileOpen;
-    });
-  }
-
-  void _closeProfile() {
-    if (_isProfileOpen) {
-      setState(() {
-        _isProfileOpen = false;
-      });
-    }
-  }
-
   Future<void> _fetchData() async {
     setState(() => _isLoading = true);
-
     try {
-      final authService = legacy_provider.Provider.of<AuthService>(
-        context,
-        listen: false,
-      );
-      final token = await authService.getToken();
-
-      // Fetch B2C users for B2B meetings
-      // These have UUID IDs for meeting requests between app users
       try {
-        final usersResponse = await http.get(
-          Uri.parse('${AppConfig.b2cApiBaseUrl}/api/v1/users/'),
-          headers: {
-            'Authorization': 'Bearer $token',
-            'Content-Type': 'application/json',
-          },
-        );
+        final meetingService = ref.read(meetingServiceProvider);
+        final eventId = int.tryParse(widget.eventId) ?? 0;
+        _companies = await meetingService.fetchPublicCompanies(eventId: eventId);
 
-        if (usersResponse.statusCode == 200) {
-          final List data = jsonDecode(usersResponse.body);
-          _participants = data.cast<Map<String, dynamic>>();
-        } else {
-          debugPrint('Failed to fetch B2C users: ${usersResponse.statusCode}');
+        // Filter out user's own companies
+        try {
+          final myCompanies = await ref.read(myCompaniesProvider(eventId).future);
+          final myCompanyIds = myCompanies.map((c) => c.id).toSet();
+          _companies = _companies
+              .where((c) => !myCompanyIds.contains(c['id']?.toString()))
+              .toList();
+        } catch (_) {
+          // If we can't fetch own companies, show all (safe fallback)
         }
-      } catch (usersError) {
-        debugPrint('Error fetching B2C users: $usersError');
+      } catch (companiesError) {
+        if (kDebugMode) debugPrint('Error fetching public companies: $companiesError');
       }
-
-      // Note: B2G gov entities are now fetched lazily when user switches to B2G tab
-      // BUT if page opened with B2G mode, fetch them immediately
       if (!_isB2B) {
         await _fetchGovEntities();
       }
-
       setState(() {
         _applyFilters();
         _isLoading = false;
       });
     } catch (e) {
-      debugPrint('Error fetching data: $e');
+      if (kDebugMode) debugPrint('Error fetching data: $e');
       setState(() => _isLoading = false);
     }
   }
 
   Future<void> _fetchGovEntities() async {
-    if (_govEntities.isNotEmpty) return; // Already loaded
-
+    if (_govEntities.isNotEmpty) return;
     try {
-      final authService = legacy_provider.Provider.of<AuthService>(
-        context,
-        listen: false,
-      );
-      final token = await authService.getToken();
-
-      final govResponse = await http.get(
-        Uri.parse('${AppConfig.b2cApiBaseUrl}/api/v1/meetings/gov-entities'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-      );
-
-      if (govResponse.statusCode == 200) {
-        final List govData = jsonDecode(govResponse.body);
-        setState(() {
-          _govEntities = govData.cast<Map<String, dynamic>>();
-          _applyFilters();
-        });
-      }
+      final meetingService = ref.read(meetingServiceProvider);
+      final entities = await meetingService.fetchGovEntities();
+      setState(() {
+        _govEntities = entities;
+        _applyFilters();
+      });
     } catch (govError) {
-      debugPrint('Error fetching gov entities: $govError');
+      if (kDebugMode) debugPrint('Error fetching gov entities: $govError');
     }
   }
 
   void _applyFilters() {
-    // Select data source based on toggle
-    List<Map<String, dynamic>> source = _isB2B ? _participants : _govEntities;
+    List<Map<String, dynamic>> source =
+        _isB2B ? _companies : _govEntities;
     List<Map<String, dynamic>> result = List.from(source);
 
-    // Apply search filter
     if (_searchQuery.isNotEmpty) {
       result = result.where((item) {
         if (_isB2B) {
-          // Search B2C user fields
-          final firstName = (item['first_name'] ?? '').toString().toLowerCase();
-          final lastName = (item['last_name'] ?? '').toString().toLowerCase();
-          final companyName = (item['company_name'] ?? '')
-              .toString()
-              .toLowerCase();
+          final companyName =
+              (item['name'] ?? '').toString().toLowerCase();
+          final categories =
+              (item['categories'] ?? []).toString().toLowerCase();
           final query = _searchQuery.toLowerCase();
-          return firstName.contains(query) ||
-              lastName.contains(query) ||
-              companyName.contains(query);
+          return companyName.contains(query) ||
+              categories.contains(query);
         } else {
-          // Search gov entity name
           final name = (item['name'] ?? '').toString().toLowerCase();
           return name.contains(_searchQuery.toLowerCase());
         }
       }).toList();
+    }
+
+    // Sort by name if selected
+    if (_sortBy == 'name') {
+      result.sort((a, b) {
+        final aName = (a['name'] ?? '').toString();
+        final bName = (b['name'] ?? '').toString();
+        return aName.toLowerCase().compareTo(bName.toLowerCase());
+      });
     }
 
     setState(() {
@@ -221,203 +163,234 @@ class _NewMeetingPageState extends ConsumerState<NewMeetingPage> {
     });
   }
 
-  String _buildImageUrl(String? imagePath, {bool isB2G = false}) {
+  String _buildImageUrl(String? imagePath) {
     if (imagePath == null || imagePath.isEmpty) return '';
-    if (imagePath.startsWith('http')) return imagePath;
-    // B2C backend for both B2B users and B2G entities
+    if (imagePath.startsWith('http') || imagePath.startsWith('data:')) {
+      return imagePath;
+    }
     return '${AppConfig.b2cApiBaseUrl}$imagePath';
+  }
+
+  Widget _buildImage(String imageUrl,
+      {BoxFit fit = BoxFit.cover,
+      double? width,
+      double? height,
+      Widget Function()? errorBuilder}) {
+    final placeholder = errorBuilder ?? _buildPhotoPlaceholder;
+    if (imageUrl.startsWith('data:')) {
+      try {
+        final base64Str = imageUrl.split(',').last;
+        final bytes = base64Decode(base64Str);
+        return Image.memory(
+          bytes,
+          fit: fit,
+          width: width,
+          height: height,
+          errorBuilder: (_, __, ___) => placeholder(),
+        );
+      } catch (_) {
+        return placeholder();
+      }
+    }
+    return Image.network(
+      imageUrl,
+      fit: fit,
+      width: width,
+      height: height,
+      errorBuilder: (_, __, ___) => placeholder(),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      key: _scaffoldKey,
-      backgroundColor: const Color(0xFF3C4494),
-      endDrawer: const NotificationDrawer(),
-      body: GestureDetector(
-        onTap: _closeProfile,
-        child: Stack(
-          children: [
-            SafeArea(
-              child: Column(
-                children: [
-                  // Custom header
-                  _buildHeader(),
-                  // B2B/B2G toggle row
-                  _buildToggleRow(),
-                  const SizedBox(height: 16),
-                  // Search bar
-                  _buildSearchBar(),
-                  const SizedBox(height: 16),
-                  // Content area with white rounded container
-                  Expanded(
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 20),
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.vertical(
-                          top: Radius.circular(20),
-                        ),
-                      ),
-                      child: _isLoading
-                          ? const Center(child: CircularProgressIndicator())
-                          : _buildItemsGrid(),
-                    ),
-                  ),
-                ],
+    final isMobile = MediaQuery.of(context).size.width < 700;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Title row: "Meetings" + B2B/B2G toggle
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+          child: Row(
+            children: [
+              Text(
+                'Meetings',
+                style: GoogleFonts.montserrat(
+                  fontSize: 30,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF3C4494),
+                ),
+              ),
+              const Spacer(),
+              _buildMeetingTypeToggle(isMobile),
+            ],
+          ),
+        ),
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 20),
+          child: Divider(
+            color: Color(0xFFCACACA),
+            thickness: 0.5,
+            height: 0.5,
+          ),
+        ),
+        const SizedBox(height: 16),
+        // Search + Sort row
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: _buildSearchSortRow(isMobile),
+        ),
+        const SizedBox(height: 16),
+        // Grid content
+        Expanded(
+          child: _isLoading
+              ? Center(
+                  child: CircularProgressIndicator(
+                      color: AppTheme.primaryColor))
+              : Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: _buildItemsGrid(),
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMeetingTypeToggle(bool isMobile) {
+    final fontSize = isMobile ? 14.0 : 20.0;
+    final toggleWidth = isMobile ? 80.0 : 113.0;
+    final toggleHeight = isMobile ? 32.0 : 38.0;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        GestureDetector(
+          onTap: () => _onToggleChanged(true),
+          child: Container(
+            width: toggleWidth,
+            height: toggleHeight,
+            alignment: Alignment.center,
+            color: _isB2B
+                ? const Color(0xFF3C4494)
+                : const Color(0xFFE6E7F2),
+            child: Text(
+              'B2B',
+              style: GoogleFonts.montserrat(
+                fontSize: fontSize,
+                fontWeight: FontWeight.w600,
+                color: _isB2B ? Colors.white : const Color(0xFF3C4494),
               ),
             ),
-            // Profile dropdown overlay
-            if (_isProfileOpen)
-              Positioned(
-                top: 100,
-                right: 20,
-                child: ProfileDropdown(onClose: _closeProfile),
+          ),
+        ),
+        GestureDetector(
+          onTap: () => _onToggleChanged(false),
+          child: Container(
+            width: toggleWidth,
+            height: toggleHeight,
+            alignment: Alignment.center,
+            color: !_isB2B
+                ? const Color(0xFF3C4494)
+                : const Color(0xFFE6E7F2),
+            child: Text(
+              'B2G',
+              style: GoogleFonts.montserrat(
+                fontSize: fontSize,
+                fontWeight: FontWeight.w600,
+                color: !_isB2B ? Colors.white : const Color(0xFF3C4494),
               ),
-          ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSearchSortRow(bool isMobile) {
+    if (isMobile) {
+      return Column(
+        children: [
+          _buildSearchBar(),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(child: _buildSortDropdown()),
+            ],
+          ),
+        ],
+      );
+    }
+    return Row(
+      children: [
+        Expanded(flex: 5, child: _buildSearchBar()),
+        const SizedBox(width: 12),
+        _buildSortDropdown(),
+      ],
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return TextField(
+      controller: _searchController,
+      onChanged: _onSearchChanged,
+      style: GoogleFonts.inter(fontSize: 14),
+      decoration: InputDecoration(
+        hintText: _isB2B ? 'Search companies...' : 'Search entities...',
+        hintStyle: GoogleFonts.inter(fontSize: 14, color: Colors.grey),
+        prefixIcon: const Icon(Icons.search, size: 20),
+        filled: true,
+        fillColor: const Color(0xFFE6E7F2),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(5),
+          borderSide: const BorderSide(color: Color(0xFFCBCBCB), width: 1),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(5),
+          borderSide: const BorderSide(color: Color(0xFFCBCBCB), width: 1),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(5),
+          borderSide:
+              const BorderSide(color: AppTheme.primaryColor, width: 2),
         ),
       ),
     );
   }
 
-  Widget _buildHeader() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-      child: Row(
-        children: [
-          // Back button
-          IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
-            onPressed: () => context.pop(),
-          ),
-          const SizedBox(width: 8),
-          // Title
-          Text(
-            'New Meeting',
-            style: GoogleFonts.montserrat(
-              fontSize: 28,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
-            ),
-          ),
-          const Spacer(),
-          // Notification & Profile icons
-          CustomAppBar(
-            onNotificationTap: () {
-              _scaffoldKey.currentState?.openEndDrawer();
-            },
-            onProfileTap: _toggleProfile,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildToggleRow() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-      child: Center(child: _buildMeetingTypeToggle()),
-    );
-  }
-
-  Widget _buildMeetingTypeToggle() {
-    // Responsive toggle size
-    final isSmall = MediaQuery.of(context).size.width < 600;
-    final fontSize = isSmall ? 14.0 : 20.0;
-    final horizontalPadding = isSmall ? 16.0 : 40.0;
-    final verticalPadding = isSmall ? 8.0 : 12.0;
-
+  Widget _buildSortDropdown() {
     return Container(
+      height: 38,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.white, width: 2),
-        borderRadius: BorderRadius.circular(10),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(5),
+        border: Border.all(color: const Color(0xFFCBCBCB), width: 1),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // B2B button
-          GestureDetector(
-            onTap: () => _onToggleChanged(true),
-            child: Container(
-              padding: EdgeInsets.symmetric(
-                horizontal: horizontalPadding,
-                vertical: verticalPadding,
-              ),
-              decoration: BoxDecoration(
-                color: _isB2B ? Colors.white : Colors.transparent,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                'B2B',
-                style: GoogleFonts.roboto(
-                  fontSize: fontSize,
-                  fontWeight: FontWeight.w600,
-                  color: _isB2B ? Colors.black : Colors.white,
-                ),
-              ),
-            ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: _sortBy,
+          icon: const Icon(Icons.keyboard_arrow_down,
+              size: 16, color: Color(0xFF6B7280)),
+          style: GoogleFonts.roboto(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: const Color(0xFF757A8A),
           ),
-          // B2G button
-          GestureDetector(
-            onTap: () => _onToggleChanged(false),
-            child: Container(
-              padding: EdgeInsets.symmetric(
-                horizontal: horizontalPadding,
-                vertical: verticalPadding,
-              ),
-              decoration: BoxDecoration(
-                color: !_isB2B ? Colors.white : Colors.transparent,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                'B2G',
-                style: GoogleFonts.roboto(
-                  fontSize: fontSize,
-                  fontWeight: FontWeight.w600,
-                  color: !_isB2B ? Colors.black : Colors.white,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSearchBar() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            Icons.search,
-            color: Colors.white.withValues(alpha: 0.8),
-            size: 28,
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: TextField(
-              controller: _searchController,
-              style: GoogleFonts.roboto(color: Colors.white, fontSize: 16),
-              decoration: InputDecoration(
-                hintText: _isB2B ? 'Search users...' : 'Search entities...',
-                hintStyle: GoogleFonts.roboto(
-                  color: Colors.white.withValues(alpha: 0.6),
-                  fontSize: 16,
-                ),
-                border: InputBorder.none,
-                isDense: true,
-                contentPadding: EdgeInsets.zero,
-              ),
-              onChanged: _onSearchChanged,
-            ),
-          ),
-        ],
+          items: const [
+            DropdownMenuItem(value: 'all', child: Text('Sort by: All')),
+            DropdownMenuItem(value: 'name', child: Text('Sort by: Name')),
+          ],
+          onChanged: (v) {
+            if (v != null) {
+              setState(() {
+                _sortBy = v;
+                _applyFilters();
+              });
+            }
+          },
+        ),
       ),
     );
   }
@@ -441,29 +414,28 @@ class _NewMeetingPageState extends ConsumerState<NewMeetingPage> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Responsive grid
         int crossAxisCount;
-        double childAspectRatio;
-        if (constraints.maxWidth > 1200) {
-          crossAxisCount = 4;
-          childAspectRatio = 0.95;
+        if (constraints.maxWidth > 1100) {
+          crossAxisCount = 5;
         } else if (constraints.maxWidth > 900) {
-          crossAxisCount = 3;
-          childAspectRatio = 0.9;
+          crossAxisCount = 4;
         } else if (constraints.maxWidth > 600) {
-          crossAxisCount = 2;
-          childAspectRatio = 0.95;
+          crossAxisCount = 3;
         } else {
           crossAxisCount = 2;
-          childAspectRatio = 0.85;
         }
 
+        // Figma cards: 184x183 ~ 1:1
+        const childAspectRatio = 184.0 / 183.0;
+        // Figma gap between cards: ~10px
+        const gridSpacing = 10.0;
+
         return GridView.builder(
-          padding: const EdgeInsets.all(30),
+          padding: const EdgeInsets.only(bottom: 16),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: crossAxisCount,
-            crossAxisSpacing: 30,
-            mainAxisSpacing: 30,
+            crossAxisSpacing: gridSpacing,
+            mainAxisSpacing: gridSpacing,
             childAspectRatio: childAspectRatio,
           ),
           itemCount: _filteredItems.length,
@@ -476,28 +448,23 @@ class _NewMeetingPageState extends ConsumerState<NewMeetingPage> {
   }
 
   Widget _buildItemCard(Map<String, dynamic> item) {
-    // B2B: B2C users have first_name, last_name, company_name, photo_url
-    // B2G: Gov entities have name, logo_url
     String name;
     String? imageUrl;
     String? subtitle;
 
     if (_isB2B) {
-      // B2C user fields - combine first_name and last_name
-      final firstName = item['first_name'] ?? '';
-      final lastName = item['last_name'] ?? '';
-      name = '$firstName $lastName'.trim();
-      if (name.isEmpty) name = item['email'] ?? 'Unknown User';
-
-      // For B2B users, show company_name or status as subtitle
-      subtitle = item['company_name'] ?? item['status'];
-      final photoPath = item['photo_url'];
-      imageUrl = _buildImageUrl(photoPath, isB2G: false);
+      name = (item['name'] ?? '').toString();
+      if (name.isEmpty) name = 'Unknown Company';
+      final categories = item['categories'];
+      if (categories is List && categories.isNotEmpty) {
+        subtitle = categories.join(', ');
+      }
+      imageUrl = _buildImageUrl(
+        (item['brand_icon_url'] ?? item['full_logo_url']) as String?,
+      );
     } else {
-      // Gov entity fields
       name = item['name'] ?? 'Unknown Entity';
-      final logoPath = item['logo_url'];
-      imageUrl = _buildImageUrl(logoPath, isB2G: true);
+      imageUrl = _buildImageUrl(item['logo_url'] as String?);
     }
 
     final itemId = item['id'];
@@ -506,19 +473,16 @@ class _NewMeetingPageState extends ConsumerState<NewMeetingPage> {
       onTap: () async {
         dynamic result;
         if (_isB2B) {
-          // Navigate to B2B meeting request page
           result = await context.push(
-            '/events/${widget.eventId}/meetings/new/$itemId',
+            '/events/${widget.eventId}/meetings/company/$itemId',
             extra: item,
           );
         } else {
-          // Navigate to B2G meeting request page
           result = await context.push(
-            '/events/${widget.eventId}/meetings/b2g/new/$itemId',
+            '/events/${widget.eventId}/meetings/new/b2g/$itemId',
             extra: item,
           );
         }
-        // If meeting was created, pop back to meetings page with result
         if (result == true && mounted) {
           context.pop(true);
         }
@@ -526,94 +490,93 @@ class _NewMeetingPageState extends ConsumerState<NewMeetingPage> {
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(5),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
+              color: Colors.black.withValues(alpha: 0.15),
+              blurRadius: 4,
+              offset: const Offset(0, 1),
             ),
           ],
         ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: Column(
-            children: [
-              // Photo section - full bleed, no border radius, cover all space
-              Expanded(
-                flex: 70,
+        child: Column(
+          children: [
+            // Image area with padding (Figma: ~5.43% sides, ~5.46% top)
+            Expanded(
+              flex: 55,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(10, 10, 10, 0),
                 child: Container(
                   width: double.infinity,
-                  color: Colors.grey[200],
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFC5C5C5),
+                    border: Border.all(
+                      color: const Color(0xFFDDDDDD),
+                      width: 0.5,
+                    ),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                  clipBehavior: Clip.antiAlias,
                   child: imageUrl.isNotEmpty
-                      ? Image.network(
+                      ? _buildImage(
                           imageUrl,
                           fit: BoxFit.cover,
                           width: double.infinity,
                           height: double.infinity,
-                          errorBuilder: (context, error, stackTrace) =>
-                              _buildPhotoPlaceholder(),
                         )
                       : _buildPhotoPlaceholder(),
                 ),
               ),
-              // Name section (bottom 30%)
-              Expanded(
-                flex: 30,
-                child: Container(
-                  width: double.infinity,
-                  color: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+            ),
+            // Name section
+            Expanded(
+              flex: 25,
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.roboto(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black,
+                      ),
+                    ),
+                    if (subtitle != null && subtitle.isNotEmpty) ...[
+                      const SizedBox(height: 2),
                       Text(
-                        name,
+                        subtitle,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.inter(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: const Color(0xFF1E1E1E),
+                        style: GoogleFonts.roboto(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w400,
+                          color: Colors.grey[500],
                         ),
                       ),
-                      if (subtitle != null && subtitle.isNotEmpty) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          subtitle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.roboto(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w400,
-                            color: Colors.grey[500],
-                          ),
-                        ),
-                      ],
                     ],
-                  ),
+                  ],
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 
   Widget _buildPhotoPlaceholder() {
-    return Container(
-      color: Colors.grey[200],
-      child: Center(
-        child: Icon(
-          _isB2B ? Icons.person : Icons.account_balance,
-          size: 64,
-          color: Colors.grey[400],
-        ),
+    return Center(
+      child: Icon(
+        _isB2B ? Icons.business : Icons.account_balance,
+        size: 48,
+        color: Colors.grey[400],
       ),
     );
   }

@@ -1,11 +1,12 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
-import '../../features/auth/services/auth_service.dart';
 import '../config/app_config.dart';
 import '../models/api_exception.dart';
+import 'token_provider.dart';
 
 /// Result type for API calls - Success or Error
 class ApiResult<T> {
@@ -22,11 +23,11 @@ class ApiResult<T> {
 /// Centralized API client for all HTTP requests.
 /// Handles authentication, headers, and error parsing.
 class ApiClient {
-  final AuthService _authService;
+  final TokenProvider _tokenProvider;
 
   static const String _contentTypeJson = 'application/json';
 
-  ApiClient(this._authService);
+  ApiClient(this._tokenProvider);
 
   /// Base URL for B2C backend
   String get baseUrl => AppConfig.b2cApiBaseUrl;
@@ -39,7 +40,7 @@ class ApiClient {
     final headers = <String, String>{'Content-Type': _contentTypeJson};
 
     if (auth) {
-      final token = await _authService.getToken();
+      final token = await _tokenProvider.getToken();
       if (token != null) {
         headers['Authorization'] = 'Bearer $token';
       }
@@ -55,22 +56,23 @@ class ApiClient {
     Map<String, String>? queryParams,
     T Function(dynamic json)? parser,
   }) async {
-    try {
-      var uri = Uri.parse('$baseUrl$path');
-      if (queryParams != null && queryParams.isNotEmpty) {
-        uri = uri.replace(queryParameters: queryParams);
+    return _withTokenRefresh(() async {
+      try {
+        var uri = Uri.parse('$baseUrl$path');
+        if (queryParams != null && queryParams.isNotEmpty) {
+          uri = uri.replace(queryParameters: queryParams);
+        }
+
+        final response =
+            await http.get(uri, headers: await _headers(auth: auth));
+
+        return _handleResponse(response, parser);
+      } catch (e) {
+        return ApiResult.failure(
+          ApiException(statusCode: 0, message: 'Network error: $e'),
+        );
       }
-
-      final response = await http.get(uri, headers: await _headers(auth: auth));
-
-      return _handleResponseWithRetry(response, parser, retryRequest: auth
-          ? () async => http.get(uri, headers: await _headers(auth: true))
-          : null);
-    } catch (e) {
-      return ApiResult.failure(
-        ApiException(statusCode: 0, message: 'Network error: $e'),
-      );
-    }
+    }, auth: auth);
   }
 
   /// POST request
@@ -78,26 +80,28 @@ class ApiClient {
     String path, {
     dynamic body,
     bool auth = true,
+    Map<String, String>? queryParams,
     T Function(dynamic json)? parser,
   }) async {
-    try {
-      final uri = Uri.parse('$baseUrl$path');
-      final encodedBody = body != null ? jsonEncode(body) : null;
+    return _withTokenRefresh(() async {
+      try {
+        var uri = Uri.parse('$baseUrl$path');
+        if (queryParams != null && queryParams.isNotEmpty) {
+          uri = uri.replace(queryParameters: queryParams);
+        }
+        final response = await http.post(
+          uri,
+          headers: await _headers(auth: auth),
+          body: body != null ? jsonEncode(body) : null,
+        );
 
-      final response = await http.post(
-        uri,
-        headers: await _headers(auth: auth),
-        body: encodedBody,
-      );
-
-      return _handleResponseWithRetry(response, parser, retryRequest: auth
-          ? () async => http.post(uri, headers: await _headers(auth: true), body: encodedBody)
-          : null);
-    } catch (e) {
-      return ApiResult.failure(
-        ApiException(statusCode: 0, message: 'Network error: $e'),
-      );
-    }
+        return _handleResponse(response, parser);
+      } catch (e) {
+        return ApiResult.failure(
+          ApiException(statusCode: 0, message: 'Network error: $e'),
+        );
+      }
+    }, auth: auth);
   }
 
   /// POST with form data (for login)
@@ -108,12 +112,13 @@ class ApiClient {
     T Function(dynamic json)? parser,
   }) async {
     try {
+      final headers = {
+        if (auth) ...await _headers(auth: true),
+        'Content-Type': 'application/x-www-form-urlencoded',
+      };
       final response = await http.post(
         Uri.parse('$baseUrl$path'),
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          if (auth) ...await _headers(auth: true),
-        },
+        headers: headers,
         body: body,
       );
 
@@ -132,24 +137,21 @@ class ApiClient {
     bool auth = true,
     T Function(dynamic json)? parser,
   }) async {
-    try {
-      final uri = Uri.parse('$baseUrl$path');
-      final encodedBody = body != null ? jsonEncode(body) : null;
+    return _withTokenRefresh(() async {
+      try {
+        final response = await http.patch(
+          Uri.parse('$baseUrl$path'),
+          headers: await _headers(auth: auth),
+          body: body != null ? jsonEncode(body) : null,
+        );
 
-      final response = await http.patch(
-        uri,
-        headers: await _headers(auth: auth),
-        body: encodedBody,
-      );
-
-      return _handleResponseWithRetry(response, parser, retryRequest: auth
-          ? () async => http.patch(uri, headers: await _headers(auth: true), body: encodedBody)
-          : null);
-    } catch (e) {
-      return ApiResult.failure(
-        ApiException(statusCode: 0, message: 'Network error: $e'),
-      );
-    }
+        return _handleResponse(response, parser);
+      } catch (e) {
+        return ApiResult.failure(
+          ApiException(statusCode: 0, message: 'Network error: $e'),
+        );
+      }
+    }, auth: auth);
   }
 
   /// PUT request
@@ -157,26 +159,28 @@ class ApiClient {
     String path, {
     dynamic body,
     bool auth = true,
+    Map<String, String>? queryParams,
     T Function(dynamic json)? parser,
   }) async {
-    try {
-      final uri = Uri.parse('$baseUrl$path');
-      final encodedBody = body != null ? jsonEncode(body) : null;
+    return _withTokenRefresh(() async {
+      try {
+        var uri = Uri.parse('$baseUrl$path');
+        if (queryParams != null && queryParams.isNotEmpty) {
+          uri = uri.replace(queryParameters: queryParams);
+        }
+        final response = await http.put(
+          uri,
+          headers: await _headers(auth: auth),
+          body: body != null ? jsonEncode(body) : null,
+        );
 
-      final response = await http.put(
-        uri,
-        headers: await _headers(auth: auth),
-        body: encodedBody,
-      );
-
-      return _handleResponseWithRetry(response, parser, retryRequest: auth
-          ? () async => http.put(uri, headers: await _headers(auth: true), body: encodedBody)
-          : null);
-    } catch (e) {
-      return ApiResult.failure(
-        ApiException(statusCode: 0, message: 'Network error: $e'),
-      );
-    }
+        return _handleResponse(response, parser);
+      } catch (e) {
+        return ApiResult.failure(
+          ApiException(statusCode: 0, message: 'Network error: $e'),
+        );
+      }
+    }, auth: auth);
   }
 
   /// DELETE request
@@ -185,49 +189,20 @@ class ApiClient {
     bool auth = true,
     T Function(dynamic json)? parser,
   }) async {
-    try {
-      final uri = Uri.parse('$baseUrl$path');
+    return _withTokenRefresh(() async {
+      try {
+        final response = await http.delete(
+          Uri.parse('$baseUrl$path'),
+          headers: await _headers(auth: auth),
+        );
 
-      final response = await http.delete(
-        uri,
-        headers: await _headers(auth: auth),
-      );
-
-      return _handleResponseWithRetry(response, parser, retryRequest: auth
-          ? () async => http.delete(uri, headers: await _headers(auth: true))
-          : null);
-    } catch (e) {
-      return ApiResult.failure(
-        ApiException(statusCode: 0, message: 'Network error: $e'),
-      );
-    }
-  }
-
-  /// Check if response indicates an expired/invalid token
-  bool _isAuthError(http.Response response) {
-    return response.statusCode == 401 || response.statusCode == 403;
-  }
-
-  /// Handle HTTP response, with automatic token refresh on auth errors.
-  /// [retryRequest] is called to retry the original request after token refresh.
-  Future<ApiResult<T>> _handleResponseWithRetry<T>(
-    http.Response response,
-    T Function(dynamic json)? parser, {
-    Future<http.Response> Function()? retryRequest,
-  }) async {
-    // If auth error and we have a retry function, try refreshing the token
-    if (_isAuthError(response) && retryRequest != null) {
-      final refreshed = await _authService.tryRefreshToken();
-      if (refreshed) {
-        final retryResponse = await retryRequest();
-        return _handleResponse(retryResponse, parser);
-      } else {
-        // Refresh failed — force logout so user gets redirected to login
-        await _authService.logout();
+        return _handleResponse(response, parser);
+      } catch (e) {
+        return ApiResult.failure(
+          ApiException(statusCode: 0, message: 'Network error: $e'),
+        );
       }
-    }
-
-    return _handleResponse(response, parser);
+    }, auth: auth);
   }
 
   /// Handle HTTP response
@@ -264,6 +239,44 @@ class ApiClient {
       return ApiResult.failure(
         ApiException.fromResponse(response.statusCode, response.body),
       );
+    }
+  }
+
+  Completer<String?>? _refreshCompleter;
+
+  /// Wrapper that retries a request once after refreshing the token on 401.
+  /// Uses a Completer so concurrent 401s share a single refresh call.
+  Future<ApiResult<T>> _withTokenRefresh<T>(
+    Future<ApiResult<T>> Function() request, {
+    required bool auth,
+  }) async {
+    final result = await request();
+
+    // Only attempt refresh for authenticated requests that got 401
+    if (!auth) return result;
+    if (result.isSuccess) return result;
+    final code = result.error?.statusCode;
+    if (code != 401) return result;
+
+    // If a refresh is already in flight, wait for it instead of starting another
+    if (_refreshCompleter != null) {
+      final token = await _refreshCompleter!.future;
+      if (token == null) return result;
+      return await request();
+    }
+
+    // Start a new refresh
+    _refreshCompleter = Completer<String?>();
+    try {
+      final newToken = await _tokenProvider.refreshAccessToken();
+      _refreshCompleter!.complete(newToken);
+      if (newToken == null) return result;
+      return await request();
+    } catch (e) {
+      _refreshCompleter!.complete(null);
+      return result;
+    } finally {
+      _refreshCompleter = null;
     }
   }
 }

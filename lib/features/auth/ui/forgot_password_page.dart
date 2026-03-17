@@ -1,25 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../../core/app_theme.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_text_field.dart';
-import '../services/auth_service.dart';
-import 'forgot_password_verify_code_page.dart';
+import '../providers/auth_provider.dart';
 import 'widgets/auth_info_box.dart';
 import 'widgets/auth_page_layout.dart';
 import 'widgets/auth_button.dart';
 import 'widgets/send_me_back_link.dart';
 
-class ForgotPasswordPage extends StatefulWidget {
+class ForgotPasswordPage extends ConsumerStatefulWidget {
   const ForgotPasswordPage({super.key});
 
   @override
-  State<ForgotPasswordPage> createState() => _ForgotPasswordPageState();
+  ConsumerState<ForgotPasswordPage> createState() => _ForgotPasswordPageState();
 }
 
-class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
+class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
   final _emailController = TextEditingController();
-  final _authService = AuthService();
   bool _isLoading = false;
   String? _errorMessage;
 
@@ -141,17 +141,14 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     });
 
     try {
-      final error = await _authService.forgotPassword(email);
+      final error = await ref.read(authNotifierProvider.notifier).forgotPassword(email);
 
       if (!mounted) return;
 
       if (error == null) {
         // Success - navigate to verify code page
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (_) => ForgotPasswordVerifyCodePage(email: email),
-          ),
-        );
+        final encodedEmail = Uri.encodeComponent(email);
+        context.go('/forgot-password/verify?email=$encodedEmail');
       } else {
         setState(
           () => _errorMessage = "Your email is incorrect. Please try again!",

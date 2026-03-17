@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:provider/provider.dart';
 
-import '../services/visa_service.dart';
+import '../providers/visa_providers.dart';
 
 /// Visa Details Page - Shows APPROVED/DECLINED status with full details
-class VisaDetailsPage extends StatelessWidget {
+class VisaDetailsPage extends ConsumerWidget {
   final int eventId;
   final String participantId;
 
@@ -16,75 +16,50 @@ class VisaDetailsPage extends StatelessWidget {
     required this.participantId,
   });
 
-  Future<Map<String, dynamic>> _loadVisa(BuildContext context) async {
-    final visaService = context.read<VisaService>();
-    return await visaService.getMyVisa(participantId: participantId, eventId: eventId);
-  }
-
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF3C4494),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF3C4494),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => context.pop(),
-        ),
-        title: const Text(
-          'Visa Details',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
+  Widget build(BuildContext context, WidgetRef ref) {
+    final visaAsync = ref.watch(visaDetailsProvider(
+      (eventId: eventId, participantId: participantId),
+    ));
+
+    return Container(
+      color: const Color(0xFF3C4494),
+      child: SafeArea(
+        child: visaAsync.when(
+          loading: () => const Center(
+            child: CircularProgressIndicator(color: Colors.white),
           ),
-        ),
-      ),
-      body: SafeArea(
-        child: FutureBuilder<Map<String, dynamic>>(
-          future: _loadVisa(context),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(
-                child: CircularProgressIndicator(color: Colors.white),
-              );
-            }
-
-            if (snapshot.hasError) {
-              return Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(
-                        Icons.error_outline,
-                        size: 64,
-                        color: Colors.white70,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Error loading visa details',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        snapshot.error.toString(),
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.white70),
-                      ),
-                    ],
+          error: (error, _) => Center(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.error_outline,
+                    size: 64,
+                    color: Colors.white70,
                   ),
-                ),
-              );
-            }
-
-            final visa = snapshot.data!;
+                  const SizedBox(height: 16),
+                  Text(
+                    'Error loading visa details',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    error.toString(),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white70),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          data: (visa) {
             final status = visa['status'] as String;
             final isApproved = status == 'APPROVED';
             final reviewedAt = visa['reviewed_at'] as String?;
@@ -356,7 +331,7 @@ class VisaDetailsPage extends StatelessWidget {
                         height: 48,
                         child: OutlinedButton(
                           onPressed: () {
-                            // TODO: Navigate to contact support
+                            context.go('/events/$eventId/hotline');
                           },
                           style: OutlinedButton.styleFrom(
                             side: const BorderSide(color: Color(0xFF3C4494)),

@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:provider/provider.dart';
 
-import '../../../core/app_theme.dart';
-import '../services/auth_service.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/app_snackbar.dart';
+import '../providers/auth_provider.dart';
 import 'widgets/auth_info_box.dart';
 import 'widgets/auth_page_layout.dart';
 import 'widgets/auth_button.dart';
@@ -12,19 +13,18 @@ import 'widgets/hover_text.dart';
 
 /// Page shown after registration where user enters the verification code
 /// sent to their email.
-class VerificationCodePage extends StatefulWidget {
+class VerificationCodePage extends ConsumerStatefulWidget {
   final String email;
   final String? password;
 
   const VerificationCodePage({super.key, required this.email, this.password});
 
   @override
-  State<VerificationCodePage> createState() => _VerificationCodePageState();
+  ConsumerState<VerificationCodePage> createState() => _VerificationCodePageState();
 }
 
-class _VerificationCodePageState extends State<VerificationCodePage> {
+class _VerificationCodePageState extends ConsumerState<VerificationCodePage> {
   final _codeController = TextEditingController();
-  final _authService = AuthService();
   bool _isVerifying = false;
   bool _isResending = false;
 
@@ -167,13 +167,7 @@ class _VerificationCodePageState extends State<VerificationCodePage> {
               MouseRegion(
                 cursor: SystemMouseCursors.click,
                 child: GestureDetector(
-                  onTap: () {
-                    if (Navigator.canPop(context)) {
-                      Navigator.pop(context);
-                    } else {
-                      context.go('/signup');
-                    }
-                  },
+                  onTap: () => context.go('/signup'),
                   child: RichText(
                     text: TextSpan(
                       children: [
@@ -212,33 +206,27 @@ class _VerificationCodePageState extends State<VerificationCodePage> {
     setState(() => _isVerifying = true);
 
     try {
-      final error = await _authService.verifyCode(widget.email, code);
+      final authNotifier = ref.read(authNotifierProvider.notifier);
+      final error = await authNotifier.verifyCode(widget.email, code);
 
       if (!mounted) return;
 
       if (error == null) {
         // Auto-login if we have the password from registration
         if (widget.password != null) {
-          final authService = Provider.of<AuthService>(context, listen: false);
-          final loginError = await authService.login(widget.email, widget.password!);
+          final loginError = await authNotifier.login(widget.email, widget.password!);
 
           if (!mounted) return;
 
           if (loginError == null) {
-            context.go('/');
+            context.go('/post-login');
             return;
           }
         }
 
         // Fallback: redirect to login if auto-login not possible
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Email verified successfully! Please login."),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 3),
-          ),
-        );
+        AppSnackBar.showSuccess(context, "Email verified successfully! Please login.");
         context.go('/login');
       } else {
         _showError(error);
@@ -260,18 +248,12 @@ class _VerificationCodePageState extends State<VerificationCodePage> {
     setState(() => _isResending = true);
 
     try {
-      final error = await _authService.resendCode(widget.email);
+      final error = await ref.read(authNotifierProvider.notifier).resendCode(widget.email);
 
       if (!mounted) return;
 
       if (error == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Verification code sent! Check your email."),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 3),
-          ),
-        );
+        AppSnackBar.showSuccess(context, "Verification code sent! Check your email.");
       } else {
         _showError(error);
       }
@@ -287,13 +269,6 @@ class _VerificationCodePageState extends State<VerificationCodePage> {
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-        duration: const Duration(seconds: 4),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    AppSnackBar.showError(context, message);
   }
 }

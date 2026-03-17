@@ -89,12 +89,17 @@ class _PhoneInputFieldState extends State<PhoneInputField> {
             // Country Code Picker
             Container(
               height: 48,
+              clipBehavior: Clip.antiAlias,
               decoration: BoxDecoration(
                 color: Colors.white,
                 border: Border.all(color: Colors.grey.shade300),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: CountryCodePicker(
+              child: Material(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(7),
+                clipBehavior: Clip.antiAlias,
+                child: CountryCodePicker(
                 onChanged: (country) {
                   setState(() {
                     _dialCode = country.dialCode ?? '+993';
@@ -109,6 +114,7 @@ class _PhoneInputFieldState extends State<PhoneInputField> {
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 flagWidth: 24,
                 textStyle: const TextStyle(fontSize: 14),
+              ),
               ),
             ),
             const SizedBox(width: 12),

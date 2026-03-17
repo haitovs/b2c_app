@@ -1,11 +1,10 @@
 import '../../../core/services/api_client.dart';
-import '../../auth/services/auth_service.dart';
 
 /// Service for fetching events from the B2C backend
 class EventService {
   final ApiClient _api;
 
-  EventService(AuthService authService) : _api = ApiClient(authService);
+  EventService(this._api);
 
   /// Fetch all events, optionally filtered by site ID
   Future<List<dynamic>> fetchEvents({int? siteId}) async {
@@ -15,7 +14,7 @@ class EventService {
     }
 
     final result = await _api.get<List<dynamic>>(
-      '/api/v1/events/',
+      '/api/v1/events',
       auth: false,
       queryParams: queryParams.isNotEmpty ? queryParams : null,
     );

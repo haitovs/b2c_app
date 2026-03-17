@@ -1,18 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import 'services/event_context_service.dart';
+import 'providers/event_context_provider.dart';
 
 /// Styled error page for routing errors (404, invalid routes)
-class ErrorPage extends StatelessWidget {
+class ErrorPage extends ConsumerWidget {
   final String? error;
   final String? path;
 
   const ErrorPage({super.key, this.error, this.path});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       body: Container(
         width: double.infinity,
@@ -137,15 +138,15 @@ class ErrorPage extends StatelessWidget {
                     child: ElevatedButton.icon(
                       onPressed: () {
                         // Navigate to event menu if in event context, otherwise home
-                        if (eventContextService.hasEventContext) {
-                          context.go(eventContextService.eventMenuPath);
+                        if (ref.read(eventContextProvider).hasEventContext) {
+                          context.go(ref.read(eventContextProvider).eventMenuPath);
                         } else {
                           context.go('/');
                         }
                       },
                       icon: const Icon(Icons.home_rounded),
                       label: Text(
-                        eventContextService.hasEventContext
+                        ref.read(eventContextProvider).hasEventContext
                             ? "Go to Event Menu"
                             : "Go to Home",
                         style: const TextStyle(
@@ -172,8 +173,8 @@ class ErrorPage extends StatelessWidget {
                   TextButton.icon(
                     onPressed: () {
                       // If in event context, go to event menu
-                      if (eventContextService.hasEventContext) {
-                        context.go(eventContextService.eventMenuPath);
+                      if (ref.read(eventContextProvider).hasEventContext) {
+                        context.go(ref.read(eventContextProvider).eventMenuPath);
                       } else if (Navigator.canPop(context)) {
                         Navigator.pop(context);
                       } else {

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:b2c_app/core/app_theme.dart';
+import 'package:b2c_app/core/theme/app_theme.dart';
 
 /// Reusable text field widget with consistent styling
 class AppTextField extends StatelessWidget {
@@ -11,6 +11,7 @@ class AppTextField extends StatelessWidget {
   final bool obscureText;
   final bool required;
   final int? maxLines;
+  final int? minLines;
   final Widget? suffix;
   final void Function(String)? onChanged;
   final bool enabled;
@@ -31,6 +32,7 @@ class AppTextField extends StatelessWidget {
     this.obscureText = false,
     this.required = false,
     this.maxLines = 1,
+    this.minLines,
     this.suffix,
     this.onChanged,
     this.enabled = true,
@@ -65,13 +67,14 @@ class AppTextField extends StatelessWidget {
             ),
           ),
         SizedBox(
-          height: height,
+          height: maxLines == null ? null : height,
           child: TextFormField(
             controller: controller,
             validator: validator ?? (required ? _defaultValidator : null),
             keyboardType: keyboardType,
             obscureText: obscureText,
             maxLines: maxLines,
+            minLines: minLines,
             onChanged: onChanged,
             enabled: enabled,
             textInputAction: textInputAction,

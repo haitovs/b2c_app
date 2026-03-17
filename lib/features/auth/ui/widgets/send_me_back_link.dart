@@ -12,7 +12,6 @@ class SendMeBackLink extends StatelessWidget {
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
         onTap: () {
-          Navigator.of(context).popUntil((route) => route.isFirst);
           context.go('/login');
         },
         child: RichText(

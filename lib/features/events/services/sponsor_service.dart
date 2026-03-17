@@ -1,10 +1,9 @@
 import '../../../core/services/api_client.dart';
-import '../../auth/services/auth_service.dart';
 
 class SponsorService {
   final ApiClient _api;
 
-  SponsorService(AuthService authService) : _api = ApiClient(authService);
+  SponsorService(this._api);
 
   Future<List<dynamic>> fetchSponsors() async {
     final result = await _api.get<List<dynamic>>(

@@ -1,6 +1,6 @@
 import '../../../core/config/app_config.dart';
 import '../../../core/services/api_client.dart';
-import '../../auth/services/auth_service.dart';
+import '../../../core/services/token_provider.dart';
 
 class ChatMessage {
   final int? id;
@@ -35,9 +35,9 @@ class ChatMessage {
 
 class HotlineService {
   final ApiClient _api;
-  final AuthService _authService;
+  final TokenProvider _tokenProvider;
 
-  HotlineService(this._authService) : _api = ApiClient(_authService);
+  HotlineService(this._api, this._tokenProvider);
 
   /// Get chat history
   Future<List<ChatMessage>> getChatHistory({
@@ -64,12 +64,20 @@ class HotlineService {
     return result.isSuccess;
   }
 
-  /// Get WebSocket URL for real-time chat
+  /// Send a message with media attachment via REST API
+  Future<bool> sendMessageWithMedia(String content, String mediaUrl) async {
+    final result = await _api.post<Map<String, dynamic>>(
+      '/api/v1/chat/send?content=${Uri.encodeComponent(content)}&media_url=${Uri.encodeComponent(mediaUrl)}',
+    );
+
+    return result.isSuccess;
+  }
+
+  /// Get WebSocket URL for real-time chat with token as query param.
   Future<String?> getWebSocketUrl() async {
-    final token = await _authService.getToken();
+    final token = await _tokenProvider.getToken();
     if (token == null) return null;
-    // Convert http(s) to ws(s)
     final wsUrl = AppConfig.b2cApiBaseUrl.replaceFirst('http', 'ws');
-    return '$wsUrl/api/v1/chat/ws?token=$token';
+    return '$wsUrl/api/v1/chat/ws?token=${Uri.encodeComponent(token)}';
   }
 }

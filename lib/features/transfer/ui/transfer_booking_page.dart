@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:provider/provider.dart';
 
-import '../../auth/services/auth_service.dart';
+import '../../../core/widgets/app_snackbar.dart';
+import '../../../shared/widgets/app_checkbox.dart';
+import '../providers/transfer_providers.dart';
 import '../services/transfer_service.dart';
 import 'booking_confirmation_page.dart';
 
 /// Booking page for all transfer types
-class TransferBookingPage extends StatefulWidget {
+class TransferBookingPage extends ConsumerStatefulWidget {
   final String serviceType; // "shuttle", "individual", "rental"
   final int resourceId;
   final String resourceName;
@@ -28,10 +30,11 @@ class TransferBookingPage extends StatefulWidget {
   });
 
   @override
-  State<TransferBookingPage> createState() => _TransferBookingPageState();
+  ConsumerState<TransferBookingPage> createState() =>
+      _TransferBookingPageState();
 }
 
-class _TransferBookingPageState extends State<TransferBookingPage> {
+class _TransferBookingPageState extends ConsumerState<TransferBookingPage> {
   final _formKey = GlobalKey<FormState>();
   TransferService? _transferService;
 
@@ -69,10 +72,7 @@ class _TransferBookingPageState extends State<TransferBookingPage> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (_transferService == null) {
-      final authService = context.read<AuthService>();
-      _transferService = TransferService(authService);
-    }
+    _transferService ??= ref.read(transferServiceProvider);
   }
 
   @override
@@ -141,9 +141,7 @@ class _TransferBookingPageState extends State<TransferBookingPage> {
   Future<void> _createBooking() async {
     if (!_formKey.currentState!.validate()) return;
     if (!_agreedToTerms) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please agree to terms and conditions')),
-      );
+      AppSnackBar.showInfo(context, 'Please agree to terms and conditions');
       return;
     }
 
@@ -219,9 +217,7 @@ class _TransferBookingPageState extends State<TransferBookingPage> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
+      AppSnackBar.showError(context, 'Error: ${e.toString()}');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -229,21 +225,9 @@ class _TransferBookingPageState extends State<TransferBookingPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[100],
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF3C4494),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Booking',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-      ),
-      body: Form(
+    return Container(
+      color: Colors.grey[100],
+      child: Form(
         key: _formKey,
         child: ListView(
           padding: const EdgeInsets.all(16),
@@ -384,15 +368,10 @@ class _TransferBookingPageState extends State<TransferBookingPage> {
             const SizedBox(height: 16),
 
             // Terms checkbox
-            CheckboxListTile(
+            AppCheckbox(
               value: _agreedToTerms,
-              onChanged: (v) => setState(() => _agreedToTerms = v ?? false),
-              title: const Text(
-                'I agree to the terms and conditions',
-                style: TextStyle(fontSize: 14),
-              ),
-              controlAffinity: ListTileControlAffinity.leading,
-              contentPadding: EdgeInsets.zero,
+              onChanged: (v) => setState(() => _agreedToTerms = v),
+              label: 'I agree to the terms and conditions',
             ),
             const SizedBox(height: 16),
 
@@ -416,9 +395,7 @@ class _TransferBookingPageState extends State<TransferBookingPage> {
                       ),
                     )
                   : Text(
-                      widget.serviceType == 'shuttle'
-                          ? 'Confirm Booking'
-                          : 'Continue to Payment',
+                      'Confirm Booking',
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,

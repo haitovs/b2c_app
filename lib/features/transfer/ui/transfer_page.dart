@@ -1,27 +1,26 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
-import 'package:provider/provider.dart';
-
-import '../../auth/services/auth_service.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/car.dart';
 import '../models/shuttle.dart';
+import '../providers/transfer_providers.dart';
 import '../services/transfer_service.dart';
 import '../widgets/car_card.dart';
 import '../widgets/shuttle_card.dart';
 import 'car_detail_page.dart';
 import 'shuttle_detail_page.dart';
+import '../../../core/widgets/staggered_fade_in.dart';
 
 /// Main transfer page with 3 tabs: Shuttle, Individual Car, Rent Car
-class TransferPage extends StatefulWidget {
+class TransferPage extends ConsumerStatefulWidget {
   final int eventId;
 
   const TransferPage({super.key, required this.eventId});
 
   @override
-  State<TransferPage> createState() => _TransferPageState();
+  ConsumerState<TransferPage> createState() => _TransferPageState();
 }
 
-class _TransferPageState extends State<TransferPage>
+class _TransferPageState extends ConsumerState<TransferPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   TransferService? _transferService;
@@ -48,8 +47,7 @@ class _TransferPageState extends State<TransferPage>
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (_transferService == null) {
-      final authService = context.read<AuthService>();
-      _transferService = TransferService(authService);
+      _transferService = ref.read(transferServiceProvider);
       _loadData();
     }
   }
@@ -113,48 +111,33 @@ class _TransferPageState extends State<TransferPage>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF3C4494),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF3C4494),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => context.go('/events/${widget.eventId}/menu'),
-        ),
-        title: const Text(
-          'Transfer',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: Colors.white,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white60,
-          tabs: const [
-            Tab(icon: Icon(Icons.directions_bus), text: 'Free Shuttle'),
-            Tab(icon: Icon(Icons.directions_car), text: 'With Driver'),
-            Tab(icon: Icon(Icons.car_rental), text: 'Rent Car'),
-          ],
-        ),
-      ),
-      body: Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(24),
-            topRight: Radius.circular(24),
+    return Column(
+      children: [
+        Container(
+          color: const Color(0xFF3C4494),
+          child: TabBar(
+            controller: _tabController,
+            indicatorColor: Colors.white,
+            labelColor: Colors.white,
+            unselectedLabelColor: Colors.white60,
+            tabs: const [
+              Tab(icon: Icon(Icons.directions_bus), text: 'Free Shuttle'),
+              Tab(icon: Icon(Icons.directions_car), text: 'With Driver'),
+              Tab(icon: Icon(Icons.car_rental), text: 'Rent Car'),
+            ],
           ),
         ),
-        child: TabBarView(
-          controller: _tabController,
-          children: [
-            _buildShuttleTab(),
-            _buildIndividualTab(),
-            _buildRentalTab(),
-          ],
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              _buildShuttleTab(),
+              _buildIndividualTab(),
+              _buildRentalTab(),
+            ],
+          ),
         ),
-      ),
+      ],
     );
   }
 
@@ -208,7 +191,7 @@ class _TransferPageState extends State<TransferPage>
         itemCount: _shuttles.length,
         itemBuilder: (context, index) {
           final shuttle = _shuttles[index];
-          return ShuttleCard(
+          return StaggeredFadeIn(index: index, child: ShuttleCard(
             shuttle: shuttle,
             onTap: () => Navigator.push(
               context,
@@ -219,7 +202,7 @@ class _TransferPageState extends State<TransferPage>
                 ),
               ),
             ),
-          );
+          ));
         },
       ),
     );
@@ -275,7 +258,7 @@ class _TransferPageState extends State<TransferPage>
         itemCount: _individualCars.length,
         itemBuilder: (context, index) {
           final car = _individualCars[index];
-          return CarCard(
+          return StaggeredFadeIn(index: index, child: CarCard(
             car: car,
             onTap: () => Navigator.push(
               context,
@@ -284,7 +267,7 @@ class _TransferPageState extends State<TransferPage>
                     CarDetailPage(car: car, eventId: widget.eventId),
               ),
             ),
-          );
+          ));
         },
       ),
     );
@@ -340,7 +323,7 @@ class _TransferPageState extends State<TransferPage>
         itemCount: _rentalCars.length,
         itemBuilder: (context, index) {
           final car = _rentalCars[index];
-          return CarCard(
+          return StaggeredFadeIn(index: index, child: CarCard(
             car: car,
             onTap: () => Navigator.push(
               context,
@@ -349,7 +332,7 @@ class _TransferPageState extends State<TransferPage>
                     CarDetailPage(car: car, eventId: widget.eventId),
               ),
             ),
-          );
+          ));
         },
       ),
     );

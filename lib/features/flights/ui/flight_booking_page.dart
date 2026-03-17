@@ -1,24 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:provider/provider.dart';
 
-import '../../auth/services/auth_service.dart';
+import '../../../core/widgets/app_snackbar.dart';
 import '../models/flight.dart';
 import '../models/flight_booking.dart';
+import '../providers/flight_providers.dart';
 import '../services/flight_service.dart';
 
 /// Flight booking page with traveler details and payment.
-class FlightBookingPage extends StatefulWidget {
+class FlightBookingPage extends ConsumerStatefulWidget {
   final int flightId;
 
   const FlightBookingPage({super.key, required this.flightId});
 
   @override
-  State<FlightBookingPage> createState() => _FlightBookingPageState();
+  ConsumerState<FlightBookingPage> createState() => _FlightBookingPageState();
 }
 
-class _FlightBookingPageState extends State<FlightBookingPage> {
+class _FlightBookingPageState extends ConsumerState<FlightBookingPage> {
   FlightService? _service;
   Flight? _flight;
   bool _isLoading = true;
@@ -32,16 +33,12 @@ class _FlightBookingPageState extends State<FlightBookingPage> {
   final _phoneController = TextEditingController();
   String _gender = '';
   DateTime? _dob;
-  String _paymentMethod = 'card';
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final authService = context.read<AuthService>();
-      _service = FlightService(authService);
-      _loadFlight();
-    });
+    _service = ref.read(flightServiceProvider);
+    _loadFlight();
   }
 
   @override
@@ -63,9 +60,7 @@ class _FlightBookingPageState extends State<FlightBookingPage> {
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Failed to load flight: $e')));
+        AppSnackBar.showError(context, 'Failed to load flight: $e');
       }
     }
   }
@@ -77,15 +72,11 @@ class _FlightBookingPageState extends State<FlightBookingPage> {
   Future<void> _submitBooking() async {
     if (!_formKey.currentState!.validate()) return;
     if (_dob == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select date of birth')),
-      );
+      AppSnackBar.showInfo(context, 'Please select date of birth');
       return;
     }
     if (_gender.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Please select gender')));
+      AppSnackBar.showInfo(context, 'Please select gender');
       return;
     }
 
@@ -105,28 +96,18 @@ class _FlightBookingPageState extends State<FlightBookingPage> {
         flightId: widget.flightId,
         passengers: 1,
         traveler: traveler,
-        paymentMethod: _paymentMethod,
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Booking confirmed! Reference: ${result.bookingReference}',
-            ),
-            backgroundColor: Colors.green,
-          ),
+        AppSnackBar.showSuccess(
+          context,
+          'Booking confirmed! Reference: ${result.bookingReference}',
         );
         context.pop();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Booking failed: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppSnackBar.showError(context, 'Booking failed: $e');
       }
     } finally {
       if (mounted) setState(() => _isBooking = false);
@@ -135,9 +116,9 @@ class _FlightBookingPageState extends State<FlightBookingPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF3C4494),
-      body: SafeArea(
+    return Container(
+      color: const Color(0xFF3C4494),
+      child: SafeArea(
         child: Column(
           children: [
             // Header
@@ -289,11 +270,6 @@ class _FlightBookingPageState extends State<FlightBookingPage> {
           // Price details
           _buildPriceDetails(),
 
-          const SizedBox(height: 16),
-
-          // Payment methods
-          _buildPaymentSection(),
-
           const SizedBox(height: 24),
 
           // Book button
@@ -320,7 +296,7 @@ class _FlightBookingPageState extends State<FlightBookingPage> {
                         ),
                       )
                     : const Text(
-                        'Book and pay',
+                        'Confirm Booking',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w600,
@@ -498,103 +474,4 @@ class _FlightBookingPageState extends State<FlightBookingPage> {
     );
   }
 
-  Widget _buildPaymentSection() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'How would you like to pay?',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              _paymentOption('card', Icons.credit_card, 'New card'),
-              const SizedBox(width: 12),
-              _paymentOption('google_pay', Icons.g_mobiledata, 'Google Pay'),
-              const SizedBox(width: 12),
-              _paymentOption('paypal', Icons.paypal, 'PayPal'),
-            ],
-          ),
-          if (_paymentMethod == 'card') ...[
-            const SizedBox(height: 20),
-            _buildCardForm(),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _paymentOption(String value, IconData icon, String label) {
-    final isSelected = _paymentMethod == value;
-    return GestureDetector(
-      onTap: () => setState(() => _paymentMethod = value),
-      child: Column(
-        children: [
-          Container(
-            width: 100,
-            height: 70,
-            decoration: BoxDecoration(
-              border: Border.all(
-                color: isSelected
-                    ? const Color(0xFF3C4494)
-                    : Colors.grey.shade400,
-                width: isSelected ? 2 : 1,
-              ),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(
-              icon,
-              size: 32,
-              color: isSelected ? const Color(0xFF3C4494) : Colors.grey,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(label, style: const TextStyle(fontSize: 12)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCardForm() {
-    return Column(
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: _buildTextField(
-                "Cardholder's name *",
-                TextEditingController(),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: _buildTextField('Card number *', TextEditingController()),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: _buildTextField(
-                'Expiration date *',
-                TextEditingController(),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(child: _buildTextField('CVC *', TextEditingController())),
-          ],
-        ),
-      ],
-    );
-  }
 }

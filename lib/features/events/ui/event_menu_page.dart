@@ -3,20 +3,23 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
-import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../../../core/config/app_config.dart';
-import '../../../../core/services/event_context_service.dart';
-import '../../../../core/widgets/attention_seeker.dart';
-import '../../../../l10n/generated/app_localizations.dart';
-import '../../auth/services/auth_service.dart';
-import '../../notifications/ui/notification_drawer.dart';
-import 'widgets/profile_dropdown.dart';
+import '../../../core/config/app_config.dart';
+import '../../../core/providers/event_context_provider.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/app_snackbar.dart';
+import '../../../shared/widgets/app_cached_image.dart';
+import '../../../l10n/generated/app_localizations.dart';
+import '../../auth/providers/auth_provider.dart';
+import '../../shop/providers/shop_providers.dart';
+
+// =============================================================================
+// EventMenuPage — the event dashboard
+// =============================================================================
 
 class EventMenuPage extends ConsumerStatefulWidget {
   final int eventId;
@@ -28,26 +31,11 @@ class EventMenuPage extends ConsumerStatefulWidget {
 }
 
 class _EventMenuPageState extends ConsumerState<EventMenuPage> {
-  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  bool _isProfileOpen = false;
-
   List<Map<String, dynamic>> _sponsors = [];
   bool _isLoadingSponsors = true;
-
-  // Event data for dynamic logo and name
-  Map<String, dynamic>? _eventData;
-
-  // Registration status
-  bool _isRegistered = false;
-  bool _isCheckingRegistration = true;
-
-  // Registration button highlight
-  bool _showRegistrationHighlight = false;
-
-  // For endless scrolling carousel
   late ScrollController _sponsorScrollController;
   Timer? _sponsorScrollTimer;
-  Timer? _sponsorRefreshTimer; // Refresh sponsors every 2 minutes
+  Timer? _sponsorRefreshTimer;
 
   @override
   void initState() {
@@ -57,212 +45,60 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
   }
 
   Future<void> _initializeAndFetch() async {
-    // Ensure the event context is loaded for this event
-    // This handles direct navigation and page refreshes
-    await eventContextService.ensureEventContext(widget.eventId);
-    _fetchEvent();
-    _fetchSponsors(); // Initial fetch
-    _startPeriodicSponsorRefresh(); // Start periodic refresh
-    _checkRegistrationStatus();
-    _checkParticipantAutoRegistration();
-  }
-
-  void _startPeriodicSponsorRefresh() {
-    // Refresh sponsors every 2 minutes
-    _sponsorRefreshTimer = Timer.periodic(const Duration(minutes: 2), (_) {
-      _fetchSponsors();
-    });
-  }
-
-  Future<void> _checkRegistrationStatus() async {
-    try {
-      final authService = context.read<AuthService>();
-      final token = await authService.getToken();
-
-      final response = await http.get(
-        Uri.parse(
-          '${AppConfig.b2cApiBaseUrl}/api/v1/registrations/my-status?event_id=${widget.eventId}',
-        ),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-      );
-
-      if (!mounted) return;
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final status = data['status'];
-
-        setState(() {
-          // Accept SUBMITTED, APPROVED/ACCEPTED as registered
-          _isRegistered =
-              status == 'ACCEPTED' ||
-              status == 'APPROVED' ||
-              status == 'SUBMITTED';
-          _isCheckingRegistration = false;
-        });
-      } else {
-        setState(() {
-          _isRegistered = false;
-          _isCheckingRegistration = false;
-        });
-      }
-    } catch (e) {
-      debugPrint('[EventMenu] Error checking registration: $e');
-      if (mounted) {
-        setState(() {
-          _isRegistered = false;
-          _isCheckingRegistration = false;
-        });
-      }
-    }
-  }
-
-  /// Check if user is a participant (auto-registered, no registration form needed)
-  Future<void> _checkParticipantAutoRegistration() async {
-    try {
-      final authService = context.read<AuthService>();
-      final token = await authService.getToken();
-
-      final response = await http.get(
-        Uri.parse(
-          '${AppConfig.b2cApiBaseUrl}/api/v1/participant-auth/my-profile',
-        ),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-      );
-
-      if (!mounted) return;
-
-      if (response.statusCode == 200) {
-        // User is a participant - they are auto-registered
-        setState(() {
-          _isRegistered = true;
-        });
-      }
-    } catch (e) {
-      debugPrint('[EventMenu] Error checking participant status: $e');
-    }
-  }
-
-  Future<void> _fetchEvent() async {
-    try {
-      // Events are in B2C API, not Tourism API
-      final uri = Uri.parse(
-        '${AppConfig.b2cApiBaseUrl}/api/v1/events/${widget.eventId}',
-      );
-      final response = await http.get(uri);
-      if (!mounted) return;
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        setState(() {
-          _eventData = data;
-        });
-      }
-    } catch (e) {
-      // Silently fail - event header will show defaults
-    }
-  }
-
-  @override
-  void dispose() {
-    _sponsorScrollTimer?.cancel();
-    _sponsorRefreshTimer?.cancel(); // Stop periodic refresh
-    _sponsorScrollController.dispose();
-    super.dispose();
+    await ref
+        .read(eventContextProvider.notifier)
+        .ensureEventContext(widget.eventId);
+    _fetchSponsors();
+    _sponsorRefreshTimer = Timer.periodic(
+      const Duration(minutes: 2),
+      (_) => _fetchSponsors(),
+    );
   }
 
   Future<void> _fetchSponsors() async {
     try {
-      // Use EventContextService for site_id
-      final siteId = eventContextService.siteId;
-      // Use query param for site_id instead of header for better compatibility
+      final siteId = ref.read(eventContextProvider).siteId;
       final uri = siteId != null
-          ? Uri.parse(
-              '${AppConfig.tourismApiBaseUrl}/sponsors/?site_id=$siteId',
-            )
+          ? Uri.parse('${AppConfig.tourismApiBaseUrl}/sponsors/?site_id=$siteId')
           : Uri.parse('${AppConfig.tourismApiBaseUrl}/sponsors/');
       final response = await http.get(uri);
-      if (!mounted) return; // Check if widget is still mounted
-
+      if (!mounted) return;
       if (response.statusCode == 200) {
         final List data = jsonDecode(response.body);
         setState(() {
           _sponsors = data.cast<Map<String, dynamic>>();
           _isLoadingSponsors = false;
         });
-        // Start auto-scroll after data loads
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) _startAutoScroll();
         });
       } else {
         setState(() => _isLoadingSponsors = false);
       }
-    } catch (e) {
+    } catch (_) {
       if (mounted) setState(() => _isLoadingSponsors = false);
     }
   }
 
   void _startAutoScroll() {
     if (_sponsors.isEmpty) return;
-
-    _sponsorScrollTimer = Timer.periodic(const Duration(milliseconds: 30), (
-      timer,
-    ) {
-      if (_sponsorScrollController.hasClients) {
-        final maxScroll = _sponsorScrollController.position.maxScrollExtent;
-        final currentScroll = _sponsorScrollController.offset;
-
-        if (currentScroll >= maxScroll) {
-          _sponsorScrollController.jumpTo(0);
-        } else {
-          _sponsorScrollController.jumpTo(currentScroll + 1);
-        }
-      }
-    });
+    _sponsorScrollTimer = Timer.periodic(
+      const Duration(milliseconds: 30),
+      (_) {
+        if (!_sponsorScrollController.hasClients) return;
+        final max = _sponsorScrollController.position.maxScrollExtent;
+        final current = _sponsorScrollController.offset;
+        _sponsorScrollController.jumpTo(current >= max ? 0 : current + 1);
+      },
+    );
   }
 
-  void _toggleProfile() {
-    setState(() {
-      _isProfileOpen = !_isProfileOpen;
-    });
-  }
-
-  void _closeProfile() {
-    if (_isProfileOpen) {
-      setState(() {
-        _isProfileOpen = false;
-      });
-    }
-  }
-
-  void _onExitEvent() {
-    eventContextService.clearContext();
-    context.go('/');
-  }
-
-  Color _getTierColor(String? tier) {
-    switch (tier?.toLowerCase()) {
-      case 'premier':
-      case 'diamond':
-        return const Color(0xFFB9F2FF);
-      case 'platinum':
-        return const Color(0xFFE5E4E2);
-      case 'gold':
-        return const Color(0xFFFFD700);
-      case 'silver':
-        return const Color(0xFFC0C0C0);
-      case 'bronze':
-        return const Color(0xFFCD7F32);
-      case 'general':
-      default:
-        return Colors.blue;
-    }
+  @override
+  void dispose() {
+    _sponsorScrollTimer?.cancel();
+    _sponsorRefreshTimer?.cancel();
+    _sponsorScrollController.dispose();
+    super.dispose();
   }
 
   @override
@@ -270,647 +106,548 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
     final l10n = AppLocalizations.of(context)!;
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
+    final hasPurchased = ref.watch(hasPurchasedProvider(widget.eventId));
 
-    // Menu Items - Registration first, then items requiring registration, then always-available items
-    final menuItems = [
-      // VISA APPLICATION - First position, always accessible (temporarily replaces Registration)
-      {
-        'icon': 'registration.png',
-        'label': 'Visa Application',
-        'route': '/events/${widget.eventId}/visa-apply',
-        'isRegistrationButton': true,
-      },
-      // Items requiring registration
-      {
-        'icon': 'agenda.png',
-        'label': l10n.agenda,
-        'route': '/events/${widget.eventId}/agenda',
-        'requiresRegistration': true,
-      },
-      {
-        'icon': 'speakers.png',
-        'label': l10n.speakers,
-        'route': '/events/${widget.eventId}/speakers',
-        'requiresRegistration': true,
-        'requiresAgreement': true,
-      },
-      {
-        'icon': 'participants.png',
-        'label': l10n.participants,
-        'route': '/events/${widget.eventId}/participants',
-        'requiresRegistration': true,
-        'requiresAgreement': true,
-      },
-      {
-        'icon': 'meetings.png',
-        'label': l10n.meetings,
-        'route': '/events/${widget.eventId}/meetings',
-        'requiresRegistration': true,
-        'requiresAgreement': true,
-      },
-      // My Participants - Show after registration is SUBMITTED/APPROVED
-      {
-        'icon': 'my_participants.png',
-        'label': l10n.myParticipants,
-        'route': '/events/${widget.eventId}/my-participants',
-        'requiresRegistration': true,
-        'requiresAgreement': true,
-      },
-      {
-        'icon': 'flights.png',
-        'label': l10n.flights,
-        'route': '/events/${widget.eventId}/flights',
-        'requiresRegistration': true,
-        'requiresAgreement': true,
-      },
-      {
-        'icon': 'accommodation.png',
-        'label': l10n.accommodation,
-        'route': '/events/${widget.eventId}/accommodation',
-        'requiresRegistration': true,
-        'requiresAgreement': true,
-      },
-      {
-        'icon': 'transfer.png',
-        'label': l10n.transfer,
-        'route': '/events/${widget.eventId}/transfer',
-        'requiresRegistration': true,
-        'requiresAgreement': true,
-      },
-      // Always available items - News moved before Hotline
-      {
-        'icon': 'news.png',
-        'label': l10n.news,
-        'route': '/events/${widget.eventId}/news',
-      },
-      {
-        'icon': 'hotline.png',
-        'label': l10n.hotline,
-        'route': '/events/${widget.eventId}/hotline',
-      },
-      {
-        'icon': 'feedback.png',
-        'label': l10n.feedback,
-        'route': '/events/${widget.eventId}/feedback',
-      },
-      {
-        'icon': 'faq.png',
-        'label': l10n.faq,
-        'route': '/events/${widget.eventId}/faq',
-      },
-      {
-        'icon': 'contact_us.png',
-        'label': l10n.contactUs,
-        'route': '/events/${widget.eventId}/contact',
-      },
-      {'icon': 'exit', 'label': l10n.exitEvent, 'route': null, 'isExit': true},
-    ];
-
-    // Filter menu items - hide "My Participants" until registered
-    final filteredMenuItems = menuItems.where((item) {
-      final showOnlyWhenRegistered = item['showOnlyWhenRegistered'] == true;
-      if (showOnlyWhenRegistered && !_isRegistered) {
-        return false; // Hide "My Participants" until status is SUBMITTED/APPROVED
-      }
-      return true;
-    }).toList();
-
-    return Scaffold(
-      key: _scaffoldKey,
-      backgroundColor: const Color(0xFF3C4494),
-      endDrawer: const NotificationDrawer(),
-      body: GestureDetector(
-        onTap: _closeProfile,
-        behavior: HitTestBehavior.translucent,
-        child: Stack(
+    return SingleChildScrollView(
+        padding: EdgeInsets.all(isMobile ? 16 : 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Column(
-              children: [
-                // 1. Header with Logo + Title + AppBar Icons
-                Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: isMobile ? 20 : 40,
-                    vertical: 20,
-                  ),
-                  child: Row(
-                    children: [
-                      // Logo
-                      Container(
-                        width: isMobile ? 60 : 80,
-                        height: isMobile ? 60 : 80,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: _eventData?['logo_url'] != null
-                              ? Image.network(
-                                  _eventData!['logo_url'].startsWith('http')
-                                      ? _eventData!['logo_url']
-                                      : '${AppConfig.tourismApiBaseUrl}${_eventData!['logo_url']}',
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (c, e, s) => const Icon(
-                                    Icons.event,
-                                    color: Colors.white,
-                                    size: 40,
-                                  ),
-                                )
-                              : const Icon(
-                                  Icons.event,
-                                  color: Colors.white,
-                                  size: 40,
-                                ),
-                        ),
+            // Sponsor Carousel
+            _SponsorCarousel(
+              sponsors: _sponsors,
+              isLoading: _isLoadingSponsors,
+              scrollController: _sponsorScrollController,
+            ),
+            const SizedBox(height: 24),
+
+            // Dashboard heading
+            Text(
+              'Dashboard',
+              style: GoogleFonts.montserrat(
+                fontSize: 24,
+                fontWeight: FontWeight.w700,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Quick access to event features',
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                color: Colors.grey.shade600,
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Menu Grid
+            _DashboardGrid(
+              eventId: widget.eventId,
+              hasPurchased: hasPurchased,
+              isMobile: isMobile,
+              l10n: l10n,
+              onExitEvent: () {
+                ref.read(eventContextProvider.notifier).clearContext();
+                context.go('/');
+              },
+              onAgreementRequired: () {
+                showDialog(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Agreement Required'),
+                    content: const Text(
+                      'Please complete the Participation Agreement Process in your Profile before accessing this feature.',
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text('Cancel'),
                       ),
-                      const SizedBox(width: 15),
-                      // Title - Event name from API
-                      Expanded(
-                        child: Text(
-                          _eventData?['title'] ?? l10n.eventMenuLine1,
-                          style: GoogleFonts.montserrat(
-                            fontWeight: FontWeight.w600,
-                            fontSize: isMobile ? 20 : 28,
-                            color: const Color(0xFFF1F1F6),
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      // AppBar Icons (Notifications, Profile)
-                      Row(
-                        children: [
-                          Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(50),
-                              onTap: () {
-                                _closeProfile();
-                                _scaffoldKey.currentState?.openEndDrawer();
-                              },
-                              child: Padding(
-                                padding: const EdgeInsets.all(8.0),
-                                child: SvgPicture.asset(
-                                  'assets/event_calendar/bell.svg',
-                                  width: 28,
-                                  height: 28,
-                                  colorFilter: const ColorFilter.mode(
-                                    Colors.white,
-                                    BlendMode.srcIn,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(50),
-                              onTap: _toggleProfile,
-                              child: Padding(
-                                padding: const EdgeInsets.all(8.0),
-                                child: SvgPicture.asset(
-                                  'assets/event_calendar/user.svg',
-                                  width: 28,
-                                  height: 28,
-                                  colorFilter: const ColorFilter.mode(
-                                    Colors.white,
-                                    BlendMode.srcIn,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
+                      ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          context.go(
+                            '/profile?returnTo=/events/${widget.eventId}/menu',
+                          );
+                        },
+                        child: const Text('Go to Profile'),
                       ),
                     ],
                   ),
-                ),
+                );
+              },
+              hasAgreedTerms: ref.read(authNotifierProvider).hasAgreedTerms,
+            ),
+          ],
+        ),
+      );
+  }
+}
 
-                // 2. Main Content
+// =============================================================================
+// Sponsor Carousel
+// =============================================================================
+
+class _SponsorCarousel extends StatelessWidget {
+  final List<Map<String, dynamic>> sponsors;
+  final bool isLoading;
+  final ScrollController scrollController;
+
+  const _SponsorCarousel({
+    required this.sponsors,
+    required this.isLoading,
+    required this.scrollController,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (isLoading) {
+      return const SizedBox(
+        height: 90,
+        child: Center(
+          child: CircularProgressIndicator(color: AppTheme.primaryColor),
+        ),
+      );
+    }
+
+    if (sponsors.isEmpty) return const SizedBox.shrink();
+
+    return SizedBox(
+      height: 90,
+      child: ListView.builder(
+        controller: scrollController,
+        scrollDirection: Axis.horizontal,
+        itemCount: sponsors.length * 100,
+        itemBuilder: (context, index) {
+          final s = sponsors[index % sponsors.length];
+          return _SponsorCard(sponsor: s);
+        },
+      ),
+    );
+  }
+}
+
+class _SponsorCard extends StatelessWidget {
+  final Map<String, dynamic> sponsor;
+
+  const _SponsorCard({required this.sponsor});
+
+  @override
+  Widget build(BuildContext context) {
+    final tier = sponsor['tier'] as String? ?? 'general';
+    final rawLogoUrl = sponsor['logo'] as String?;
+    final website = sponsor['website'] as String?;
+
+    String? fullLogoUrl;
+    if (rawLogoUrl != null && rawLogoUrl.isNotEmpty) {
+      fullLogoUrl = rawLogoUrl.startsWith('http')
+          ? rawLogoUrl
+          : '${AppConfig.tourismApiBaseUrl}$rawLogoUrl';
+    }
+
+    final tierColor = _getTierColor(tier);
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 12),
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        elevation: 1,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: () async {
+            if (website == null || website.isEmpty) return;
+            var url = website;
+            if (!url.startsWith('http://') && !url.startsWith('https://')) {
+              url = 'https://$url';
+            }
+            try {
+              await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+            } catch (_) {}
+          },
+          child: Container(
+            width: 150,
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
                 Expanded(
-                  child: SingleChildScrollView(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: isMobile ? 0 : 40,
-                    ),
-                    child: Column(
-                      children: [
-                        // Sponsors Carousel (endless scrolling)
-                        if (_isLoadingSponsors)
-                          const SizedBox(
-                            height: 100,
-                            child: Center(
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                              ),
-                            ),
-                          )
-                        else if (_sponsors.isNotEmpty)
-                          SizedBox(
-                            height: 100,
-                            child: ListView.builder(
-                              controller: _sponsorScrollController,
-                              scrollDirection: Axis.horizontal,
-                              // Duplicate list for endless effect
-                              itemCount: _sponsors.length * 100,
-                              itemBuilder: (context, index) {
-                                final s = _sponsors[index % _sponsors.length];
-                                final tier = s['tier'] as String? ?? 'general';
-                                final tierColor = _getTierColor(tier);
-                                final rawLogoUrl = s['logo'] as String?;
-                                final website = s['website'] as String?;
-
-                                // Build full logo URL
-                                String? fullLogoUrl;
-                                if (rawLogoUrl != null &&
-                                    rawLogoUrl.isNotEmpty) {
-                                  if (rawLogoUrl.startsWith('http')) {
-                                    fullLogoUrl = rawLogoUrl;
-                                  } else {
-                                    fullLogoUrl =
-                                        '${AppConfig.tourismApiBaseUrl}$rawLogoUrl';
-                                  }
-                                }
-
-                                return Material(
-                                  color: Colors.transparent,
-                                  child: InkWell(
-                                    borderRadius: BorderRadius.circular(8),
-                                    onTap: () async {
-                                      if (website != null &&
-                                          website.isNotEmpty) {
-                                        // Add http:// if missing
-                                        String url = website;
-                                        if (!url.startsWith('http://') &&
-                                            !url.startsWith('https://')) {
-                                          url = 'https://$url';
-                                        }
-                                        try {
-                                          final uri = Uri.parse(url);
-                                          await launchUrl(
-                                            uri,
-                                            mode:
-                                                LaunchMode.externalApplication,
-                                          );
-                                        } catch (e) {
-                                          debugPrint(
-                                            'Could not launch $url: $e',
-                                          );
-                                        }
-                                      }
-                                    },
-                                    child: Container(
-                                      width: 160,
-                                      margin: const EdgeInsets.only(right: 15),
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 8,
-                                        horizontal: 10,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white,
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(
-                                          color: tierColor.withValues(
-                                            alpha: 0.5,
-                                          ),
-                                        ),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withValues(
-                                              alpha: 0.1,
-                                            ),
-                                            blurRadius: 4,
-                                            offset: const Offset(0, 2),
-                                          ),
-                                        ],
-                                      ),
-                                      child: Column(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          // Logo - takes most of the space
-                                          Expanded(
-                                            child: (fullLogoUrl != null)
-                                                ? Image.network(
-                                                    fullLogoUrl,
-                                                    fit: BoxFit.contain,
-                                                    errorBuilder: (c, e, s) =>
-                                                        Icon(
-                                                          Icons.business,
-                                                          color: tierColor,
-                                                          size: 40,
-                                                        ),
-                                                  )
-                                                : Icon(
-                                                    Icons.business,
-                                                    color: tierColor,
-                                                    size: 40,
-                                                  ),
-                                          ),
-                                          // Tier label with dark bg strip
-                                          Container(
-                                            width: double.infinity,
-                                            padding: const EdgeInsets.symmetric(
-                                              vertical: 4,
-                                              horizontal: 8,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: const Color(
-                                                0xFF262B60,
-                                              ).withValues(alpha: 0.85),
-                                              borderRadius:
-                                                  BorderRadius.circular(4),
-                                            ),
-                                            child: Text(
-                                              tier.toUpperCase(),
-                                              textAlign: TextAlign.center,
-                                              style: GoogleFonts.roboto(
-                                                color: Colors.white,
-                                                fontWeight: FontWeight.w600,
-                                                fontSize: 11,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          )
-                        else
-                          const SizedBox(height: 100),
-
-                        const SizedBox(height: 25),
-
-                        // Grid (responsive: 2 columns mobile, 5 columns desktop)
-                        Padding(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: isMobile ? 16 : 24,
+                  child: fullLogoUrl != null
+                      ? AppCachedImage(
+                          imageUrl: fullLogoUrl,
+                          fit: BoxFit.contain,
+                          placeholder: Icon(
+                            Icons.business,
+                            color: tierColor,
+                            size: 32,
                           ),
-                          child: Center(
-                            child: ConstrainedBox(
-                              constraints: BoxConstraints(
-                                maxWidth: isMobile ? double.infinity : 900,
-                              ),
-                              child: GridView.builder(
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                gridDelegate:
-                                    SliverGridDelegateWithFixedCrossAxisCount(
-                                      crossAxisCount: isMobile ? 3 : 5,
-                                      mainAxisSpacing: isMobile ? 10 : 20,
-                                      crossAxisSpacing: isMobile ? 10 : 20,
-                                      childAspectRatio: isMobile ? 0.9 : 1.0,
-                                    ),
-                                itemCount: filteredMenuItems.length,
-                                itemBuilder: (context, index) {
-                                  final item = filteredMenuItems[index];
-                                  final isExit = item['isExit'] == true;
-                                  final iconName = item['icon'] as String;
-                                  final isRegistrationButton =
-                                      item['isRegistrationButton'] == true;
-                                  final requiresRegistration =
-                                      item['requiresRegistration'] == true;
-                                  final requiresAgreement =
-                                      item['requiresAgreement'] == true;
-
-                                  // Items requiring registration are disabled until registered
-                                  // Agreement check happens on tap via redirect to Profile
-                                  final isDisabled =
-                                      requiresRegistration &&
-                                      !_isRegistered;
-
-                                  // Build the menu card content
-                                  Widget cardContent = Container(
-                                    decoration: BoxDecoration(
-                                      color: isExit
-                                          ? Colors.orange.withValues(
-                                              alpha: 0.15,
-                                            )
-                                          : Colors.transparent,
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                        color: isExit
-                                            ? Colors.orange.withValues(
-                                                alpha: 0.3,
-                                              )
-                                            : Colors.white.withValues(
-                                                alpha: 0.1,
-                                              ),
-                                      ),
-                                    ),
-                                    child: Stack(
-                                      children: [
-                                        // Main content - centered
-                                        Center(
-                                          child: Opacity(
-                                            opacity: isDisabled ? 0.4 : 1.0,
-                                            child: Column(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.center,
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                if (isExit)
-                                                  Icon(
-                                                    Icons.exit_to_app,
-                                                    color: Colors.orange,
-                                                    size: isMobile ? 48 : 52,
-                                                  )
-                                                else
-                                                  Image.asset(
-                                                    'assets/event_menu/$iconName',
-                                                    width: isMobile ? 64 : 58,
-                                                    height: isMobile ? 64 : 58,
-                                                    errorBuilder: (c, e, s) =>
-                                                        const Icon(
-                                                          Icons.image,
-                                                          color: Colors.white54,
-                                                          size: 24,
-                                                        ),
-                                                  ),
-                                                SizedBox(
-                                                  height: isMobile ? 4 : 8,
-                                                ),
-                                                Padding(
-                                                  padding:
-                                                      const EdgeInsets.symmetric(
-                                                        horizontal: 4.0,
-                                                      ),
-                                                  child: Text(
-                                                    item['label'] as String,
-                                                    textAlign: TextAlign.center,
-                                                    style: GoogleFonts.roboto(
-                                                      fontSize: isMobile
-                                                          ? 14
-                                                          : 18,
-                                                      fontWeight:
-                                                          FontWeight.w500,
-                                                      color: isExit
-                                                          ? Colors.orange
-                                                          : const Color(
-                                                              0xFFF1F1F6,
-                                                            ),
-                                                    ),
-                                                    maxLines: 2,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                        // Lock icon overlay for disabled buttons
-                                        if (isDisabled)
-                                          Positioned(
-                                            top: 6,
-                                            right: 6,
-                                            child: Container(
-                                              padding: const EdgeInsets.all(4),
-                                              decoration: BoxDecoration(
-                                                color: Colors.black54,
-                                                borderRadius:
-                                                    BorderRadius.circular(12),
-                                              ),
-                                              child: const Icon(
-                                                Icons.lock_outline,
-                                                color: Colors.white70,
-                                                size: 14,
-                                              ),
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  );
-
-                                  // Wrap registration button with AttentionSeeker animation
-                                  if (isRegistrationButton) {
-                                    cardContent = AttentionSeeker(
-                                      animate: _showRegistrationHighlight,
-                                      glowColor: Colors.greenAccent,
-                                      repeatCount: 3,
-                                      onAnimationComplete: () {
-                                        if (mounted) {
-                                          setState(
-                                            () => _showRegistrationHighlight =
-                                                false,
-                                          );
-                                        }
-                                      },
-                                      child: cardContent,
-                                    );
-                                  }
-
-                                  return Material(
-                                    color: Colors.transparent,
-                                    child: InkWell(
-                                      onTap: () {
-                                        // Handle disabled button tap
-                                        if (isDisabled) {
-                                          // Registration required
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            const SnackBar(
-                                              content: Text(
-                                                'Please register for this event first',
-                                              ),
-                                              backgroundColor: Color(
-                                                0xFF3C4494,
-                                              ),
-                                              duration: Duration(seconds: 2),
-                                            ),
-                                          );
-                                          // Trigger registration button highlight
-                                          setState(
-                                            () => _showRegistrationHighlight =
-                                                true,
-                                          );
-                                          return;
-                                        }
-
-                                        if (isExit) {
-                                          _onExitEvent();
-                                        } else if (item['route'] != null) {
-                                          // Check if menu item requires agreement
-                                          final requiresAgreement =
-                                              item['requiresAgreement'] == true;
-                                          final hasAgreed = context
-                                              .read<AuthService>()
-                                              .hasAgreedTerms;
-
-                                          if (requiresAgreement && !hasAgreed) {
-                                            // Show dialog to guide user to agreement
-                                            showDialog(
-                                              context: context,
-                                              builder: (ctx) => AlertDialog(
-                                                title: const Text(
-                                                  'Agreement Required',
-                                                ),
-                                                content: const Text(
-                                                  'Please complete the Participation Agreement Process in your Profile before accessing this feature.',
-                                                ),
-                                                actions: [
-                                                  TextButton(
-                                                    onPressed: () =>
-                                                        Navigator.pop(ctx),
-                                                    child: const Text('Cancel'),
-                                                  ),
-                                                  ElevatedButton(
-                                                    onPressed: () {
-                                                      Navigator.pop(ctx);
-                                                      context.go(
-                                                        '/profile?tab=0&returnTo=/events/${widget.eventId}/menu',
-                                                      );
-                                                    },
-                                                    child: const Text(
-                                                      'Go to Profile',
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            );
-                                            return;
-                                          }
-                                          context.go(item['route'] as String);
-                                        }
-                                      },
-                                      borderRadius: BorderRadius.circular(12),
-                                      splashColor: isDisabled
-                                          ? Colors.transparent
-                                          : Colors.white24,
-                                      highlightColor: isDisabled
-                                          ? Colors.transparent
-                                          : Colors.white10,
-                                      child: cardContent,
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
-                          ),
-                        ),
-
-                        const SizedBox(height: 30),
-                      ],
+                        )
+                      : Icon(Icons.business, color: tierColor, size: 32),
+                ),
+                const SizedBox(height: 4),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 3, horizontal: 8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryColor.withValues(alpha: 0.9),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    tier.toUpperCase(),
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.inter(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 10,
                     ),
                   ),
                 ),
               ],
             ),
-
-            // Profile Dropdown Overlay
-            if (_isProfileOpen)
-              Positioned(
-                top: 100,
-                right: isMobile ? 20 : 65,
-                child: ProfileDropdown(onLogout: _onExitEvent),
-              ),
-          ],
+          ),
         ),
       ),
     );
   }
+
+  static Color _getTierColor(String tier) {
+    switch (tier.toLowerCase()) {
+      case 'premier':
+      case 'diamond':
+        return const Color(0xFF64B5F6);
+      case 'platinum':
+        return const Color(0xFFB0BEC5);
+      case 'gold':
+        return const Color(0xFFFFD54F);
+      case 'silver':
+        return const Color(0xFF90A4AE);
+      case 'bronze':
+        return const Color(0xFFBCAAA4);
+      default:
+        return AppTheme.primaryColor;
+    }
+  }
+}
+
+// =============================================================================
+// Dashboard Grid
+// =============================================================================
+
+class _DashboardGrid extends StatelessWidget {
+  final int eventId;
+  final bool hasPurchased;
+  final bool isMobile;
+  final AppLocalizations l10n;
+  final VoidCallback onExitEvent;
+  final VoidCallback onAgreementRequired;
+  final bool hasAgreedTerms;
+
+  const _DashboardGrid({
+    required this.eventId,
+    required this.hasPurchased,
+    required this.isMobile,
+    required this.l10n,
+    required this.onExitEvent,
+    required this.onAgreementRequired,
+    required this.hasAgreedTerms,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final items = <_MenuItem>[
+      _MenuItem(
+        asset: 'registration.png',
+        fallbackIcon: Icons.description_outlined,
+        label: 'Visa Application',
+        route: '/events/$eventId/visa-travel',
+        color: const Color(0xFF5C6BC0),
+      ),
+      _MenuItem(
+        asset: 'agenda.png',
+        fallbackIcon: Icons.event_note_outlined,
+        label: l10n.agenda,
+        route: '/events/$eventId/agenda',
+        color: const Color(0xFF42A5F5),
+      ),
+      _MenuItem(
+        asset: 'speakers.png',
+        fallbackIcon: Icons.record_voice_over_outlined,
+        label: l10n.speakers,
+        route: '/events/$eventId/speakers',
+        color: const Color(0xFFAB47BC),
+        requiresAgreement: true,
+      ),
+      _MenuItem(
+        asset: 'participants.png',
+        fallbackIcon: Icons.groups_outlined,
+        label: l10n.participants,
+        route: '/events/$eventId/participants',
+        color: const Color(0xFF26A69A),
+        requiresAgreement: true,
+      ),
+      _MenuItem(
+        asset: 'meetings.png',
+        fallbackIcon: Icons.handshake_outlined,
+        label: l10n.meetings,
+        route: '/events/$eventId/meetings',
+        color: const Color(0xFFEF5350),
+        requiresPurchase: true,
+        requiresAgreement: true,
+      ),
+      _MenuItem(
+        asset: 'flights.png',
+        fallbackIcon: Icons.flight_outlined,
+        label: l10n.flights,
+        route: '/events/$eventId/flights',
+        color: const Color(0xFF29B6F6),
+        requiresPurchase: true,
+        requiresAgreement: true,
+      ),
+      _MenuItem(
+        asset: 'transfer.png',
+        fallbackIcon: Icons.directions_car_outlined,
+        label: l10n.transfer,
+        route: '/events/$eventId/transfer',
+        color: const Color(0xFF66BB6A),
+        requiresPurchase: true,
+        requiresAgreement: true,
+      ),
+      _MenuItem(
+        asset: 'news.png',
+        fallbackIcon: Icons.article_outlined,
+        label: l10n.news,
+        route: '/events/$eventId/news',
+        color: const Color(0xFFFF7043),
+      ),
+      _MenuItem(
+        asset: 'hotline.png',
+        fallbackIcon: Icons.support_agent_outlined,
+        label: l10n.hotline,
+        route: '/events/$eventId/hotline',
+        color: const Color(0xFF78909C),
+      ),
+      _MenuItem(
+        asset: 'feedback.png',
+        fallbackIcon: Icons.chat_bubble_outline,
+        label: l10n.feedback,
+        route: '/events/$eventId/feedback',
+        color: const Color(0xFF7E57C2),
+      ),
+      _MenuItem(
+        asset: 'faq.png',
+        fallbackIcon: Icons.help_outline,
+        label: l10n.faq,
+        route: '/events/$eventId/faq',
+        color: const Color(0xFF8D6E63),
+      ),
+      _MenuItem(
+        fallbackIcon: Icons.exit_to_app,
+        label: l10n.exitEvent,
+        route: null,
+        color: Colors.orange,
+        isExit: true,
+      ),
+    ];
+
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 960),
+        child: GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: isMobile ? 3 : 4,
+            mainAxisSpacing: isMobile ? 12 : 16,
+            crossAxisSpacing: isMobile ? 12 : 16,
+            childAspectRatio: isMobile ? 0.95 : 1.05,
+          ),
+          itemCount: items.length,
+          itemBuilder: (context, index) {
+            final item = items[index];
+            final isDisabled = item.requiresPurchase && !hasPurchased;
+
+            return _DashboardCard(
+              item: item,
+              isDisabled: isDisabled,
+              isMobile: isMobile,
+              onTap: () => _handleTap(context, item, isDisabled),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  void _handleTap(BuildContext context, _MenuItem item, bool isDisabled) {
+    if (isDisabled) {
+      AppSnackBar.showInfo(context, 'Purchase a service package to unlock this feature');
+      return;
+    }
+
+    if (item.isExit) {
+      onExitEvent();
+      return;
+    }
+
+    if (item.route == null) return;
+
+    if (item.requiresAgreement && !hasAgreedTerms) {
+      onAgreementRequired();
+      return;
+    }
+
+    context.go(item.route!);
+  }
+}
+
+// =============================================================================
+// Dashboard Card — white card with icon, label, optional lock
+// =============================================================================
+
+class _DashboardCard extends StatelessWidget {
+  final _MenuItem item;
+  final bool isDisabled;
+  final bool isMobile;
+  final VoidCallback onTap;
+
+  const _DashboardCard({
+    required this.item,
+    required this.isDisabled,
+    required this.isMobile,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isExit = item.isExit;
+
+    return Material(
+      color: isExit ? Colors.orange.withValues(alpha: 0.08) : Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      elevation: isExit ? 0 : 1,
+      shadowColor: Colors.black.withValues(alpha: 0.08),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isExit
+                  ? Colors.orange.withValues(alpha: 0.3)
+                  : Colors.grey.shade200,
+            ),
+          ),
+          child: Stack(
+            children: [
+              Center(
+                child: Opacity(
+                  opacity: isDisabled ? 0.4 : 1.0,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(
+                          width: isMobile ? 48 : 56,
+                          height: isMobile ? 48 : 56,
+                          child: item.asset != null
+                              ? Image.asset(
+                                  'assets/event_menu/${item.asset}',
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (_, __, ___) => Container(
+                                    decoration: BoxDecoration(
+                                      color: item.color.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Icon(
+                                      item.fallbackIcon,
+                                      size: isMobile ? 24 : 26,
+                                      color: item.color,
+                                    ),
+                                  ),
+                                )
+                              : Container(
+                                  decoration: BoxDecoration(
+                                    color: item.color.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Icon(
+                                    item.fallbackIcon,
+                                    size: isMobile ? 24 : 26,
+                                    color: item.color,
+                                  ),
+                                ),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          item.label,
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.inter(
+                            fontSize: isMobile ? 12 : 13,
+                            fontWeight: FontWeight.w500,
+                            color: isExit ? Colors.orange : Colors.black87,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              if (isDisabled)
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      Icons.lock_outline,
+                      size: 14,
+                      color: Colors.grey.shade500,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// =============================================================================
+// MenuItem data class
+// =============================================================================
+
+class _MenuItem {
+  final String? asset;
+  final IconData fallbackIcon;
+  final String label;
+  final String? route;
+  final Color color;
+  final bool requiresPurchase;
+  final bool requiresAgreement;
+  final bool isExit;
+
+  const _MenuItem({
+    this.asset,
+    required this.fallbackIcon,
+    required this.label,
+    required this.route,
+    required this.color,
+    this.requiresPurchase = false,
+    this.requiresAgreement = false,
+    this.isExit = false,
+  });
 }

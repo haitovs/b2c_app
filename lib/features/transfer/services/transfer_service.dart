@@ -1,5 +1,4 @@
 import '../../../core/services/api_client.dart';
-import '../../auth/services/auth_service.dart';
 import '../models/booking.dart';
 import '../models/car.dart';
 import '../models/shuttle.dart';
@@ -8,7 +7,7 @@ import '../models/shuttle.dart';
 class TransferService {
   final ApiClient _api;
 
-  TransferService(AuthService authService) : _api = ApiClient(authService);
+  TransferService(this._api);
 
   /// Get all shuttles
   Future<List<Shuttle>> getShuttles() async {

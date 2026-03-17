@@ -1,22 +1,18 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
-import 'package:provider/provider.dart' as legacy_provider;
-
 import '../../../core/config/app_config.dart';
-import '../../../core/services/event_context_service.dart';
-import '../../../core/widgets/custom_app_bar.dart';
-import '../../auth/services/auth_service.dart';
-import '../../events/ui/widgets/profile_dropdown.dart';
-import '../../notifications/services/notification_service.dart';
-import '../../notifications/ui/notification_drawer.dart';
+import '../../../core/widgets/animated_fade_in.dart';
+import '../../../core/widgets/staggered_fade_in.dart';
+import '../../../core/theme/app_theme.dart';
 
-/// News Page - displays news from Tourism backend with search and infinite scroll
+/// News Page - displays news from B2C backend with search and infinite scroll
 class NewsPage extends ConsumerStatefulWidget {
   final String eventId;
 
@@ -27,9 +23,7 @@ class NewsPage extends ConsumerStatefulWidget {
 }
 
 class _NewsPageState extends ConsumerState<NewsPage> {
-  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final ScrollController _scrollController = ScrollController();
-  bool _isProfileOpen = false;
 
   List<Map<String, dynamic>> _news = [];
   List<Map<String, dynamic>> _filteredNews = [];
@@ -47,29 +41,6 @@ class _NewsPageState extends ConsumerState<NewsPage> {
     super.initState();
     _fetchNews();
     _scrollController.addListener(_onScroll);
-    _loadNotificationCount();
-  }
-
-  int _unreadNotificationCount = 0;
-
-  Future<void> _loadNotificationCount() async {
-    try {
-      final authService = legacy_provider.Provider.of<AuthService>(
-        context,
-        listen: false,
-      );
-      final notificationService = NotificationService(authService);
-      final notifications = await notificationService.getNotifications();
-      if (mounted) {
-        setState(() {
-          _unreadNotificationCount = notifications
-              .where((n) => !n.isRead)
-              .length;
-        });
-      }
-    } catch (e) {
-      // Silently fail
-    }
   }
 
   @override
@@ -91,16 +62,12 @@ class _NewsPageState extends ConsumerState<NewsPage> {
 
   Future<void> _fetchNews() async {
     try {
-      final siteId = eventContextService.siteId;
-      final uri = siteId != null
-          ? Uri.parse(
-              '${AppConfig.tourismApiBaseUrl}/news/?site_id=$siteId&skip=$_skip&limit=$_limit',
-            )
-          : Uri.parse(
-              '${AppConfig.tourismApiBaseUrl}/news/?skip=$_skip&limit=$_limit',
-            );
+      final uri = Uri.parse(
+        '${AppConfig.b2cApiBaseUrl}/api/v1/content/news?visibility=B2C&skip=$_skip&limit=$_limit',
+      );
 
       final response = await http.get(uri);
+      if (!mounted) return;
       if (response.statusCode == 200) {
         final List data = jsonDecode(response.body);
         setState(() {
@@ -111,11 +78,12 @@ class _NewsPageState extends ConsumerState<NewsPage> {
           _skip = _news.length;
         });
       } else {
-        debugPrint('Failed to fetch news: ${response.statusCode}');
+        if (kDebugMode) debugPrint('Failed to fetch news: ${response.statusCode}');
         setState(() => _isLoading = false);
       }
     } catch (e) {
-      debugPrint('Error fetching news: $e');
+      if (kDebugMode) debugPrint('Error fetching news: $e');
+      if (!mounted) return;
       setState(() => _isLoading = false);
     }
   }
@@ -126,16 +94,12 @@ class _NewsPageState extends ConsumerState<NewsPage> {
     setState(() => _isLoadingMore = true);
 
     try {
-      final siteId = eventContextService.siteId;
-      final uri = siteId != null
-          ? Uri.parse(
-              '${AppConfig.tourismApiBaseUrl}/news/?site_id=$siteId&skip=$_skip&limit=$_limit',
-            )
-          : Uri.parse(
-              '${AppConfig.tourismApiBaseUrl}/news/?skip=$_skip&limit=$_limit',
-            );
+      final uri = Uri.parse(
+        '${AppConfig.b2cApiBaseUrl}/api/v1/content/news?visibility=B2C&skip=$_skip&limit=$_limit',
+      );
 
       final response = await http.get(uri);
+      if (!mounted) return;
       if (response.statusCode == 200) {
         final List data = jsonDecode(response.body);
         setState(() {
@@ -149,7 +113,8 @@ class _NewsPageState extends ConsumerState<NewsPage> {
         setState(() => _isLoadingMore = false);
       }
     } catch (e) {
-      debugPrint('Error loading more news: $e');
+      if (kDebugMode) debugPrint('Error loading more news: $e');
+      if (!mounted) return;
       setState(() => _isLoadingMore = false);
     }
   }
@@ -173,18 +138,10 @@ class _NewsPageState extends ConsumerState<NewsPage> {
     });
   }
 
-  void _toggleProfile() {
-    setState(() => _isProfileOpen = !_isProfileOpen);
-  }
-
-  void _closeProfile() {
-    if (_isProfileOpen) setState(() => _isProfileOpen = false);
-  }
-
   String _buildImageUrl(String? path) {
     if (path == null || path.isEmpty) return '';
     if (path.startsWith('http')) return path;
-    return '${AppConfig.tourismApiBaseUrl}$path';
+    return '${AppConfig.b2cApiBaseUrl}$path';
   }
 
   String _formatDate(String? dateStr) {
@@ -201,141 +158,63 @@ class _NewsPageState extends ConsumerState<NewsPage> {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
-    final horizontalPadding = isMobile ? 16.0 : 50.0;
 
-    return Scaffold(
-      key: _scaffoldKey,
-      backgroundColor: const Color(0xFF3C4494),
-      endDrawer: const NotificationDrawer(),
-      body: GestureDetector(
-        onTap: _closeProfile,
-        behavior: HitTestBehavior.translucent,
-        child: Stack(
-          children: [
-            SafeArea(
-              child: Column(
-                children: [
-                  // Header
-                  Padding(
-                    padding: EdgeInsets.only(
-                      left: horizontalPadding,
-                      right: horizontalPadding,
-                      top: isMobile ? 12 : 20,
-                    ),
-                    child: _buildHeader(isMobile),
-                  ),
+    return Padding(
+      padding: EdgeInsets.all(isMobile ? 16 : 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Text(
+            'News',
+            style: GoogleFonts.montserrat(
+              fontSize: isMobile ? 18 : 22,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.primaryColor,
+            ),
+          ),
+          const SizedBox(height: 16),
 
-                  // Search Bar
-                  Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: horizontalPadding,
-                      vertical: isMobile ? 12 : 20,
-                    ),
-                    child: _buildSearchBar(isMobile),
-                  ),
-
-                  // Content Container
-                  Expanded(
-                    child: Container(
-                      margin: EdgeInsets.symmetric(
-                        horizontal: horizontalPadding,
-                      ),
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.vertical(
-                          top: Radius.circular(20),
-                        ),
-                      ),
-                      child: _isLoading
-                          ? const Center(child: CircularProgressIndicator())
-                          : _buildNewsGrid(isMobile, screenWidth),
-                    ),
-                  ),
-                ],
+          // Search bar
+          TextField(
+            controller: _searchController,
+            onChanged: _filterNews,
+            style: GoogleFonts.inter(fontSize: 14),
+            decoration: InputDecoration(
+              hintText: 'Search news...',
+              hintStyle: GoogleFonts.inter(fontSize: 14, color: Colors.grey),
+              prefixIcon: const Icon(Icons.search, size: 20),
+              filled: true,
+              fillColor: Colors.white,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: Colors.grey.shade300),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: Colors.grey.shade300),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide:
+                    const BorderSide(color: AppTheme.primaryColor, width: 2),
               ),
             ),
-            // Profile dropdown overlay
-            if (_isProfileOpen)
-              Positioned(
-                top: isMobile ? 60 : 80,
-                right: horizontalPadding,
-                child: ProfileDropdown(onClose: _closeProfile),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
+          ),
+          const SizedBox(height: 20),
 
-  Widget _buildHeader(bool isMobile) {
-    return Row(
-      children: [
-        // Back button
-        IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
-          onPressed: () => context.go('/events/${widget.eventId}/menu'),
-        ),
-        const SizedBox(width: 8),
-        // Title
-        Text(
-          'News',
-          style: GoogleFonts.montserrat(
-            fontSize: isMobile ? 24 : 32,
-            fontWeight: FontWeight.w600,
-            color: const Color(0xFFF1F1F6),
+          // Content
+          Expanded(
+            child: _isLoading
+                ? const Center(
+                    child: CircularProgressIndicator(
+                        color: AppTheme.primaryColor),
+                  )
+                : AnimatedFadeIn(child: _buildNewsGrid(isMobile, screenWidth)),
           ),
-        ),
-        const Spacer(),
-        // Notification & Profile icons
-        CustomAppBar(
-          onNotificationTap: () {
-            _scaffoldKey.currentState?.openEndDrawer();
-          },
-          onProfileTap: _toggleProfile,
-          unreadNotificationCount: _unreadNotificationCount,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSearchBar(bool isMobile) {
-    return Container(
-      height: isMobile ? 46 : 56,
-      decoration: BoxDecoration(
-        color: const Color(0xFFF1F1F6).withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      alignment: Alignment.center,
-      child: TextField(
-        controller: _searchController,
-        cursorColor: const Color(0xFFF1F1F6),
-        style: GoogleFonts.roboto(
-          fontSize: isMobile ? 16 : 18,
-          color: const Color(0xFFF1F1F6),
-          fontWeight: FontWeight.w500,
-        ),
-        textAlignVertical: TextAlignVertical.center,
-        decoration: InputDecoration(
-          isDense: true,
-          filled: false,
-          prefixIcon: Icon(
-            Icons.search,
-            color: const Color(0xFFF1F1F6),
-            size: isMobile ? 24 : 28,
-          ),
-          hintText: 'Search news...',
-          hintStyle: GoogleFonts.roboto(
-            fontWeight: FontWeight.w500,
-            fontSize: isMobile ? 16 : 18,
-            color: const Color(0xFFF1F1F6),
-          ),
-          border: InputBorder.none,
-          focusedBorder: InputBorder.none,
-          enabledBorder: InputBorder.none,
-          disabledBorder: InputBorder.none,
-          contentPadding: EdgeInsets.zero,
-        ),
-        onChanged: _filterNews,
+        ],
       ),
     );
   }
@@ -350,7 +229,7 @@ class _NewsPageState extends ConsumerState<NewsPage> {
             const SizedBox(height: 16),
             Text(
               'No news found',
-              style: GoogleFonts.roboto(fontSize: 18, color: Colors.grey[600]),
+              style: GoogleFonts.inter(fontSize: 16, color: Colors.grey.shade500),
             ),
           ],
         ),
@@ -375,9 +254,8 @@ class _NewsPageState extends ConsumerState<NewsPage> {
       childAspectRatio = 1.0; // Wider cards on mobile
     }
 
-    return Padding(
-      padding: EdgeInsets.all(isMobile ? 12 : 24),
-      child: GridView.builder(
+    return GridView.builder(
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 24),
         controller: _scrollController,
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: crossAxisCount,
@@ -395,14 +273,16 @@ class _NewsPageState extends ConsumerState<NewsPage> {
               ),
             );
           }
-          return _NewsCard(
-            eventId: widget.eventId,
-            news: _filteredNews[index],
-            imageUrl: _buildImageUrl(_filteredNews[index]['photo']),
-            formattedDate: _formatDate(_filteredNews[index]['created_at']),
+          return StaggeredFadeIn(
+            index: index,
+            child: _NewsCard(
+              eventId: widget.eventId,
+              news: _filteredNews[index],
+              imageUrl: _buildImageUrl(_filteredNews[index]['photo']),
+              formattedDate: _formatDate(_filteredNews[index]['created_at']),
+            ),
           );
         },
-      ),
     );
   }
 }

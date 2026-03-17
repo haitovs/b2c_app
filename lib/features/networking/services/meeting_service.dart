@@ -1,5 +1,4 @@
 import '../../../core/services/api_client.dart';
-import '../../auth/services/auth_service.dart';
 
 /// Meeting types matching the B2C backend enum
 enum MeetingType { b2b, b2g }
@@ -11,11 +10,16 @@ enum MeetingStatus { pending, confirmed, declined, cancelled }
 class MeetingService {
   final ApiClient _api;
 
-  MeetingService(AuthService authService) : _api = ApiClient(authService);
+  MeetingService(this._api);
 
   /// Get all meetings for the current user
-  Future<List<Map<String, dynamic>>> fetchMyMeetings() async {
-    final result = await _api.get<List<dynamic>>('/api/v1/meetings');
+  Future<List<Map<String, dynamic>>> fetchMyMeetings({int? eventId}) async {
+    final queryParams = <String, String>{};
+    if (eventId != null) queryParams['event_id'] = eventId.toString();
+    final result = await _api.get<List<dynamic>>(
+      '/api/v1/meetings',
+      queryParams: queryParams.isNotEmpty ? queryParams : null,
+    );
 
     if (result.isSuccess && result.data != null) {
       return result.data!.cast<Map<String, dynamic>>();
@@ -47,9 +51,10 @@ class MeetingService {
     String? location,
     String? targetUserId,
     int? targetGovEntityId,
-    int? targetSpeakerId,
+    int? targetOfficialId,
     String? attendeesText,
     String? language,
+    String? message,
   }) async {
     final body = {
       'event_id': eventId,
@@ -60,9 +65,10 @@ class MeetingService {
       if (location != null) 'location': location,
       if (targetUserId != null) 'target_user_id': targetUserId,
       if (targetGovEntityId != null) 'target_gov_entity_id': targetGovEntityId,
-      if (targetSpeakerId != null) 'target_speaker_id': targetSpeakerId,
+      if (targetOfficialId != null) 'target_official_id': targetOfficialId,
       if (attendeesText != null) 'attendees_text': attendeesText,
       if (language != null) 'language': language,
+      if (message != null) 'message': message,
     };
 
     final result = await _api.post<Map<String, dynamic>>(
@@ -85,6 +91,7 @@ class MeetingService {
     DateTime? endTime,
     String? location,
     String? attendeesText,
+    String? message,
   }) async {
     final body = <String, dynamic>{};
     if (subject != null) body['subject'] = subject;
@@ -92,6 +99,7 @@ class MeetingService {
     if (endTime != null) body['end_time'] = endTime.toIso8601String();
     if (location != null) body['location'] = location;
     if (attendeesText != null) body['attendees_text'] = attendeesText;
+    if (message != null) body['message'] = message;
 
     final result = await _api.put<Map<String, dynamic>>(
       '/api/v1/meetings/$meetingId',
@@ -121,6 +129,19 @@ class MeetingService {
     }
   }
 
+  /// Fetch meeting locations for an event
+  Future<List<Map<String, dynamic>>> fetchLocations(int eventId) async {
+    final result = await _api.get<List<dynamic>>(
+      '/api/v1/meetings/locations/$eventId',
+    );
+
+    if (result.isSuccess && result.data != null) {
+      return result.data!.cast<Map<String, dynamic>>();
+    } else {
+      throw result.error ?? Exception('Failed to load meeting locations');
+    }
+  }
+
   /// Get government entities list (for B2G meetings)
   Future<List<Map<String, dynamic>>> fetchGovEntities() async {
     final result = await _api.get<List<dynamic>>(
@@ -131,6 +152,70 @@ class MeetingService {
       return result.data!.cast<Map<String, dynamic>>();
     } else {
       throw result.error ?? Exception('Failed to load gov entities');
+    }
+  }
+
+  /// Respond to a meeting request (accept/decline)
+  Future<Map<String, dynamic>> respondToMeeting({
+    required String meetingId,
+    required String action,
+  }) async {
+    final result = await _api.post<Map<String, dynamic>>(
+      '/api/v1/meetings/$meetingId/respond',
+      body: {'action': action},
+    );
+    if (result.isSuccess && result.data != null) {
+      return result.data!;
+    } else {
+      throw result.error ?? Exception('Failed to respond to meeting');
+    }
+  }
+
+  /// Cancel a meeting
+  Future<Map<String, dynamic>> cancelMeeting(String meetingId) async {
+    return updateMeetingStatus(
+      meetingId: meetingId,
+      status: MeetingStatus.cancelled,
+    );
+  }
+
+  /// Delete a meeting (requester can delete PENDING, admin can delete any)
+  Future<void> deleteMeeting(String meetingId) async {
+    final result = await _api.delete<dynamic>(
+      '/api/v1/meetings/$meetingId',
+    );
+
+    if (!result.isSuccess) {
+      throw result.error ?? Exception('Failed to delete meeting');
+    }
+  }
+
+  /// Fetch public companies for meeting target selection
+  Future<List<Map<String, dynamic>>> fetchPublicCompanies({
+    required int eventId,
+  }) async {
+    final result = await _api.get<List<dynamic>>(
+      '/api/v1/companies/public',
+      queryParams: {'event_id': eventId.toString()},
+    );
+
+    if (result.isSuccess && result.data != null) {
+      return result.data!.cast<Map<String, dynamic>>();
+    } else {
+      throw result.error ?? Exception('Failed to load companies');
+    }
+  }
+
+  /// Fetch a single public company with team members
+  Future<Map<String, dynamic>> fetchPublicCompany(String companyId) async {
+    final result = await _api.get<Map<String, dynamic>>(
+      '/api/v1/companies/public/$companyId',
+    );
+
+    if (result.isSuccess && result.data != null) {
+      return result.data!;
+    } else {
+      throw result.error ?? Exception('Failed to load company');
     }
   }
 

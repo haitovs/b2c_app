@@ -1,28 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../../core/app_theme.dart';
-import '../services/auth_service.dart';
-import 'reset_password_page.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/app_snackbar.dart';
+import '../providers/auth_provider.dart';
 import 'widgets/auth_info_box.dart';
 import 'widgets/auth_page_layout.dart';
 import 'widgets/auth_button.dart';
 import 'widgets/send_me_back_link.dart';
 
-class ForgotPasswordVerifyCodePage extends StatefulWidget {
+class ForgotPasswordVerifyCodePage extends ConsumerStatefulWidget {
   final String email;
 
   const ForgotPasswordVerifyCodePage({super.key, required this.email});
 
   @override
-  State<ForgotPasswordVerifyCodePage> createState() =>
+  ConsumerState<ForgotPasswordVerifyCodePage> createState() =>
       _ForgotPasswordVerifyCodePageState();
 }
 
 class _ForgotPasswordVerifyCodePageState
-    extends State<ForgotPasswordVerifyCodePage> {
+    extends ConsumerState<ForgotPasswordVerifyCodePage> {
   final _codeController = TextEditingController();
-  final _authService = AuthService();
   bool _isLoading = false;
 
   @override
@@ -128,20 +129,15 @@ class _ForgotPasswordVerifyCodePageState
     setState(() => _isLoading = true);
 
     try {
-      final error = await _authService.verifyResetCode(widget.email, code);
+      final error = await ref.read(authNotifierProvider.notifier).verifyResetCode(widget.email, code);
 
       if (!mounted) return;
 
       if (error == null) {
         // Success - navigate to reset password page
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (_) => ResetPasswordPage(
-              email: widget.email,
-              code: code,
-            ),
-          ),
-        );
+        final encodedEmail = Uri.encodeComponent(widget.email);
+        final encodedCode = Uri.encodeComponent(code);
+        context.go('/reset-password?email=$encodedEmail&code=$encodedCode');
       } else {
         _showError(error);
       }
@@ -157,13 +153,6 @@ class _ForgotPasswordVerifyCodePageState
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-        duration: const Duration(seconds: 4),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    AppSnackBar.showError(context, message);
   }
 }
