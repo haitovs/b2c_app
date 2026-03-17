@@ -46,12 +46,15 @@ class DashboardVisaCard extends StatelessWidget {
                         color: Color(0xFF5C6BC0), size: 22),
                   ),
                   const SizedBox(width: 12),
-                  Text(
-                    'Visa Status',
-                    style: GoogleFonts.montserrat(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.black87,
+                  Flexible(
+                    child: Text(
+                      'Visa Status',
+                      style: GoogleFonts.montserrat(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.black87,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],

@@ -216,8 +216,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                   fontSize: 20,
                 ),
               ),
-              content: SizedBox(
-                width: 400,
+              content: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 400),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -451,11 +451,15 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   }
 
   Widget _buildProfilePhoto() {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+    final photoWidth = isMobile ? 200.0 : 300.0;
+    final photoHeight = isMobile ? 234.0 : 351.0;
+
     return Column(
       children: [
         Container(
-          width: 300,
-          height: 351,
+          width: photoWidth,
+          height: photoHeight,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
             color: Colors.grey[300],
@@ -571,8 +575,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
             const SizedBox(height: 16),
 
             // Position (single column)
-            SizedBox(
-              width: 394,
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 394),
               child: _buildTextField("Position:", _positionController),
             ),
 
@@ -600,8 +604,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
               ),
             ),
             const SizedBox(height: 16),
-            SizedBox(
-              width: 394,
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 394),
               child: ElevatedButton.icon(
                 onPressed: _showChangePasswordDialog,
                 icon: const Icon(Icons.lock_outline, color: Colors.white),
@@ -1012,8 +1016,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
             final entry = mapEntry.value;
             return Padding(
               padding: const EdgeInsets.only(bottom: 16),
-              child: SizedBox(
-                width: 394,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 394),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -1114,8 +1118,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       spacing: 16,
       runSpacing: 16,
       children: filledLinks.map((entry) {
-        return SizedBox(
-          width: 394,
+        return ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 394),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

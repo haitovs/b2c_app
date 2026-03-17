@@ -217,48 +217,95 @@ class _FlightBookingPageState extends ConsumerState<FlightBookingPage> {
                   const SizedBox(height: 24),
 
                   // Name row
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildTextField('Name *', _nameController),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: _buildTextField('Surname *', _surnameController),
-                      ),
-                    ],
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      if (constraints.maxWidth < 600) {
+                        return Column(
+                          children: [
+                            _buildTextField('Name *', _nameController),
+                            const SizedBox(height: 16),
+                            _buildTextField('Surname *', _surnameController),
+                          ],
+                        );
+                      }
+                      return Row(
+                        children: [
+                          Expanded(
+                            child: _buildTextField('Name *', _nameController),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: _buildTextField('Surname *', _surnameController),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                   const SizedBox(height: 16),
 
                   // Gender and DOB row
-                  Row(
-                    children: [
-                      Expanded(child: _buildGenderDropdown()),
-                      const SizedBox(width: 16),
-                      Expanded(child: _buildDobPicker()),
-                    ],
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      if (constraints.maxWidth < 600) {
+                        return Column(
+                          children: [
+                            _buildGenderDropdown(),
+                            const SizedBox(height: 16),
+                            _buildDobPicker(),
+                          ],
+                        );
+                      }
+                      return Row(
+                        children: [
+                          Expanded(child: _buildGenderDropdown()),
+                          const SizedBox(width: 16),
+                          Expanded(child: _buildDobPicker()),
+                        ],
+                      );
+                    },
                   ),
                   const SizedBox(height: 16),
 
                   // Email and Phone row
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildTextField(
-                          'E-mail address:',
-                          _emailController,
-                          inputType: TextInputType.emailAddress,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: _buildTextField(
-                          'Mobile number:',
-                          _phoneController,
-                          inputType: TextInputType.phone,
-                        ),
-                      ),
-                    ],
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      if (constraints.maxWidth < 600) {
+                        return Column(
+                          children: [
+                            _buildTextField(
+                              'E-mail address:',
+                              _emailController,
+                              inputType: TextInputType.emailAddress,
+                            ),
+                            const SizedBox(height: 16),
+                            _buildTextField(
+                              'Mobile number:',
+                              _phoneController,
+                              inputType: TextInputType.phone,
+                            ),
+                          ],
+                        );
+                      }
+                      return Row(
+                        children: [
+                          Expanded(
+                            child: _buildTextField(
+                              'E-mail address:',
+                              _emailController,
+                              inputType: TextInputType.emailAddress,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: _buildTextField(
+                              'Mobile number:',
+                              _phoneController,
+                              inputType: TextInputType.phone,
+                            ),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ],
               ),

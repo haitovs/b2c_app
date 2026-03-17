@@ -628,21 +628,24 @@ class _CompanyProfilePageState extends ConsumerState<CompanyProfilePage> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(
-          width: 160,
-          child: DropdownButtonFormField<String>(
-            initialValue:
-                _platformOptions.contains(entry.platformController.text)
-                ? entry.platformController.text
-                : null,
-            decoration: _inputDecoration(hintText: 'Platform'),
-            style: GoogleFonts.inter(fontSize: 14, color: Colors.black87),
-            items: _platformOptions
-                .map((p) => DropdownMenuItem(value: p, child: Text(p)))
-                .toList(),
-            onChanged: (v) {
-              if (v != null) entry.platformController.text = v;
-            },
+        Flexible(
+          flex: 0,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 160, minWidth: 100),
+            child: DropdownButtonFormField<String>(
+              initialValue:
+                  _platformOptions.contains(entry.platformController.text)
+                  ? entry.platformController.text
+                  : null,
+              decoration: _inputDecoration(hintText: 'Platform'),
+              style: GoogleFonts.inter(fontSize: 14, color: Colors.black87),
+              items: _platformOptions
+                  .map((p) => DropdownMenuItem(value: p, child: Text(p)))
+                  .toList(),
+              onChanged: (v) {
+                if (v != null) entry.platformController.text = v;
+              },
+            ),
           ),
         ),
         const SizedBox(width: 12),

@@ -42,12 +42,15 @@ class DashboardOrdersCard extends StatelessWidget {
                         color: Color(0xFF66BB6A), size: 22),
                   ),
                   const SizedBox(width: 12),
-                  Text(
-                    'Services & Orders',
-                    style: GoogleFonts.montserrat(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.black87,
+                  Flexible(
+                    child: Text(
+                      'Services & Orders',
+                      style: GoogleFonts.montserrat(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.black87,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],

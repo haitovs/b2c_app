@@ -68,7 +68,7 @@ class _ProfileDropdownState extends ConsumerState<ProfileDropdown>
         : "Guest";
 
     return Container(
-      width: 406,
+      constraints: const BoxConstraints(maxWidth: 406),
       padding: const EdgeInsets.symmetric(vertical: 25, horizontal: 20),
       decoration: BoxDecoration(
         color: const Color(0xFF9CA4CC),

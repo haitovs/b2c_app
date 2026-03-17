@@ -44,12 +44,15 @@ class DashboardTeamCard extends StatelessWidget {
                       color: Color(0xFF42A5F5), size: 22),
                 ),
                 const SizedBox(width: 12),
-                Text(
-                  'Team Members',
-                  style: GoogleFonts.montserrat(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black87,
+                Flexible(
+                  child: Text(
+                    'Team Members',
+                    style: GoogleFonts.montserrat(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black87,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],

@@ -8,16 +8,20 @@ class ProfileDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final dialogWidth = isMobile ? screenWidth - 40 : 406.0;
+
     return Dialog(
       alignment: Alignment.topRight,
-      insetPadding: const EdgeInsets.only(
+      insetPadding: EdgeInsets.only(
         top: 120,
-        right: 65,
+        right: isMobile ? 20 : 65,
+        left: isMobile ? 20 : 0,
       ), // Position based on design
       backgroundColor: Colors.transparent,
       child: Container(
-        width: 406,
-        height: 343,
+        width: dialogWidth,
         decoration: BoxDecoration(
           color: const Color(0xFF9CA4CC),
           borderRadius: BorderRadius.circular(15),
@@ -30,139 +34,69 @@ class ProfileDialog extends StatelessWidget {
             ),
           ],
         ),
-        child: Stack(
+        padding: const EdgeInsets.symmetric(vertical: 25, horizontal: 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             // User Info Card
-            Positioned(
-              left: 20,
-              top: 25,
-              child: Container(
-                width: 366,
-                height: 57,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(5),
-                ),
-                child: Row(
-                  children: [
-                    const SizedBox(width: 13),
-                    // Avatar
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: Colors.grey, // Placeholder
-                        borderRadius: BorderRadius.circular(25),
-                        // image: DecorationImage(image: AssetImage('assets/avatar.jpg')),
-                      ),
-                      child: const Icon(Icons.person, color: Colors.white),
+            Container(
+              height: 57,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(5),
+              ),
+              child: Row(
+                children: [
+                  const SizedBox(width: 13),
+                  // Avatar
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: Colors.grey, // Placeholder
+                      borderRadius: BorderRadius.circular(25),
                     ),
-                    const SizedBox(width: 11),
-                    // Name
-                    Text(
+                    child: const Icon(Icons.person, color: Colors.white),
+                  ),
+                  const SizedBox(width: 11),
+                  // Name
+                  Expanded(
+                    child: Text(
                       "Name Surname", // Placeholder
                       style: GoogleFonts.montserrat(
                         fontWeight: FontWeight.w500,
                         fontSize: 14,
                         color: const Color(0xFF1C1C1C),
                       ),
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 13),
+                ],
               ),
             ),
+            const SizedBox(height: 15),
 
             // Language Selection
-            Positioned(
-              left: 20,
-              top: 97,
-              child: Container(
-                width: 366,
-                height: 157,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(5),
-                ),
-                child: Stack(
-                  children: [
-                    // Header
-                    Positioned(
-                      left: 20,
-                      top: 20,
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.language,
-                            size: 24,
-                            color: Color(0xFF999999),
-                          ),
-                          const SizedBox(width: 10),
-                          Text(
-                            AppLocalizations.of(context)!.language,
-                            style: GoogleFonts.montserrat(
-                              fontWeight: FontWeight.w500,
-                              fontSize: 14,
-                              color: const Color(0xFF1C1C1C),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    // Selected Language Highlight (RUS in design, but we default to EN/Active)
-                    Positioned(
-                      left: 53, // Adjusted
-                      top: 53,
-                      child: Container(
-                        width: 298,
-                        height: 31,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF9CA4CC).withValues(alpha: 0.4),
-                          borderRadius: BorderRadius.circular(5),
-                        ),
-                      ),
-                    ),
-                    // Languages
-                    Positioned(
-                      left: 64,
-                      top: 60,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _LanguageItem(text: "RUS", isSelected: true),
-                          const SizedBox(height: 12),
-                          _LanguageItem(text: "EN", isSelected: false),
-                          const SizedBox(height: 12),
-                          _LanguageItem(text: "TKM", isSelected: false),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(5),
               ),
-            ),
-
-            // Log Out Button
-            Positioned(
-              left: 20,
-              top: 269,
-              child: GestureDetector(
-                onTap: () {
-                  context.go('/login'); // Logout logic
-                },
-                child: Container(
-                  width: 366,
-                  height: 57,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(5),
-                  ),
-                  child: Row(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
-                      const SizedBox(width: 20),
-                      const Icon(Icons.logout, size: 24, color: Colors.black54),
-                      const SizedBox(width: 20),
+                      const Icon(
+                        Icons.language,
+                        size: 24,
+                        color: Color(0xFF999999),
+                      ),
+                      const SizedBox(width: 10),
                       Text(
-                        AppLocalizations.of(context)!.logOut,
+                        AppLocalizations.of(context)!.language,
                         style: GoogleFonts.montserrat(
                           fontWeight: FontWeight.w500,
                           fontSize: 14,
@@ -171,6 +105,50 @@ class ProfileDialog extends StatelessWidget {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 12),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 34),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _LanguageItem(text: "RUS", isSelected: true),
+                        const SizedBox(height: 12),
+                        _LanguageItem(text: "EN", isSelected: false),
+                        const SizedBox(height: 12),
+                        _LanguageItem(text: "TKM", isSelected: false),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 15),
+
+            // Log Out Button
+            GestureDetector(
+              onTap: () {
+                context.go('/login'); // Logout logic
+              },
+              child: Container(
+                height: 57,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(5),
+                ),
+                child: Row(
+                  children: [
+                    const SizedBox(width: 20),
+                    const Icon(Icons.logout, size: 24, color: Colors.black54),
+                    const SizedBox(width: 20),
+                    Text(
+                      AppLocalizations.of(context)!.logOut,
+                      style: GoogleFonts.montserrat(
+                        fontWeight: FontWeight.w500,
+                        fontSize: 14,
+                        color: const Color(0xFF1C1C1C),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),

@@ -29,6 +29,39 @@ class DashboardStatusCards extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (isMobile) {
+      return Column(
+        children: [
+          DashboardCompanyCard(
+            eventId: eventId,
+            isMobile: isMobile,
+            hasPurchased: hasPurchased,
+            companies: companies,
+          ),
+          const SizedBox(height: 16),
+          DashboardTeamCard(
+            eventId: eventId,
+            isMobile: isMobile,
+            hasPurchased: hasPurchased,
+            teamMembers: teamMembers,
+          ),
+          const SizedBox(height: 16),
+          DashboardVisaCard(
+            eventId: eventId,
+            isMobile: isMobile,
+            hasPurchased: hasPurchased,
+            visas: visas,
+          ),
+          const SizedBox(height: 16),
+          DashboardOrdersCard(
+            eventId: eventId,
+            isMobile: isMobile,
+            orders: orders,
+          ),
+        ],
+      );
+    }
+
     return Column(
       children: [
         Row(

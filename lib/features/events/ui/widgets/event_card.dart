@@ -88,7 +88,7 @@ class _EventCardState extends State<EventCard> {
         final isMobile = constraints.maxWidth < 900;
 
         return Container(
-          width: 1310,
+          width: double.infinity,
           // Let height be dynamic on mobile, fixed on desktop
           height: isMobile ? null : 242,
           decoration: BoxDecoration(

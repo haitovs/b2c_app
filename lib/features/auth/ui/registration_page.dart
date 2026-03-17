@@ -52,33 +52,57 @@ class _RegistrationPageState extends ConsumerState<RegistrationPage> {
         Text(loc.registrationTitle, style: AppTextStyles.titleLargeDesktop),
         const SizedBox(height: 20),
 
-        SizedBox(
-          width: 480,
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 480),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Name & Surname row
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: AppTextField(
-                      labelText: loc.nameLabel,
-                      hintText: "Name",
-                      controller: _nameController,
-                      required: true,
-                    ),
-                  ),
-                  const SizedBox(width: 15),
-                  Expanded(
-                    child: AppTextField(
-                      labelText: loc.surnameLabel,
-                      hintText: "Surname",
-                      controller: _surnameController,
-                      required: true,
-                    ),
-                  ),
-                ],
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  if (constraints.maxWidth < 500) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        AppTextField(
+                          labelText: loc.nameLabel,
+                          hintText: "Name",
+                          controller: _nameController,
+                          required: true,
+                        ),
+                        const SizedBox(height: 12),
+                        AppTextField(
+                          labelText: loc.surnameLabel,
+                          hintText: "Surname",
+                          controller: _surnameController,
+                          required: true,
+                        ),
+                      ],
+                    );
+                  }
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: AppTextField(
+                          labelText: loc.nameLabel,
+                          hintText: "Name",
+                          controller: _nameController,
+                          required: true,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: AppTextField(
+                          labelText: loc.surnameLabel,
+                          hintText: "Surname",
+                          controller: _surnameController,
+                          required: true,
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 12),
 
@@ -93,27 +117,51 @@ class _RegistrationPageState extends ConsumerState<RegistrationPage> {
               const SizedBox(height: 12),
 
               // Password & Confirm Password row
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: AppPasswordField(
-                      labelText: loc.passwordLabel,
-                      hintText: "very secret password",
-                      controller: _passwordController,
-                      required: true,
-                    ),
-                  ),
-                  const SizedBox(width: 15),
-                  Expanded(
-                    child: AppPasswordField(
-                      labelText: loc.confirmPasswordLabel,
-                      hintText: "very secret password",
-                      controller: _confirmPasswordController,
-                      required: true,
-                    ),
-                  ),
-                ],
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  if (constraints.maxWidth < 500) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        AppPasswordField(
+                          labelText: loc.passwordLabel,
+                          hintText: "very secret password",
+                          controller: _passwordController,
+                          required: true,
+                        ),
+                        const SizedBox(height: 12),
+                        AppPasswordField(
+                          labelText: loc.confirmPasswordLabel,
+                          hintText: "very secret password",
+                          controller: _confirmPasswordController,
+                          required: true,
+                        ),
+                      ],
+                    );
+                  }
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: AppPasswordField(
+                          labelText: loc.passwordLabel,
+                          hintText: "very secret password",
+                          controller: _passwordController,
+                          required: true,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: AppPasswordField(
+                          labelText: loc.confirmPasswordLabel,
+                          hintText: "very secret password",
+                          controller: _confirmPasswordController,
+                          required: true,
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 12),
 
@@ -135,7 +183,7 @@ class _RegistrationPageState extends ConsumerState<RegistrationPage> {
                 hintText: "company.com",
                 controller: _websiteController,
               ),
-              const SizedBox(height: 25),
+              const SizedBox(height: 24),
 
               // Registration Button
               AuthButton(
