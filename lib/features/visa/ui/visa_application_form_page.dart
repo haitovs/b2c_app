@@ -856,6 +856,7 @@ class _VisaApplicationFormPageState
     }
 
     if (!_formKey.currentState!.validate()) {
+      AppSnackBar.showError(context, 'Please fill in all required fields marked with *');
       return;
     }
 
