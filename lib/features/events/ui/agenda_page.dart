@@ -5,10 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:http/http.dart' as http;
 import '../../../../core/config/app_config.dart';
+import '../../../../core/providers/shared_preferences_provider.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/app_cached_image.dart';
+import '../providers/event_providers.dart';
 
 class AgendaPage extends ConsumerStatefulWidget {
   final String eventId;
@@ -32,6 +33,8 @@ class _AgendaPageState extends ConsumerState<AgendaPage> {
   bool _isLoadingDays = true;
   bool _isLoadingEpisodes = true;
 
+  String get _favoritesKey => 'agenda_favorites_${widget.eventId}';
+
   List<String> get _availableLocations {
     final locations = <String>{'All'};
     for (final ep in _episodes) {
@@ -45,40 +48,54 @@ class _AgendaPageState extends ConsumerState<AgendaPage> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadFavorites();
       _fetchAgendaDays();
     });
   }
 
+  void _loadFavorites() {
+    final prefs = ref.read(sharedPreferencesProvider);
+    final json = prefs.getString(_favoritesKey);
+    if (json != null) {
+      try {
+        final List<dynamic> ids = jsonDecode(json);
+        _favoriteIds.addAll(ids.cast<int>());
+      } catch (e) {
+        if (kDebugMode) debugPrint('Error loading favorites: $e');
+      }
+    }
+  }
+
+  void _saveFavorites() {
+    final prefs = ref.read(sharedPreferencesProvider);
+    prefs.setString(_favoritesKey, jsonEncode(_favoriteIds.toList()));
+  }
+
   Future<void> _fetchAgendaDays() async {
     try {
-      final eventId = widget.eventId;
-      final uri = Uri.parse(
-          '${AppConfig.b2cApiBaseUrl}/api/v1/agenda/days?event_id=$eventId');
-      final response = await http.get(uri);
+      final eventId = int.tryParse(widget.eventId) ?? 0;
+      final agendaService = ref.read(agendaServiceProvider);
+      final data = await agendaService.fetchAgendaDays(eventId: eventId);
 
-      if (response.statusCode == 200) {
-        final List data = jsonDecode(response.body);
-        if (mounted) {
-          setState(() {
-            _days = data.map((d) {
-              final date = DateTime.tryParse(d['date'] ?? '');
-              return {
-                'id': d['id'],
-                'date': d['date'],
-                'label': d['label'],
-                'day': date?.day ?? 0,
-                'weekday': _getWeekdayShort(date?.weekday ?? 1),
-              };
-            }).toList();
-            _isLoadingDays = false;
-          });
+      if (mounted) {
+        setState(() {
+          _days = data.map((d) {
+            final raw = d as Map<String, dynamic>;
+            final date = DateTime.tryParse(raw['date'] ?? '');
+            return {
+              'id': raw['id'],
+              'date': raw['date'],
+              'label': raw['label'],
+              'day': date?.day ?? 0,
+              'weekday': _getWeekdayShort(date?.weekday ?? 1),
+            };
+          }).toList();
+          _isLoadingDays = false;
+        });
 
-          if (_days.isNotEmpty) {
-            _fetchEpisodesForDay(_days[0]['id']);
-          }
+        if (_days.isNotEmpty) {
+          _fetchEpisodesForDay(_days[0]['id']);
         }
-      } else {
-        if (mounted) setState(() => _isLoadingDays = false);
       }
     } catch (e) {
       if (kDebugMode) debugPrint('Error fetching agenda days: $e');
@@ -90,20 +107,16 @@ class _AgendaPageState extends ConsumerState<AgendaPage> {
     setState(() => _isLoadingEpisodes = true);
 
     try {
-      final uri = Uri.parse(
-          '${AppConfig.b2cApiBaseUrl}/api/v1/agenda/day/$dayId/episodes');
-      final response = await http.get(uri);
+      final agendaService = ref.read(agendaServiceProvider);
+      final data = await agendaService.fetchEpisodesForDay(dayId);
 
-      if (response.statusCode == 200) {
-        final List data = jsonDecode(response.body);
-        if (mounted) {
-          setState(() {
-            _episodes = data.map((e) => _parseEpisode(e)).toList();
-            _isLoadingEpisodes = false;
-          });
-        }
-      } else {
-        if (mounted) setState(() => _isLoadingEpisodes = false);
+      if (mounted) {
+        setState(() {
+          _episodes = data
+              .map((e) => _parseEpisode(e as Map<String, dynamic>))
+              .toList();
+          _isLoadingEpisodes = false;
+        });
       }
     } catch (e) {
       if (kDebugMode) debugPrint('Error fetching episodes: $e');
@@ -114,7 +127,8 @@ class _AgendaPageState extends ConsumerState<AgendaPage> {
   String _buildImageUrl(String? path) {
     if (path == null || path.isEmpty) return '';
     if (path.startsWith('http')) return path;
-    return '${AppConfig.b2cApiBaseUrl}$path';
+    // Relative paths are from Tourism API
+    return '${AppConfig.tourismApiBaseUrl}$path';
   }
 
   Map<String, dynamic> _parseEpisode(Map<String, dynamic> e) {
@@ -212,6 +226,7 @@ class _AgendaPageState extends ConsumerState<AgendaPage> {
         }
       }
     });
+    _saveFavorites();
   }
 
   void _toggleExpand(int index) {
