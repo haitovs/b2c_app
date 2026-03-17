@@ -20,7 +20,7 @@ class _ProfileDropdownState extends ConsumerState<ProfileDropdown>
   bool _isLanguageExpanded = false;
   late AnimationController _rotationController;
   late Animation<double> _rotationAnimation;
-  String _currentLanguage = "RUS";
+  String _currentLanguage = "EN";
 
   @override
   void initState() {
@@ -190,11 +190,11 @@ class _ProfileDropdownState extends ConsumerState<ProfileDropdown>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildLangOption("RUS"),
-                        const SizedBox(height: 8),
                         _buildLangOption("EN"),
                         const SizedBox(height: 8),
-                        _buildLangOption("TKM"),
+                        _buildLangOption("RUS", comingSoon: true),
+                        const SizedBox(height: 8),
+                        _buildLangOption("TKM", comingSoon: true),
                       ],
                     ),
                   ),
@@ -241,24 +241,52 @@ class _ProfileDropdownState extends ConsumerState<ProfileDropdown>
     );
   }
 
-  Widget _buildLangOption(String code) {
+  Widget _buildLangOption(String code, {bool comingSoon = false}) {
     bool isSelected = _currentLanguage == code;
     return InkWell(
-      onTap: () {
-        setState(() {
-          _currentLanguage = code;
-        });
-        // Optionally close after selecting language
-        // widget.onClose?.call();
-      },
-      child: Text(
-        code,
-        style: TextStyle(
-          fontFamily: 'Montserrat',
-          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-          fontSize: 14,
-          color: isSelected ? AppColors.textPrimary : const Color(0xFF1C1C1C),
-        ),
+      onTap: comingSoon
+          ? null
+          : () {
+              setState(() {
+                _currentLanguage = code;
+              });
+            },
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            code,
+            style: TextStyle(
+              fontFamily: 'Montserrat',
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+              fontSize: 14,
+              color: comingSoon
+                  ? Colors.grey
+                  : isSelected
+                      ? AppColors.textPrimary
+                      : const Color(0xFF1C1C1C),
+            ),
+          ),
+          if (comingSoon) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: const Text(
+                'Coming soon',
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 10,
+                  fontWeight: FontWeight.w500,
+                  color: AppTheme.primaryColor,
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
