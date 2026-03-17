@@ -7,9 +7,9 @@ class AppConfig {
   );
 
   // B2C Backend URL (registration/booking system)
-  // Dev default: localhost:7010 (redesign branch); override with --dart-define for prod
+  // Override with --dart-define=B2C_API_URL=... for different environments
   static const String b2cApiBaseUrl = String.fromEnvironment(
     'B2C_API_URL',
-    defaultValue: 'http://localhost:7010',
+    defaultValue: 'https://b2c.oguzforum.com',
   );
 }

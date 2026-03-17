@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.b2c_app"
+    namespace = "com.oguzforum.b2c"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -20,10 +20,7 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.b2c_app"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
+        applicationId = "com.oguzforum.b2c"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -32,8 +29,11 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
+            // Use debug signing for now. Before Play Store upload:
+            // 1. Generate keystore: keytool -genkey -v -keystore ~/oguzforum.jks -keyalias oguzforum -keyalg RSA -keysize 2048 -validity 10000
+            // 2. Create android/key.properties with: storePassword, keyPassword, keyAlias, storeFile
+            // 3. Uncomment signingConfig below and comment out debug line
+            // signingConfig = signingConfigs.getByName("release")
             signingConfig = signingConfigs.getByName("debug")
         }
     }

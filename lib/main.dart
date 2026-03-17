@@ -1,6 +1,7 @@
 import 'package:b2c_app/core/router/app_router.dart';
 import 'package:b2c_app/core/theme/app_theme.dart';
 import 'package:b2c_app/l10n/generated/app_localizations.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
@@ -13,8 +14,8 @@ import 'core/providers/shared_preferences_provider.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Use path-based URL strategy for Flutter Web (enables proper deep links)
-  usePathUrlStrategy();
+  // Use path-based URL strategy for Flutter Web only
+  if (kIsWeb) usePathUrlStrategy();
 
   // Pre-load SharedPreferences so it can be injected synchronously
   final prefs = await SharedPreferences.getInstance();

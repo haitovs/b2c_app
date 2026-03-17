@@ -1,5 +1,5 @@
 name: b2c_app
-description: "A new Flutter project."
+description: "B2C Event Platform — manage events, meetings, visas, bookings, and more."
 publish_to: "none" # Remove this line if you wish to publish to pub.dev
 
 version: 1.0.0+1
