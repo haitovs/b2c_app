@@ -1,15 +1,14 @@
-import 'dart:convert';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/app_snackbar.dart';
 import '../../analytics/providers/analytics_providers.dart';
+import '../../auth/providers/auth_provider.dart';
 
 /// Social platform icons — consistent with company preview page.
 const _socialIcons = <String, IconData>{
@@ -85,24 +84,27 @@ class _ParticipantDetailPageState
 
   Future<void> _fetchParticipant() async {
     try {
-      final uri =
-          '${AppConfig.b2cApiBaseUrl}/api/v1/companies/public/${widget.participantId}';
-
-      final response = await http.get(Uri.parse(uri));
+      final apiClient = ref.read(authApiClientProvider);
+      final result = await apiClient.get<Map<String, dynamic>>(
+        '/api/v1/companies/public/${widget.participantId}',
+        auth: false,
+      );
       if (!mounted) return;
-      if (response.statusCode == 200) {
+      if (result.isSuccess && result.data != null) {
         setState(() {
-          _participant = jsonDecode(response.body);
+          _participant = result.data;
           _isLoading = false;
         });
       } else {
-        if (kDebugMode) debugPrint('Failed to fetch participant: ${response.statusCode}');
+        if (kDebugMode) debugPrint('Failed to fetch participant: ${result.error?.message}');
         setState(() => _isLoading = false);
+        AppSnackBar.showError(context, 'Failed to load participant details');
       }
     } catch (e) {
       if (kDebugMode) debugPrint('Error fetching participant: $e');
       if (!mounted) return;
       setState(() => _isLoading = false);
+      AppSnackBar.showError(context, 'Failed to load participant details');
     }
   }
 

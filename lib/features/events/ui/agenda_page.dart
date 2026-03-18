@@ -127,8 +127,8 @@ class _AgendaPageState extends ConsumerState<AgendaPage> {
   String _buildImageUrl(String? path) {
     if (path == null || path.isEmpty) return '';
     if (path.startsWith('http')) return path;
-    // Relative paths are from Tourism API
-    return '${AppConfig.tourismApiBaseUrl}$path';
+    // Relative paths are from B2C backend
+    return '${AppConfig.b2cApiBaseUrl}$path';
   }
 
   Map<String, dynamic> _parseEpisode(Map<String, dynamic> e) {

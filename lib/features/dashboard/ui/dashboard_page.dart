@@ -8,7 +8,6 @@ import 'package:http/http.dart' as http;
 import '../../../core/widgets/animated_fade_in.dart';
 
 import '../../../core/config/app_config.dart';
-import '../../../core/providers/event_context_provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../company/providers/company_providers.dart';
 import '../../shop/providers/shop_providers.dart';
@@ -57,11 +56,10 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
 
   Future<void> _fetchSponsors() async {
     try {
-      final siteId = ref.read(eventContextProvider).siteId;
-      final uri = siteId != null
-          ? Uri.parse(
-              '${AppConfig.tourismApiBaseUrl}/sponsors/?site_id=$siteId')
-          : Uri.parse('${AppConfig.tourismApiBaseUrl}/sponsors/');
+      final routerState = GoRouterState.of(context);
+      final eventIdStr = routerState.pathParameters['id'] ?? '0';
+      final uri = Uri.parse(
+          '${AppConfig.b2cApiBaseUrl}/api/v1/sponsors/?event_id=$eventIdStr');
       final response = await http.get(uri);
       if (!mounted) return;
       if (response.statusCode == 200) {

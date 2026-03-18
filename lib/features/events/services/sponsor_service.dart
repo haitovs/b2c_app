@@ -5,10 +5,16 @@ class SponsorService {
 
   SponsorService(this._api);
 
-  Future<List<dynamic>> fetchSponsors() async {
+  Future<List<dynamic>> fetchSponsors({int? eventId}) async {
+    final queryParams = <String, String>{};
+    if (eventId != null) {
+      queryParams['event_id'] = eventId.toString();
+    }
+
     final result = await _api.get<List<dynamic>>(
-      '/api/v1/integration/sponsors',
+      '/api/v1/sponsors/',
       auth: false,
+      queryParams: queryParams.isNotEmpty ? queryParams : null,
     );
 
     if (result.isSuccess && result.data != null) {

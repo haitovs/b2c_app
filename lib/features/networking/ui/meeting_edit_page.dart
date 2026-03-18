@@ -148,15 +148,10 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
 
   Future<void> _fetchAgendaDays() async {
     try {
-      final siteId = ref.read(eventContextProvider).siteId;
-
-      if (siteId == null) {
-        _agendaDays = _getMockDays();
-        return;
-      }
+      final eventId = int.tryParse(widget.eventId) ?? 0;
 
       final response = await http.get(
-        Uri.parse('${AppConfig.tourismApiBaseUrl}/agenda/?site_id=$siteId'),
+        Uri.parse('${AppConfig.b2cApiBaseUrl}/api/v1/agenda/days?event_id=$eventId'),
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -166,7 +161,7 @@ class _MeetingEditPageState extends ConsumerState<MeetingEditPage> {
             .map((item) => <String, dynamic>{
                   'id': item['id'],
                   'date': item['date'],
-                  'label': item['date'],
+                  'label': item['label'] ?? item['date'],
                 })
             .toList();
       }

@@ -7,11 +7,9 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
-import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
-import '../../../core/config/app_config.dart';
 import '../../../core/widgets/app_snackbar.dart';
 import '../../../core/widgets/phone_input_field.dart';
 import '../../../shared/widgets/app_checkbox.dart';
@@ -648,20 +646,13 @@ class _VisaApplicationFormPageState
     if (widget.participantId == null || widget.participantId!.isEmpty) return;
 
     try {
-      final token = await ref.read(authNotifierProvider.notifier).getToken();
-
-      final response = await http.get(
-        Uri.parse(
-          '${AppConfig.b2cApiBaseUrl}/api/v1/participants/${widget.participantId}',
-        ),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
+      final apiClient = ref.read(authApiClientProvider);
+      final result = await apiClient.get<Map<String, dynamic>>(
+        '/api/v1/participants/${widget.participantId}',
       );
 
-      if (response.statusCode == 200) {
-        final participant = jsonDecode(response.body) as Map<String, dynamic>;
+      if (result.isSuccess && result.data != null) {
+        final participant = result.data!;
 
         if (_nameController.text.isEmpty) {
           _nameController.text = participant['first_name'] ?? '';

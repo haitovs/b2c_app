@@ -2,10 +2,8 @@ import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../core/config/app_config.dart';
 import '../../../core/providers/shared_preferences_provider.dart';
 import '../../../core/services/api_client.dart';
 import '../../../core/services/token_provider.dart';
@@ -358,20 +356,20 @@ class AuthNotifier extends Notifier<AuthState> implements TokenProvider {
 
   /// Verify email with token (legacy).
   Future<String?> verifyEmail(String token) async {
-    try {
-      final uri = Uri.parse(
-        '${AppConfig.b2cApiBaseUrl}/api/v1/auth/verify-email?token=$token',
-      );
-      final response = await http.get(uri);
+    final result = await _api.get<dynamic>(
+      '/api/v1/auth/verify-email',
+      queryParams: {'token': token},
+      auth: false,
+    );
 
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        return null;
-      } else {
-        return 'Verification failed. Please request a new verification email.';
-      }
-    } catch (e) {
+    if (result.isSuccess) {
+      return null;
+    }
+    final msg = result.error?.message ?? '';
+    if (msg.toLowerCase().contains('network')) {
       return 'Network error. Please check your connection and try again.';
     }
+    return 'Verification failed. Please request a new verification email.';
   }
 
   String _getUserFriendlyError(String errorMessage) {

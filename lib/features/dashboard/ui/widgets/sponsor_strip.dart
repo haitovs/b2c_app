@@ -70,15 +70,7 @@ class _SponsorCard extends StatelessWidget {
     String? fullLogoUrl;
     if (rawLogoUrl != null && rawLogoUrl.isNotEmpty) {
       if (rawLogoUrl.startsWith('http')) {
-        // Proxy external Tourism API images through B2C backend to avoid CORS
-        final tourismBase = AppConfig.tourismApiBaseUrl;
-        if (rawLogoUrl.startsWith(tourismBase)) {
-          final relativePath = rawLogoUrl.substring(tourismBase.length);
-          fullLogoUrl =
-              '${AppConfig.b2cApiBaseUrl}/proxy/tourism${relativePath.startsWith('/') ? relativePath : '/$relativePath'}';
-        } else {
-          fullLogoUrl = rawLogoUrl;
-        }
+        fullLogoUrl = rawLogoUrl;
       } else {
         // Relative path — proxy through B2C backend
         fullLogoUrl =

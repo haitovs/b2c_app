@@ -10,7 +10,6 @@ import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/config/app_config.dart';
-import '../../../core/providers/event_context_provider.dart';
 import '../../../core/widgets/app_snackbar.dart';
 import '../../../core/widgets/app_text_field.dart';
 import '../../team/providers/team_providers.dart';
@@ -97,13 +96,13 @@ class _MeetingB2GRequestPageState
   }
 
   Future<void> _fetchAgendaDays() async {
-    final tourismSiteId = ref.read(eventContextProvider).siteId;
-    if (tourismSiteId == null) return;
+    final eventId = int.tryParse(widget.eventId) ?? 0;
+    if (eventId == 0) return;
 
     try {
       final response = await http.get(
         Uri.parse(
-          '${AppConfig.tourismApiBaseUrl}/agenda/days?site_id=$tourismSiteId',
+          '${AppConfig.b2cApiBaseUrl}/api/v1/agenda/days?event_id=$eventId',
         ),
       );
       if (response.statusCode == 200) {

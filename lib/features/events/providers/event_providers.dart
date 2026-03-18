@@ -44,12 +44,14 @@ final agendaDaysProvider =
   return ref.watch(agendaServiceProvider).fetchAgendaDays(eventId: eventId);
 });
 
-/// Fetch speakers.
-final speakerListProvider = FutureProvider<List<dynamic>>((ref) {
-  return ref.watch(speakerServiceProvider).fetchSpeakers();
+/// Fetch speakers for an event.
+final speakerListProvider =
+    FutureProvider.family<List<dynamic>, int?>((ref, eventId) {
+  return ref.watch(speakerServiceProvider).fetchSpeakers(eventId: eventId);
 });
 
-/// Fetch sponsors.
-final sponsorListProvider = FutureProvider<List<dynamic>>((ref) {
-  return ref.watch(sponsorServiceProvider).fetchSponsors();
+/// Fetch sponsors for an event.
+final sponsorListProvider =
+    FutureProvider.family<List<dynamic>, int?>((ref, eventId) {
+  return ref.watch(sponsorServiceProvider).fetchSponsors(eventId: eventId);
 });

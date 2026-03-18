@@ -1,18 +1,17 @@
-import 'dart:convert';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:http/http.dart' as http;
 
 import '../../../core/config/app_config.dart';
 import '../../../core/widgets/animated_fade_in.dart';
+import '../../../core/widgets/app_snackbar.dart';
 import '../../../core/widgets/staggered_fade_in.dart';
 import '../../../core/providers/event_context_provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/country_flags.dart';
+import '../providers/event_providers.dart';
 
 class SpeakerListPage extends ConsumerStatefulWidget {
   final String eventId;
@@ -54,21 +53,20 @@ class _SpeakerListPageState extends ConsumerState<SpeakerListPage> {
 
   Future<void> _fetchSpeakers() async {
     try {
-      final uri = Uri.parse('${AppConfig.b2cApiBaseUrl}/api/v1/speakers/');
-      final response = await http.get(uri);
-      if (response.statusCode == 200) {
-        final List data = jsonDecode(response.body);
-        setState(() {
-          _speakers = data.cast<Map<String, dynamic>>();
-          _applyFilters();
-          _isLoading = false;
-        });
-      } else {
-        setState(() => _isLoading = false);
-      }
+      final eventId = int.tryParse(widget.eventId);
+      final speakerService = ref.read(speakerServiceProvider);
+      final data = await speakerService.fetchSpeakers(eventId: eventId);
+      if (!mounted) return;
+      setState(() {
+        _speakers = data.cast<Map<String, dynamic>>();
+        _applyFilters();
+        _isLoading = false;
+      });
     } catch (e) {
       if (kDebugMode) debugPrint('Error fetching speakers: $e');
+      if (!mounted) return;
       setState(() => _isLoading = false);
+      AppSnackBar.showError(context, 'Failed to load speakers');
     }
   }
 

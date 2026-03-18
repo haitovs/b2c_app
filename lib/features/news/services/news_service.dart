@@ -61,7 +61,7 @@ class NewsService {
     };
 
     final result = await _api.get<List<dynamic>>(
-      '/content/news',
+      '/api/v1/content/news',
       queryParams: queryParams,
     );
 

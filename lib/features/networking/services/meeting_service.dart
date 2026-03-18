@@ -219,15 +219,15 @@ class MeetingService {
     }
   }
 
-  /// Fetch participants from Tourism backend (for B2B target selection)
-  Future<List<Map<String, dynamic>>> fetchParticipants({int? siteId}) async {
+  /// Fetch participants (companies) from B2C backend (for B2B target selection)
+  Future<List<Map<String, dynamic>>> fetchParticipants({int? siteId, int? eventId}) async {
     final queryParams = <String, String>{};
-    if (siteId != null) {
-      queryParams['site_id'] = siteId.toString();
+    if (eventId != null) {
+      queryParams['event_id'] = eventId.toString();
     }
 
     final result = await _api.get<List<dynamic>>(
-      '/api/v1/integration/participants',
+      '/api/v1/companies/public',
       queryParams: queryParams.isNotEmpty ? queryParams : null,
     );
 

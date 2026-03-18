@@ -57,10 +57,9 @@ class _EventMenuPageState extends ConsumerState<EventMenuPage> {
 
   Future<void> _fetchSponsors() async {
     try {
-      final siteId = ref.read(eventContextProvider).siteId;
-      final uri = siteId != null
-          ? Uri.parse('${AppConfig.tourismApiBaseUrl}/sponsors/?site_id=$siteId')
-          : Uri.parse('${AppConfig.tourismApiBaseUrl}/sponsors/');
+      final eventId = widget.eventId;
+      final uri = Uri.parse(
+          '${AppConfig.b2cApiBaseUrl}/api/v1/sponsors/?event_id=$eventId');
       final response = await http.get(uri);
       if (!mounted) return;
       if (response.statusCode == 200) {
@@ -242,7 +241,7 @@ class _SponsorCard extends StatelessWidget {
     if (rawLogoUrl != null && rawLogoUrl.isNotEmpty) {
       fullLogoUrl = rawLogoUrl.startsWith('http')
           ? rawLogoUrl
-          : '${AppConfig.tourismApiBaseUrl}$rawLogoUrl';
+          : '${AppConfig.b2cApiBaseUrl}$rawLogoUrl';
     }
 
     final tierColor = _getTierColor(tier);

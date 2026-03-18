@@ -1,16 +1,15 @@
-import 'dart:convert';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
-import '../../../core/config/app_config.dart';
 import '../../../core/widgets/animated_fade_in.dart';
+import '../../../core/widgets/app_snackbar.dart';
 import '../../../core/widgets/staggered_fade_in.dart';
 import '../../../core/theme/app_theme.dart';
+import '../providers/news_providers.dart';
+import '../services/news_service.dart';
 
 /// News Page - displays news from B2C backend with search and infinite scroll
 class NewsPage extends ConsumerStatefulWidget {
@@ -25,8 +24,8 @@ class NewsPage extends ConsumerStatefulWidget {
 class _NewsPageState extends ConsumerState<NewsPage> {
   final ScrollController _scrollController = ScrollController();
 
-  List<Map<String, dynamic>> _news = [];
-  List<Map<String, dynamic>> _filteredNews = [];
+  List<NewsItem> _news = [];
+  List<NewsItem> _filteredNews = [];
   bool _isLoading = true;
   bool _isLoadingMore = false;
   bool _hasMore = true;
@@ -62,29 +61,21 @@ class _NewsPageState extends ConsumerState<NewsPage> {
 
   Future<void> _fetchNews() async {
     try {
-      final uri = Uri.parse(
-        '${AppConfig.b2cApiBaseUrl}/api/v1/content/news?visibility=B2C&skip=$_skip&limit=$_limit',
-      );
-
-      final response = await http.get(uri);
+      final newsService = ref.read(newsServiceProvider);
+      final items = await newsService.fetchNews(skip: _skip, limit: _limit);
       if (!mounted) return;
-      if (response.statusCode == 200) {
-        final List data = jsonDecode(response.body);
-        setState(() {
-          _news = data.cast<Map<String, dynamic>>();
-          _filteredNews = _news;
-          _isLoading = false;
-          _hasMore = data.length >= _limit;
-          _skip = _news.length;
-        });
-      } else {
-        if (kDebugMode) debugPrint('Failed to fetch news: ${response.statusCode}');
-        setState(() => _isLoading = false);
-      }
+      setState(() {
+        _news = items;
+        _filteredNews = _news;
+        _isLoading = false;
+        _hasMore = items.length >= _limit;
+        _skip = _news.length;
+      });
     } catch (e) {
       if (kDebugMode) debugPrint('Error fetching news: $e');
       if (!mounted) return;
       setState(() => _isLoading = false);
+      AppSnackBar.showError(context, 'Failed to load news');
     }
   }
 
@@ -94,24 +85,16 @@ class _NewsPageState extends ConsumerState<NewsPage> {
     setState(() => _isLoadingMore = true);
 
     try {
-      final uri = Uri.parse(
-        '${AppConfig.b2cApiBaseUrl}/api/v1/content/news?visibility=B2C&skip=$_skip&limit=$_limit',
-      );
-
-      final response = await http.get(uri);
+      final newsService = ref.read(newsServiceProvider);
+      final items = await newsService.fetchNews(skip: _skip, limit: _limit);
       if (!mounted) return;
-      if (response.statusCode == 200) {
-        final List data = jsonDecode(response.body);
-        setState(() {
-          _news.addAll(data.cast<Map<String, dynamic>>());
-          _filteredNews = _news;
-          _hasMore = data.length >= _limit;
-          _skip = _news.length;
-          _isLoadingMore = false;
-        });
-      } else {
-        setState(() => _isLoadingMore = false);
-      }
+      setState(() {
+        _news.addAll(items);
+        _filteredNews = _news;
+        _hasMore = items.length >= _limit;
+        _skip = _news.length;
+        _isLoadingMore = false;
+      });
     } catch (e) {
       if (kDebugMode) debugPrint('Error loading more news: $e');
       if (!mounted) return;
@@ -125,11 +108,9 @@ class _NewsPageState extends ConsumerState<NewsPage> {
         _filteredNews = _news;
       } else {
         _filteredNews = _news.where((news) {
-          final header = (news['header'] ?? '').toString().toLowerCase();
-          final description = (news['description'] ?? '')
-              .toString()
-              .toLowerCase();
-          final category = (news['category'] ?? '').toString().toLowerCase();
+          final header = news.header.toLowerCase();
+          final description = news.description.toLowerCase();
+          final category = (news.category ?? '').toLowerCase();
           return header.contains(query.toLowerCase()) ||
               description.contains(query.toLowerCase()) ||
               category.contains(query.toLowerCase());
@@ -138,20 +119,8 @@ class _NewsPageState extends ConsumerState<NewsPage> {
     });
   }
 
-  String _buildImageUrl(String? path) {
-    if (path == null || path.isEmpty) return '';
-    if (path.startsWith('http')) return path;
-    return '${AppConfig.b2cApiBaseUrl}$path';
-  }
-
-  String _formatDate(String? dateStr) {
-    if (dateStr == null || dateStr.isEmpty) return '';
-    try {
-      final date = DateTime.parse(dateStr);
-      return DateFormat('MMM d, yyyy').format(date);
-    } catch (e) {
-      return dateStr;
-    }
+  String _formatDate(DateTime date) {
+    return DateFormat('MMM d, yyyy').format(date);
   }
 
   @override
@@ -278,8 +247,8 @@ class _NewsPageState extends ConsumerState<NewsPage> {
             child: _NewsCard(
               eventId: widget.eventId,
               news: _filteredNews[index],
-              imageUrl: _buildImageUrl(_filteredNews[index]['photo']),
-              formattedDate: _formatDate(_filteredNews[index]['created_at']),
+              imageUrl: _filteredNews[index].imageUrl,
+              formattedDate: _formatDate(_filteredNews[index].createdAt),
             ),
           );
         },
@@ -290,7 +259,7 @@ class _NewsPageState extends ConsumerState<NewsPage> {
 /// Modern compact news card with hover effects
 class _NewsCard extends StatefulWidget {
   final String eventId;
-  final Map<String, dynamic> news;
+  final NewsItem news;
   final String imageUrl;
   final String formattedDate;
 
@@ -310,17 +279,25 @@ class _NewsCardState extends State<_NewsCard> {
 
   @override
   Widget build(BuildContext context) {
-    final header = widget.news['header'] ?? 'No Title';
-    final description = widget.news['description'] ?? '';
-    final category = widget.news['category'] ?? 'News';
-    final newsId = widget.news['id']?.toString() ?? '';
+    final header = widget.news.header.isNotEmpty ? widget.news.header : 'No Title';
+    final description = widget.news.description;
+    final category = widget.news.category ?? 'News';
+    final newsId = widget.news.id.toString();
 
     return GestureDetector(
       onTap: () {
         // Navigate to news detail page
         context.push(
           '/events/${widget.eventId}/news/$newsId',
-          extra: widget.news,
+          extra: <String, dynamic>{
+            'id': widget.news.id,
+            'header': widget.news.header,
+            'description': widget.news.description,
+            'category': widget.news.category,
+            'photo': widget.news.photo,
+            'content': widget.news.content,
+            'created_at': widget.news.createdAt.toIso8601String(),
+          },
         );
       },
       child: MouseRegion(

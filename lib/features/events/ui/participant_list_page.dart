@@ -1,14 +1,13 @@
-import 'dart:convert';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:http/http.dart' as http;
 
 import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/app_snackbar.dart';
+import '../../auth/providers/auth_provider.dart';
 
 /// Participant list — grid of company cards. Tapping a card opens the
 /// company preview / participant detail page.
@@ -85,13 +84,18 @@ class _ParticipantListPageState extends ConsumerState<ParticipantListPage> {
     try {
       final page = loadMore ? _currentPage + 1 : 1;
 
-      final uri =
-          '${AppConfig.b2cApiBaseUrl}/api/v1/companies/public?event_id=${widget.eventId}&page=$page&limit=$_pageSize';
-
-      final response = await http.get(Uri.parse(uri));
-      if (response.statusCode == 200) {
-        final List data = jsonDecode(response.body);
-        final items = data.cast<Map<String, dynamic>>();
+      final apiClient = ref.read(authApiClientProvider);
+      final result = await apiClient.get<List<dynamic>>(
+        '/api/v1/companies/public',
+        auth: false,
+        queryParams: {
+          'event_id': widget.eventId,
+          'page': page.toString(),
+          'limit': _pageSize.toString(),
+        },
+      );
+      if (result.isSuccess && result.data != null) {
+        final items = result.data!.cast<Map<String, dynamic>>();
         setState(() {
           if (loadMore) {
             _participants.addAll(items);
@@ -105,10 +109,14 @@ class _ParticipantListPageState extends ConsumerState<ParticipantListPage> {
           _isLoadingMore = false;
         });
       } else {
+        if (kDebugMode) debugPrint('Failed to fetch participants: ${result.error?.message}');
         setState(() {
           _isLoading = false;
           _isLoadingMore = false;
         });
+        if (!loadMore && mounted) {
+          AppSnackBar.showError(context, 'Failed to load participants');
+        }
       }
     } catch (e) {
       if (kDebugMode) debugPrint('Error fetching participants: $e');
@@ -116,6 +124,9 @@ class _ParticipantListPageState extends ConsumerState<ParticipantListPage> {
         _isLoading = false;
         _isLoadingMore = false;
       });
+      if (!loadMore && mounted) {
+        AppSnackBar.showError(context, 'Failed to load participants');
+      }
     }
   }
 
