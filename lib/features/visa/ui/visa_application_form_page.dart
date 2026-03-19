@@ -68,7 +68,6 @@ class _VisaApplicationFormPageState
   // Personal Information Controllers
   final _nameController = TextEditingController();
   final _surnameController = TextEditingController();
-  final _fatherNameController = TextEditingController();
   final _surnameAtBirthController = TextEditingController();
   final _placeOfBirthController = TextEditingController();
   final _countryOfBirthController = TextEditingController();
@@ -88,6 +87,7 @@ class _VisaApplicationFormPageState
   final _placeOfStudyController = TextEditingController();
   final _jobTitleController = TextEditingController();
   final _employerNameController = TextEditingController();
+  final _experienceController = TextEditingController();
 
   // Residential Controllers
   final _homeAddressController = TextEditingController();
@@ -131,7 +131,6 @@ class _VisaApplicationFormPageState
   void dispose() {
     _nameController.dispose();
     _surnameController.dispose();
-    _fatherNameController.dispose();
     _surnameAtBirthController.dispose();
     _placeOfBirthController.dispose();
     _countryOfBirthController.dispose();
@@ -144,6 +143,7 @@ class _VisaApplicationFormPageState
     _placeOfStudyController.dispose();
     _jobTitleController.dispose();
     _employerNameController.dispose();
+    _experienceController.dispose();
     _homeAddressController.dispose();
     _plannedResidentialAddressController.dispose();
     for (final rel in _relatives) {
@@ -234,7 +234,6 @@ class _VisaApplicationFormPageState
     _nameController.text = visa['first_name'] ?? '';
     _surnameController.text = visa['last_name'] ?? '';
     _surnameAtBirthController.text = visa['surname_at_birth'] ?? '';
-    _fatherNameController.text = visa['father_name'] ?? '';
     _gender = visa['gender'];
     _placeOfBirthController.text = visa['place_of_birth'] ?? '';
     _countryOfBirthController.text = visa['country_of_birth'] ?? '';
@@ -271,6 +270,7 @@ class _VisaApplicationFormPageState
         ? (jobTitle.isNotEmpty ? jobTitle.first.toString() : '')
         : (jobTitle?.toString() ?? '');
     _employerNameController.text = visa['employer_name'] ?? '';
+    _experienceController.text = visa['experience'] ?? '';
 
     // Residential
     _homeAddressController.text = visa['home_address'] ?? '';
@@ -372,7 +372,6 @@ class _VisaApplicationFormPageState
       'first_name': _nameController.text.trim(),
       'last_name': _surnameController.text.trim(),
       'surname_at_birth': _surnameAtBirthController.text.trim(),
-      'father_name': _fatherNameController.text.trim(),
       'gender': _gender,
       'place_of_birth': _placeOfBirthController.text.trim(),
       'country_of_birth': _countryOfBirthController.text.trim(),
@@ -398,6 +397,7 @@ class _VisaApplicationFormPageState
           ? [_jobTitleController.text.trim()]
           : <String>[],
       'employer_name': _employerNameController.text.trim(),
+      'experience': _experienceController.text.trim(),
       'home_address': _homeAddressController.text.trim(),
       'planned_residential_address':
           _plannedResidentialAddressController.text.trim(),
@@ -1604,7 +1604,7 @@ class _VisaApplicationFormPageState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Name/Surname on the left, Photo uploads on the right
+        // Row 1-2: Name/Surname on the left, Photo uploads on the right
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1613,7 +1613,6 @@ class _VisaApplicationFormPageState
                 children: [
                   _buildTextField('Name:', _nameController, 'John', true),
                   _buildTextField('Surname:', _surnameController, 'Smith', true),
-                  _buildTextField('Middle name:', _fatherNameController, 'Middle name', true),
                 ],
               ),
             ),
@@ -1622,17 +1621,19 @@ class _VisaApplicationFormPageState
           ],
         ),
 
-        // Remaining personal info – paired rows
+        // Row 3: Gender | Date of birth
         _buildFieldRow(
           left: _buildGenderDropdown(),
           right: _buildDateField('Date of birth:', null, _dateOfBirth, (date) {
             setState(() => _dateOfBirth = date);
           }, '1990-05-20'),
         ),
+        // Row 4: Surname at birth | Citizenship
         _buildFieldRow(
           left: _buildTextField('Surname at birth:', _surnameAtBirthController, 'Maiden name (if different)', false, true, _gender != null),
           right: _buildCountryPickerField('Citizenship:', _citizenshipController, true),
         ),
+        // Row 5: Country of birth | Place of birth City
         _buildFieldRow(
           left: _buildCountryPickerField('Country of birth:', _countryOfBirthController, true, () {
             _placeOfBirthController.clear();
@@ -1641,11 +1642,12 @@ class _VisaApplicationFormPageState
           right: _buildCityPickerField(),
         ),
 
-        // Passport section – paired rows
+        // Row 6: Type of passport | Passport number
         _buildFieldRow(
           left: _buildPassportTypeDropdown(),
           right: _buildTextField('Passport number:', _passportNumberController, 'AB1234567', true),
         ),
+        // Row 7: Passport date issue | Passport validity period
         _buildFieldRow(
           left: _buildDateField('Passport date issue:', null, _passportDateIssue, (date) {
             setState(() => _passportDateIssue = date);
@@ -1654,21 +1656,26 @@ class _VisaApplicationFormPageState
             setState(() => _passportExpiry = date);
           }, '2030-01-15'),
         ),
+        // Row 8: Place of issue country | Personal Address
         _buildFieldRow(
           left: _buildCountryPickerField('Place of issue (country):', _passportIssuingCountryController),
           right: _buildTextField('Personal Address:', _homeAddressController, 'Street, Building, Apt', true),
         ),
 
-        // Email – full width
-        _buildTextField('Email:', _emailController, 'john@example.com', true),
+        // Row 9: Email (half-width)
+        _buildFieldRow(
+          left: _buildTextField('Email:', _emailController, 'john@example.com', true),
+          right: const SizedBox.shrink(),
+        ),
 
-        // Professional section – paired rows
+        // Row 10: Education | Speciality
         _buildFieldRow(
           left: _buildTextField('Education:', _educationController, "Bachelor's Degree", true),
           right: _buildTextField('Speciality:', _specialtyController, 'Computer Science', true),
         ),
+        // Row 11: Place of education | Personal mobile number
         _buildFieldRow(
-          left: _buildTextField('Place of work (Company name):', _employerNameController, 'Tech Corp'),
+          left: _buildTextField('Place of education:', _placeOfStudyController, 'Harvard University', true),
           right: PhoneInputField(
             initialPhone: _phoneNumberE164,
             labelText: 'Personal mobile number:',
@@ -1678,13 +1685,16 @@ class _VisaApplicationFormPageState
             },
           ),
         ),
+        // Row 12: Place of work (Company name) | Position
         _buildFieldRow(
-          left: _buildTextField('Position:', _jobTitleController, 'Software Engineer', true),
-          right: _buildTextField('Place of education:', _placeOfStudyController, 'Harvard University', true),
+          left: _buildTextField('Place of work (Company name):', _employerNameController, 'Tech Corp'),
+          right: _buildTextField('Position:', _jobTitleController, 'Software Engineer', true),
         ),
-
-        // Planned residential address – full width
-        _buildTextField('Planned residential address:', _plannedResidentialAddressController, 'Address during stay'),
+        // Row 13: Experience | Planned residential address
+        _buildFieldRow(
+          left: _buildTextField('Experience:', _experienceController, 'Years of experience'),
+          right: _buildTextField('Planned residential address:', _plannedResidentialAddressController, 'Address during stay'),
+        ),
       ],
     );
   }
@@ -1700,8 +1710,10 @@ class _VisaApplicationFormPageState
         _buildPhotoUploadSection(),
         _buildTextField('Name:', _nameController, 'John', true),
         _buildTextField('Surname:', _surnameController, 'Smith', true),
-        _buildTextField('Middle name:', _fatherNameController, 'Middle name', true),
         _buildGenderDropdown(),
+        _buildDateField('Date of birth:', null, _dateOfBirth, (date) {
+          setState(() => _dateOfBirth = date);
+        }, '1990-05-20'),
         _buildTextField(
           'Surname at birth:',
           _surnameAtBirthController,
@@ -1709,6 +1721,11 @@ class _VisaApplicationFormPageState
           false,
           true,
           _gender != null,
+        ),
+        _buildCountryPickerField(
+          'Citizenship:',
+          _citizenshipController,
+          true,
         ),
         _buildCountryPickerField(
           'Country of birth:',
@@ -1720,23 +1737,6 @@ class _VisaApplicationFormPageState
           },
         ),
         _buildCityPickerField(),
-        _buildDateField('Date of birth:', null, _dateOfBirth, (date) {
-          setState(() => _dateOfBirth = date);
-        }, '1990-05-20'),
-        _buildCountryPickerField(
-          'Citizenship:',
-          _citizenshipController,
-          true,
-        ),
-        _buildTextField('Email:', _emailController, 'john@example.com', true),
-        PhoneInputField(
-          initialPhone: _phoneNumberE164,
-          labelText: 'Personal mobile number:',
-          hintText: '61444555',
-          onChanged: (e164) {
-            setState(() => _phoneNumberE164 = e164);
-          },
-        ),
         _buildPassportTypeDropdown(),
         _buildTextField(
           'Passport number:',
@@ -1767,6 +1767,7 @@ class _VisaApplicationFormPageState
           'Street, Building, Apt',
           true,
         ),
+        _buildTextField('Email:', _emailController, 'john@example.com', true),
         _buildTextField(
           'Education:',
           _educationController,
@@ -1780,6 +1781,20 @@ class _VisaApplicationFormPageState
           true,
         ),
         _buildTextField(
+          'Place of education:',
+          _placeOfStudyController,
+          'Harvard University',
+          true,
+        ),
+        PhoneInputField(
+          initialPhone: _phoneNumberE164,
+          labelText: 'Personal mobile number:',
+          hintText: '61444555',
+          onChanged: (e164) {
+            setState(() => _phoneNumberE164 = e164);
+          },
+        ),
+        _buildTextField(
           'Place of work (Company name):',
           _employerNameController,
           'Tech Corp',
@@ -1791,10 +1806,9 @@ class _VisaApplicationFormPageState
           true,
         ),
         _buildTextField(
-          'Place of education:',
-          _placeOfStudyController,
-          'Harvard University',
-          true,
+          'Experience:',
+          _experienceController,
+          'Years of experience',
         ),
         _buildTextField(
           'Planned residential address:',
@@ -2347,7 +2361,7 @@ class _VisaApplicationFormPageState
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildPhotoBox(
-            width: 123, height: 154, label: 'Portrait photo',
+            width: 123, height: 154, label: 'Upload files Picture (5:6)',
             hasImage: (kIsWeb ? _photoBytes != null : _photoFile != null) || _existingPhotoUrl != null,
             imageWidget: _buildPortraitImage(),
             previewAsset: 'assets/visa_application/profile_preview.jpg',
@@ -2355,7 +2369,7 @@ class _VisaApplicationFormPageState
           ),
           const SizedBox(width: 16),
           _buildPhotoBox(
-            width: 216, height: 154, label: 'Passport scan',
+            width: 216, height: 154, label: 'Upload files',
             hasImage: (kIsWeb ? _passportScanBytes != null : _passportScanFile != null) || _existingPassportScanUrl != null,
             imageWidget: _buildPassportScanImage(),
             previewAsset: 'assets/visa_application/visa_preview.png',

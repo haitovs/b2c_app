@@ -407,6 +407,8 @@ class _CompanyCard extends StatelessWidget {
     final name = (participant['name'] ?? '').toString();
     final logo = imageUrl(participant['logo']);
     final role = (participant['role'] ?? '').toString();
+    final isRequired = participant['is_required'] == true;
+    final isRecommended = participant['is_recommended'] == true;
 
     return GestureDetector(
       onTap: () => context.push(
@@ -417,6 +419,11 @@ class _CompanyCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(10),
+          border: isRequired
+              ? Border.all(color: const Color(0xFFE53935), width: 2)
+              : isRecommended
+                  ? Border.all(color: const Color(0xFFFFA726), width: 2)
+                  : null,
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.1),
@@ -463,6 +470,43 @@ class _CompanyCard extends StatelessWidget {
                             fontWeight: FontWeight.w600,
                             color: Colors.white,
                           ),
+                        ),
+                      ),
+                    ),
+                  // Required/Recommended badge
+                  if (isRequired || isRecommended)
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isRequired
+                              ? const Color(0xFFE53935)
+                              : const Color(0xFFFFA726),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              isRequired ? Icons.star : Icons.thumb_up,
+                              size: 10,
+                              color: Colors.white,
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              isRequired ? 'Required' : 'Recommended',
+                              style: GoogleFonts.inter(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
