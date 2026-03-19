@@ -50,7 +50,6 @@ flutter:
     - assets/
     - assets/event_calendar/
     - assets/event_menu/
-    - assets/contact_us/
     - assets/meeting/
     - assets/visa_application/
     - assets/visa_application/icons/

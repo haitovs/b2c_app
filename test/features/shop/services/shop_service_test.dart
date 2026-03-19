@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:b2c_app/features/shop/services/shop_service.dart';
-import 'package:b2c_app/features/shop/models/event_service.dart';
 import '../../../helpers/mock_api_client.dart';
 
 void main() {
@@ -100,10 +99,7 @@ void main() {
     test('throws on error response', () async {
       api.stubGetError('/api/v1/shop/services', message: 'Server error');
 
-      expect(
-        () => shopService.getServices(10),
-        throwsA(isA<Exception>()),
-      );
+      expect(() => shopService.getServices(10), throwsA(isA<Exception>()));
     });
   });
 
@@ -119,12 +115,13 @@ void main() {
     });
 
     test('throws on error response', () async {
-      api.stubGetError('/api/v1/shop/services/1', statusCode: 404, message: 'Not found');
-
-      expect(
-        () => shopService.getServiceDetail(1),
-        throwsA(isA<Exception>()),
+      api.stubGetError(
+        '/api/v1/shop/services/1',
+        statusCode: 404,
+        message: 'Not found',
       );
+
+      expect(() => shopService.getServiceDetail(1), throwsA(isA<Exception>()));
     });
   });
 
@@ -144,10 +141,7 @@ void main() {
     test('throws on error response', () async {
       api.stubGetError('/api/v1/shop/cart', message: 'Failed');
 
-      expect(
-        () => shopService.getCart(10),
-        throwsA(isA<Exception>()),
-      );
+      expect(() => shopService.getCart(10), throwsA(isA<Exception>()));
     });
   });
 
@@ -244,12 +238,12 @@ void main() {
     });
 
     test('throws on error response', () async {
-      api.stubPostError('/api/v1/shop/checkout?event_id=10', message: 'Cart is empty');
-
-      expect(
-        () => shopService.checkout(10),
-        throwsA(isA<Exception>()),
+      api.stubPostError(
+        '/api/v1/shop/checkout?event_id=10',
+        message: 'Cart is empty',
       );
+
+      expect(() => shopService.checkout(10), throwsA(isA<Exception>()));
     });
   });
 
@@ -275,10 +269,9 @@ void main() {
 
   group('ShopService.hasPurchasedService', () {
     test('returns true when has approved purchase', () async {
-      api.stubGet(
-        '/api/v1/shop/purchase-status',
-        {'has_approved_purchase': true},
-      );
+      api.stubGet('/api/v1/shop/purchase-status', {
+        'has_approved_purchase': true,
+      });
 
       final result = await shopService.hasPurchasedService(10);
 
@@ -286,10 +279,9 @@ void main() {
     });
 
     test('returns false when no approved purchase', () async {
-      api.stubGet(
-        '/api/v1/shop/purchase-status',
-        {'has_approved_purchase': false},
-      );
+      api.stubGet('/api/v1/shop/purchase-status', {
+        'has_approved_purchase': false,
+      });
 
       final result = await shopService.hasPurchasedService(10);
 
