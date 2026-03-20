@@ -532,6 +532,7 @@ class _EventDetailsPageState extends ConsumerState<EventDetailsPage> {
                   child: ListView.separated(
                     controller: _galleryScrollCtrl,
                     scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
                     itemCount: images.length,
                     separatorBuilder: (_, __) => SizedBox(width: gap),
                     itemBuilder: (_, i) {

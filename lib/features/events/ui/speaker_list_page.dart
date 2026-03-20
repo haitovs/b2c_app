@@ -428,7 +428,7 @@ class _SpeakerCard extends StatelessWidget {
                 child: photoUrl.isNotEmpty
                     ? Image.network(
                         photoUrl,
-                        fit: BoxFit.cover,
+                        fit: BoxFit.contain,
                         errorBuilder: (_, __, ___) => _placeholder(),
                       )
                     : _placeholder(),
@@ -581,7 +581,7 @@ class _SpeakerMobileCard extends StatelessWidget {
             child: photoUrl.isNotEmpty
                 ? Image.network(
                     photoUrl,
-                    fit: BoxFit.cover,
+                    fit: BoxFit.contain,
                     height: double.infinity,
                     errorBuilder: (_, __, ___) => Container(
                       color: const Color(0xFFF0F0F4),

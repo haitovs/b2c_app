@@ -22,7 +22,7 @@ class AuthHeader extends StatelessWidget {
       children: [
         // Logo
         Image.asset(
-          'assets/login_signup/login_logo.png',
+          'assets/logo_blue.png',
           height: 50,
           fit: BoxFit.contain,
         ),

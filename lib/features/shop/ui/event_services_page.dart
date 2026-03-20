@@ -231,7 +231,10 @@ class _EventServicesPageState extends ConsumerState<EventServicesPage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      isDismissible: true,
+      enableDrag: true,
       backgroundColor: Colors.transparent,
+      barrierColor: Colors.black54,
       builder: (_) => const _MobileFilterDrawer(),
     );
   }

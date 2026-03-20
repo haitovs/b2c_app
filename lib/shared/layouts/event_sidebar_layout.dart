@@ -450,10 +450,11 @@ class _EventTopBar extends StatelessWidget {
             child: Text(
               eventName,
               style: GoogleFonts.montserrat(
-                fontSize: titleFontSize,
+                fontSize: isMobile ? 14.0 : titleFontSize,
                 fontWeight: FontWeight.w700,
                 color: Colors.white,
               ),
+              maxLines: isMobile ? 2 : 1,
               overflow: TextOverflow.ellipsis,
             ),
           ),

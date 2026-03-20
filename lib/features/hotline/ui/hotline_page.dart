@@ -10,6 +10,7 @@ import 'package:http_parser/http_parser.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_theme.dart';
@@ -629,39 +630,44 @@ class _HotlinePageState extends ConsumerState<HotlinePage> {
                   if (message.mediaUrl != null &&
                       message.mediaUrl!.isNotEmpty) ...[
                     if (_isImageUrl(message.mediaUrl!))
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.network(
-                          message.mediaUrl!,
-                          width: 200,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(
+                      GestureDetector(
+                        onTap: () => launchUrl(Uri.parse(message.mediaUrl!), mode: LaunchMode.externalApplication),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.network(
+                            message.mediaUrl!,
                             width: 200,
-                            height: 100,
-                            color: Colors.grey[300],
-                            child: const Icon(Icons.broken_image),
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              width: 200,
+                              height: 100,
+                              color: Colors.grey[300],
+                              child: const Icon(Icons.broken_image),
+                            ),
                           ),
                         ),
                       )
                     else
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.insert_drive_file,
-                              color: textColor, size: 20),
-                          const SizedBox(width: 8),
-                          Flexible(
-                            child: Text(
-                              message.content,
-                              style: GoogleFonts.inter(
-                                fontWeight: FontWeight.w500,
-                                fontSize: 14,
-                                color: textColor,
-                                decoration: TextDecoration.underline,
+                      GestureDetector(
+                        onTap: () => launchUrl(Uri.parse(message.mediaUrl!), mode: LaunchMode.externalApplication),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.download, color: textColor, size: 20),
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Text(
+                                message.content,
+                                style: GoogleFonts.inter(
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 14,
+                                  color: textColor,
+                                  decoration: TextDecoration.underline,
+                                ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     const SizedBox(height: 4),
                   ],

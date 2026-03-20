@@ -1314,7 +1314,7 @@ class _ResponsiveRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        if (constraints.maxWidth < 480) {
+        if (constraints.maxWidth < 600) {
           return Column(
             children: [
               left,
