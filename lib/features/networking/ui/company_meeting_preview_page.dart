@@ -57,7 +57,10 @@ class _CompanyMeetingPreviewPageState
       setState(() {
         _company = data;
         _visibleMembers = allMembers
-            .where((m) => m['will_attend'] == true && m['allow_meeting_requests'] == true)
+            .where((m) =>
+                m['will_attend'] == true &&
+                m['allow_meeting_requests'] == true &&
+                m['user_id'] != null)
             .toList();
         _isLoading = false;
       });
@@ -403,8 +406,10 @@ class _CompanyMeetingPreviewPageState
   }
 
   void _onRequestMeeting(Map<String, dynamic> teamMember) {
+    final userId = teamMember['user_id'];
+    if (userId == null) return;
     context.push(
-      '/events/${widget.eventId}/meetings/new/b2b/${teamMember['user_id']}',
+      '/events/${widget.eventId}/meetings/new/b2b/$userId',
       extra: {
         'first_name': teamMember['first_name'],
         'last_name': teamMember['last_name'],
