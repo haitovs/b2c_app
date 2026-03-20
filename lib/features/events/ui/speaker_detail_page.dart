@@ -539,10 +539,10 @@ class _SpeakerDetailPageState extends ConsumerState<SpeakerDetailPage> {
 
           return InkWell(
             onTap: () => _launchUrl(link['url'] ?? ''),
-            borderRadius: BorderRadius.circular(17),
+            borderRadius: BorderRadius.circular(22),
             child: Container(
-              width: 34,
-              height: 34,
+              width: 44,
+              height: 44,
               decoration: const BoxDecoration(
                 color: AppTheme.primaryColor,
                 shape: BoxShape.circle,

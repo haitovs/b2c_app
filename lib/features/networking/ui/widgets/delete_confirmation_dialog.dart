@@ -17,10 +17,11 @@ class _DeleteConfirmationDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
     return Dialog(
       backgroundColor: Colors.transparent,
       child: Container(
-        width: 481,
+        width: screenWidth < 520 ? screenWidth - 32 : 481,
         decoration: BoxDecoration(
           color: const Color(0xFFFAF8F8),
           borderRadius: BorderRadius.circular(10),

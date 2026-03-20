@@ -325,8 +325,9 @@ class _AgendaPageState extends ConsumerState<AgendaPage> {
                             ),
                           ),
                           const Spacer(),
-                          SizedBox(
-                            width: 430,
+                          Flexible(
+                            child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 430),
                             child: _ProgramToggle(
                               isProgramSelected: _isProgramSelected,
                               isMobile: isMobile,
@@ -335,6 +336,7 @@ class _AgendaPageState extends ConsumerState<AgendaPage> {
                               onFavouriteTap: () =>
                                   setState(() => _isProgramSelected = false),
                             ),
+                          ),
                           ),
                         ],
                       ),
