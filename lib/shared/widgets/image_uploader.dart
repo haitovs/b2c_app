@@ -11,6 +11,7 @@ class ImageUploader extends StatelessWidget {
   final double? width;
   final double height;
   final String? recommendation;
+  final bool isLoading;
 
   const ImageUploader({
     super.key,
@@ -21,6 +22,7 @@ class ImageUploader extends StatelessWidget {
     this.width,
     this.height = 160,
     this.recommendation,
+    this.isLoading = false,
   });
 
   @override
@@ -33,7 +35,9 @@ class ImageUploader extends StatelessWidget {
             style: GoogleFonts.inter(
                 fontSize: 14, fontWeight: FontWeight.w500)),
         const SizedBox(height: 8),
-        if (currentImageUrl != null && currentImageUrl!.isNotEmpty)
+        if (isLoading)
+          _buildLoadingState()
+        else if (currentImageUrl != null && currentImageUrl!.isNotEmpty)
           _buildPreview()
         else
           _buildDropZone(),
@@ -51,6 +55,42 @@ class ImageUploader extends StatelessWidget {
     );
   }
 
+  Widget _buildLoadingState() {
+    return Container(
+      width: width ?? double.infinity,
+      height: height,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        color: AppTheme.primaryColor.withValues(alpha: 0.05),
+        border: Border.all(
+          color: AppTheme.primaryColor.withValues(alpha: 0.2),
+        ),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          SizedBox(
+            width: 32,
+            height: 32,
+            child: CircularProgressIndicator(
+              strokeWidth: 3,
+              color: AppTheme.primaryColor,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Uploading...',
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              color: Colors.grey.shade600,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildPreview() {
     return SizedBox(
       width: width,
@@ -64,6 +104,31 @@ class ImageUploader extends StatelessWidget {
               width: width ?? double.infinity,
               height: height,
               fit: BoxFit.cover,
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return Container(
+                  width: width ?? double.infinity,
+                  height: height,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    color: Colors.grey.shade100,
+                  ),
+                  child: Center(
+                    child: SizedBox(
+                      width: 28,
+                      height: 28,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: AppTheme.primaryColor,
+                        value: loadingProgress.expectedTotalBytes != null
+                            ? loadingProgress.cumulativeBytesLoaded /
+                                loadingProgress.expectedTotalBytes!
+                            : null,
+                      ),
+                    ),
+                  ),
+                );
+              },
               errorBuilder: (_, __, ___) => _buildDropZone(),
             ),
           ),

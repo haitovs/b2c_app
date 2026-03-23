@@ -30,6 +30,7 @@ class CompanyProfilePage extends ConsumerStatefulWidget {
 class _CompanyProfilePageState extends ConsumerState<CompanyProfilePage> {
   bool _isSaving = false;
   bool _didPopulate = false;
+  String? _uploadingField;
 
   final _formKey = GlobalKey<FormState>();
 
@@ -717,6 +718,7 @@ class _CompanyProfilePageState extends ConsumerState<CompanyProfilePage> {
           onRemove: _brandIconUrl != null
               ? () => setState(() => _brandIconUrl = null)
               : null,
+          isLoading: _uploadingField == 'brand_icon',
         ),
         const SizedBox(height: 24),
 
@@ -733,6 +735,7 @@ class _CompanyProfilePageState extends ConsumerState<CompanyProfilePage> {
           onRemove: _fullLogoUrl != null
               ? () => setState(() => _fullLogoUrl = null)
               : null,
+          isLoading: _uploadingField == 'full_logo',
         ),
         const SizedBox(height: 24),
 
@@ -749,6 +752,7 @@ class _CompanyProfilePageState extends ConsumerState<CompanyProfilePage> {
           onRemove: _coverImageUrl != null
               ? () => setState(() => _coverImageUrl = null)
               : null,
+          isLoading: _uploadingField == 'cover',
         ),
       ],
     );
@@ -763,6 +767,7 @@ class _CompanyProfilePageState extends ConsumerState<CompanyProfilePage> {
     required double uploadHeight,
     required VoidCallback onUpload,
     VoidCallback? onRemove,
+    bool isLoading = false,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -800,7 +805,31 @@ class _CompanyProfilePageState extends ConsumerState<CompanyProfilePage> {
         const SizedBox(height: 12),
 
         // Upload box with button
-        if (currentImageUrl != null && currentImageUrl.isNotEmpty)
+        if (isLoading)
+          SizedBox(
+            width: uploadWidth,
+            height: uploadHeight,
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                color: AppTheme.primaryColor.withValues(alpha: 0.05),
+                border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.2)),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: CircularProgressIndicator(strokeWidth: 2.5, color: AppTheme.primaryColor),
+                  ),
+                  const SizedBox(height: 8),
+                  Text('Uploading...', style: GoogleFonts.inter(fontSize: 12, color: Colors.grey.shade600)),
+                ],
+              ),
+            ),
+          )
+        else if (currentImageUrl != null && currentImageUrl.isNotEmpty)
           _buildBrandingPreview(
             imageUrl: currentImageUrl,
             width: uploadWidth,
@@ -966,6 +995,27 @@ class _CompanyProfilePageState extends ConsumerState<CompanyProfilePage> {
           runSpacing: 16,
           children: List.generate(4, (index) {
             final url = _galleryUrls[index];
+            if (_uploadingField == 'gallery_$index') {
+              return SizedBox(
+                width: 170,
+                height: 170,
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    color: AppTheme.primaryColor.withValues(alpha: 0.05),
+                    border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.2)),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const SizedBox(width: 28, height: 28, child: CircularProgressIndicator(strokeWidth: 2.5, color: AppTheme.primaryColor)),
+                      const SizedBox(height: 8),
+                      Text('Uploading...', style: GoogleFonts.inter(fontSize: 12, color: Colors.grey.shade600)),
+                    ],
+                  ),
+                ),
+              );
+            }
             if (url != null && url.isNotEmpty) {
               return _buildGalleryPreview(index, url);
             }
@@ -1170,6 +1220,8 @@ class _CompanyProfilePageState extends ConsumerState<CompanyProfilePage> {
     );
     if (picked == null) return;
 
+    setState(() => _uploadingField = imageType);
+
     try {
       final bytes = await picked.readAsBytes();
       final uploadService = ref.read(uploadServiceProvider);
@@ -1181,6 +1233,7 @@ class _CompanyProfilePageState extends ConsumerState<CompanyProfilePage> {
 
       if (!mounted) return;
       setState(() {
+        _uploadingField = null;
         switch (imageType) {
           case 'brand_icon':
             _brandIconUrl = url;
@@ -1199,6 +1252,7 @@ class _CompanyProfilePageState extends ConsumerState<CompanyProfilePage> {
       });
     } catch (e) {
       if (!mounted) return;
+      setState(() => _uploadingField = null);
       AppSnackBar.showError(context, 'Upload failed: $e');
     }
   }
