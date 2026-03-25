@@ -68,6 +68,7 @@ class _VisaApplicationFormPageState
   // Personal Information Controllers
   final _nameController = TextEditingController();
   final _surnameController = TextEditingController();
+  final _middleNameController = TextEditingController();
   final _surnameAtBirthController = TextEditingController();
   final _placeOfBirthController = TextEditingController();
   final _countryOfBirthController = TextEditingController();
@@ -131,6 +132,7 @@ class _VisaApplicationFormPageState
   void dispose() {
     _nameController.dispose();
     _surnameController.dispose();
+    _middleNameController.dispose();
     _surnameAtBirthController.dispose();
     _placeOfBirthController.dispose();
     _countryOfBirthController.dispose();
@@ -233,6 +235,7 @@ class _VisaApplicationFormPageState
     // Pre-fill form data
     _nameController.text = visa['first_name'] ?? '';
     _surnameController.text = visa['last_name'] ?? '';
+    _middleNameController.text = visa['father_name'] ?? '';
     _surnameAtBirthController.text = visa['surname_at_birth'] ?? '';
     _gender = visa['gender'];
     _placeOfBirthController.text = visa['place_of_birth'] ?? '';
@@ -371,6 +374,7 @@ class _VisaApplicationFormPageState
     return {
       'first_name': _nameController.text.trim(),
       'last_name': _surnameController.text.trim(),
+      'father_name': _middleNameController.text.trim(),
       'surname_at_birth': _surnameAtBirthController.text.trim(),
       'gender': _gender,
       'place_of_birth': _placeOfBirthController.text.trim(),
@@ -1613,6 +1617,7 @@ class _VisaApplicationFormPageState
                 children: [
                   _buildTextField('Name:', _nameController, 'John', true),
                   _buildTextField('Surname:', _surnameController, 'Smith', true),
+                  _buildTextField('Middle name:', _middleNameController, 'Father\'s name', false),
                 ],
               ),
             ),
@@ -1710,6 +1715,7 @@ class _VisaApplicationFormPageState
         _buildPhotoUploadSection(),
         _buildTextField('Name:', _nameController, 'John', true),
         _buildTextField('Surname:', _surnameController, 'Smith', true),
+        _buildTextField('Middle name:', _middleNameController, 'Father\'s name', false),
         _buildGenderDropdown(),
         _buildDateField('Date of birth:', null, _dateOfBirth, (date) {
           setState(() => _dateOfBirth = date);
