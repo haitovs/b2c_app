@@ -51,6 +51,11 @@ class _NotificationDrawerState extends ConsumerState<NotificationDrawer>
     if (mounted) {
       setState(() => _isLoading = false);
     }
+    // Auto-mark all as read when drawer opens
+    if (_notificationService.unreadCount > 0) {
+      await _notificationService.markAllAsRead();
+      if (mounted) setState(() {});
+    }
   }
 
   int get _unreadCount => _notificationService.unreadCount;
