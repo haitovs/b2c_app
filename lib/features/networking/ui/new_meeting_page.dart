@@ -520,7 +520,7 @@ class _NewMeetingPageState extends ConsumerState<NewMeetingPage> {
                   child: imageUrl.isNotEmpty
                       ? _buildImage(
                           imageUrl,
-                          fit: BoxFit.cover,
+                          fit: BoxFit.contain,
                           width: double.infinity,
                           height: double.infinity,
                         )

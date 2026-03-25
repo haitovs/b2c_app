@@ -38,6 +38,7 @@ class _ParticipantListPageState extends ConsumerState<ParticipantListPage> {
     {'key': 'all', 'label': 'All'},
     {'key': 'partners', 'label': 'Partners'},
     {'key': 'companies', 'label': 'Companies'},
+    {'key': 'government', 'label': 'Government'},
     {'key': 'speakers', 'label': 'Speakers'},
     {'key': 'delegates', 'label': 'Delegates'},
     {'key': 'exhibitors', 'label': 'Exhibitors'},
@@ -85,39 +86,57 @@ class _ParticipantListPageState extends ConsumerState<ParticipantListPage> {
       final page = loadMore ? _currentPage + 1 : 1;
 
       final apiClient = ref.read(authApiClientProvider);
-      final result = await apiClient.get<List<dynamic>>(
-        '/api/v1/companies/public',
-        auth: false,
-        queryParams: {
-          'event_id': widget.eventId,
-          'page': page.toString(),
-          'limit': _pageSize.toString(),
-        },
-      );
-      if (result.isSuccess && result.data != null) {
-        final items = result.data!.cast<Map<String, dynamic>>();
-        setState(() {
-          if (loadMore) {
-            _participants.addAll(items);
-            _currentPage = page;
-          } else {
-            _participants = items;
-          }
-          _hasMore = items.length >= _pageSize;
-          _applyFilters();
-          _isLoading = false;
-          _isLoadingMore = false;
-        });
-      } else {
-        if (kDebugMode) debugPrint('Failed to fetch participants: ${result.error?.message}');
-        setState(() {
-          _isLoading = false;
-          _isLoadingMore = false;
-        });
-        if (!loadMore && mounted) {
-          AppSnackBar.showError(context, 'Failed to load participants');
+
+      // Fetch companies and gov entities in parallel
+      final results = await Future.wait([
+        apiClient.get<List<dynamic>>(
+          '/api/v1/companies/public',
+          auth: false,
+          queryParams: {
+            'event_id': widget.eventId,
+            'page': page.toString(),
+            'limit': _pageSize.toString(),
+          },
+        ),
+        if (!loadMore)
+          apiClient.get<List<dynamic>>(
+            '/api/v1/gov-entities/public',
+            auth: false,
+            queryParams: {
+              'event_id': widget.eventId,
+              'page': '1',
+              'limit': '50',
+            },
+          ),
+      ]);
+
+      final companiesResult = results[0];
+      final List<Map<String, dynamic>> items = [];
+
+      if (companiesResult.isSuccess && companiesResult.data != null) {
+        items.addAll(companiesResult.data!.cast<Map<String, dynamic>>());
+      }
+
+      // Merge gov entities on first load only (they don't paginate with companies)
+      if (!loadMore && results.length > 1) {
+        final govResult = results[1];
+        if (govResult.isSuccess && govResult.data != null) {
+          items.addAll(govResult.data!.cast<Map<String, dynamic>>());
         }
       }
+
+      setState(() {
+        if (loadMore) {
+          _participants.addAll(items);
+          _currentPage = page;
+        } else {
+          _participants = items;
+        }
+        _hasMore = (companiesResult.data?.length ?? 0) >= _pageSize;
+        _applyFilters();
+        _isLoading = false;
+        _isLoadingMore = false;
+      });
     } catch (e) {
       if (kDebugMode) debugPrint('Error fetching participants: $e');
       setState(() {
@@ -152,6 +171,8 @@ class _ParticipantListPageState extends ConsumerState<ParticipantListPage> {
             return role == 'speaker' || type == 'speaker';
           case 'delegates':
             return role == 'delegate' || type == 'delegate';
+          case 'government':
+            return role == 'gov' || role == 'government';
           case 'exhibitors':
             return role == 'exhibitor' || type == 'exhibitor' ||
                 role == 'expo' || role == 'both';
@@ -445,7 +466,7 @@ class _CompanyCard extends StatelessWidget {
                   logo.isNotEmpty
                       ? Image.network(
                           logo,
-                          fit: BoxFit.cover,
+                          fit: BoxFit.contain,
                           errorBuilder: (_, __, ___) => _placeholder(name),
                         )
                       : _placeholder(name),
@@ -578,6 +599,9 @@ class _CompanyCard extends StatelessWidget {
         return 'Delegate';
       case 'exhibitor':
         return 'Exhibitor';
+      case 'gov':
+      case 'government':
+        return 'Government';
       default:
         return role;
     }
