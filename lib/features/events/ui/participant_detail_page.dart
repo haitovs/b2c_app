@@ -85,6 +85,8 @@ class _ParticipantDetailPageState
   Future<void> _fetchParticipant() async {
     try {
       final apiClient = ref.read(authApiClientProvider);
+
+      // Try companies first
       final result = await apiClient.get<Map<String, dynamic>>(
         '/api/v1/companies/public/${widget.participantId}',
         auth: false,
@@ -95,11 +97,26 @@ class _ParticipantDetailPageState
           _participant = result.data;
           _isLoading = false;
         });
-      } else {
-        if (kDebugMode) debugPrint('Failed to fetch participant: ${result.error?.message}');
-        setState(() => _isLoading = false);
-        AppSnackBar.showError(context, 'Failed to load participant details');
+        return;
       }
+
+      // Fallback: try gov entities (participantId is numeric for gov entities)
+      final govResult = await apiClient.get<Map<String, dynamic>>(
+        '/api/v1/gov-entities/public/${widget.participantId}',
+        auth: false,
+      );
+      if (!mounted) return;
+      if (govResult.isSuccess && govResult.data != null) {
+        setState(() {
+          _participant = govResult.data;
+          _isLoading = false;
+        });
+        return;
+      }
+
+      if (kDebugMode) debugPrint('Failed to fetch participant from both endpoints');
+      setState(() => _isLoading = false);
+      if (mounted) AppSnackBar.showError(context, 'Failed to load participant details');
     } catch (e) {
       if (kDebugMode) debugPrint('Error fetching participant: $e');
       if (!mounted) return;
