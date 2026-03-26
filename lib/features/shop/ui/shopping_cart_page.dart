@@ -243,6 +243,7 @@ class _CartContent extends StatelessWidget {
           child: isMobile
               ? _MobileCartBody(
                   cart: cart,
+                  eventId: eventId,
                   eventIdStr: eventIdStr,
                   promocodeController: promocodeController,
                   isCheckingOut: isCheckingOut,
@@ -252,6 +253,7 @@ class _CartContent extends StatelessWidget {
                 )
               : _DesktopCartBody(
                   cart: cart,
+                  eventId: eventId,
                   eventIdStr: eventIdStr,
                   promocodeController: promocodeController,
                   isCheckingOut: isCheckingOut,
@@ -270,6 +272,7 @@ class _CartContent extends StatelessWidget {
 // ---------------------------------------------------------------------------
 class _DesktopCartBody extends StatelessWidget {
   final CartSummary cart;
+  final int eventId;
   final String eventIdStr;
   final TextEditingController promocodeController;
   final bool isCheckingOut;
@@ -279,6 +282,7 @@ class _DesktopCartBody extends StatelessWidget {
 
   const _DesktopCartBody({
     required this.cart,
+    required this.eventId,
     required this.eventIdStr,
     required this.promocodeController,
     required this.isCheckingOut,
@@ -339,6 +343,7 @@ class _DesktopCartBody extends StatelessWidget {
                   controller: promocodeController,
                   isCheckingOut: isCheckingOut,
                   onSend: onCheckout,
+                  eventId: eventId,
                 ),
               ],
             ),
@@ -354,6 +359,7 @@ class _DesktopCartBody extends StatelessWidget {
 // ---------------------------------------------------------------------------
 class _MobileCartBody extends StatelessWidget {
   final CartSummary cart;
+  final int eventId;
   final String eventIdStr;
   final TextEditingController promocodeController;
   final bool isCheckingOut;
@@ -363,6 +369,7 @@ class _MobileCartBody extends StatelessWidget {
 
   const _MobileCartBody({
     required this.cart,
+    required this.eventId,
     required this.eventIdStr,
     required this.promocodeController,
     required this.isCheckingOut,
@@ -399,6 +406,7 @@ class _MobileCartBody extends StatelessWidget {
             controller: promocodeController,
             isCheckingOut: isCheckingOut,
             onSend: onCheckout,
+            eventId: eventId,
           ),
         ],
       ),
@@ -958,18 +966,76 @@ class _CartSummaryPanel extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Promocode section + Send button
+// Promocode section + Apply button + Send button
 // ---------------------------------------------------------------------------
-class _PromocodeSection extends StatelessWidget {
+class _PromocodeSection extends ConsumerStatefulWidget {
   final TextEditingController controller;
   final bool isCheckingOut;
   final VoidCallback onSend;
+  final int eventId;
 
   const _PromocodeSection({
     required this.controller,
     required this.isCheckingOut,
     required this.onSend,
+    required this.eventId,
   });
+
+  @override
+  ConsumerState<_PromocodeSection> createState() => _PromocodeSectionState();
+}
+
+class _PromocodeSectionState extends ConsumerState<_PromocodeSection> {
+  bool _isApplying = false;
+  String? _promoMessage;
+  bool? _promoValid;
+
+  Future<void> _applyPromocode() async {
+    final code = widget.controller.text.trim();
+    if (code.isEmpty) {
+      setState(() {
+        _promoMessage = 'Please enter a promocode';
+        _promoValid = false;
+      });
+      return;
+    }
+
+    setState(() => _isApplying = true);
+    try {
+      final shopService = ref.read(shopServiceProvider);
+      final result = await shopService.applyPromocode(widget.eventId, code);
+      if (!mounted) return;
+      final valid = result['valid'] == true;
+      final message = result['message'] as String? ?? '';
+      final discountType = result['discount_type'] as String?;
+      final discountValue = result['discount_value'];
+
+      String displayMsg = message;
+      if (valid && discountType != null && discountValue != null) {
+        final dv = (discountValue is num) ? discountValue : 0;
+        if (discountType == 'PERCENTAGE') {
+          displayMsg = '$message (${dv.toStringAsFixed(0)}% off)';
+        } else if (discountType == 'FIXED_USD') {
+          displayMsg = '$message (\$${dv.toStringAsFixed(0)} off)';
+        } else if (discountType == 'FIXED_TMT') {
+          displayMsg = '$message (${dv.toStringAsFixed(0)} TMT off)';
+        }
+      }
+
+      setState(() {
+        _promoValid = valid;
+        _promoMessage = displayMsg;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _promoValid = false;
+        _promoMessage = 'Failed to verify promocode';
+      });
+    } finally {
+      if (mounted) setState(() => _isApplying = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -995,34 +1061,112 @@ class _PromocodeSection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        Container(
-          height: 44,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(5),
-            border: Border.all(color: const Color(0xFFCBCBCB)),
-          ),
-          child: TextField(
-            controller: controller,
-            style: GoogleFonts.inter(fontSize: 14),
-            textAlignVertical: TextAlignVertical.center,
-            decoration: const InputDecoration(
-              isDense: true,
-              border: InputBorder.none,
-              enabledBorder: InputBorder.none,
-              focusedBorder: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 12,
+        // Promocode input + Apply button
+        Row(
+          children: [
+            Expanded(
+              child: Container(
+                height: 44,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(5),
+                  border: Border.all(color: const Color(0xFFCBCBCB)),
+                ),
+                child: TextField(
+                  controller: widget.controller,
+                  style: GoogleFonts.inter(fontSize: 14),
+                  textAlignVertical: TextAlignVertical.center,
+                  onChanged: (_) {
+                    // Reset status when user edits the code
+                    if (_promoMessage != null) {
+                      setState(() {
+                        _promoMessage = null;
+                        _promoValid = null;
+                      });
+                    }
+                  },
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    hintText: 'Enter code',
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 12,
+                    ),
+                  ),
+                ),
               ),
             ),
-          ),
+            const SizedBox(width: 8),
+            SizedBox(
+              height: 44,
+              child: ElevatedButton(
+                onPressed: _isApplying ? null : _applyPromocode,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF519672),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(5),
+                  ),
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                ),
+                child: _isApplying
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Text(
+                        'Apply',
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+              ),
+            ),
+          ],
         ),
+        // Promo validation result
+        if (_promoMessage != null) ...[
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(
+                _promoValid == true ? Icons.check_circle : Icons.cancel,
+                size: 16,
+                color: _promoValid == true
+                    ? const Color(0xFF519672)
+                    : AppTheme.errorColor,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  _promoMessage!,
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: _promoValid == true
+                        ? const Color(0xFF519672)
+                        : AppTheme.errorColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
         const SizedBox(height: 16),
+        // Checkout button
         SizedBox(
           width: double.infinity,
           height: 47,
           child: ElevatedButton(
-            onPressed: isCheckingOut ? null : onSend,
+            onPressed: widget.isCheckingOut ? null : widget.onSend,
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primaryColor,
               foregroundColor: Colors.white,
@@ -1031,7 +1175,7 @@ class _PromocodeSection extends StatelessWidget {
               ),
               elevation: 0,
             ),
-            child: isCheckingOut
+            child: widget.isCheckingOut
                 ? const SizedBox(
                     width: 24,
                     height: 24,
