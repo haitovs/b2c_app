@@ -2041,7 +2041,7 @@ class _SpeakerScrollMobile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 220,
+      height: 280,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         itemCount: speakers.length,
@@ -2095,7 +2095,7 @@ class _SpeakerCarouselDesktopState extends State<_SpeakerCarouselDesktop> {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 246,
+      height: 316,
       child: Row(
         children: [
           Expanded(
@@ -2178,9 +2178,9 @@ class _SpeakerMiniCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Photo
+          // Photo (1:1 square)
           Container(
-            height: width * 0.65,
+            height: width,
             decoration: BoxDecoration(
               color: Colors.grey[300],
               borderRadius:
