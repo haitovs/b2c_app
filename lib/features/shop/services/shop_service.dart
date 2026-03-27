@@ -130,7 +130,7 @@ class ShopService {
     );
 
     if (!result.isSuccess) {
-      throw Exception(result.error ?? 'Failed to apply promocode');
+      throw result.error ?? Exception('Failed to apply promocode');
     }
 
     return result.data!;

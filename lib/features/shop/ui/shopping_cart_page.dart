@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../core/models/api_exception.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_snackbar.dart';
 import '../providers/shop_providers.dart';
@@ -1028,9 +1029,10 @@ class _PromocodeSectionState extends ConsumerState<_PromocodeSection> {
       });
     } catch (e) {
       if (!mounted) return;
+      final msg = e is ApiException ? e.message : 'Failed to verify promocode';
       setState(() {
         _promoValid = false;
-        _promoMessage = 'Failed to verify promocode';
+        _promoMessage = msg;
       });
     } finally {
       if (mounted) setState(() => _isApplying = false);
