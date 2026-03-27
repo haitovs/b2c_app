@@ -1136,19 +1136,19 @@ class _CompanyProfilePageState extends ConsumerState<CompanyProfilePage> {
               : Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    Icon(
+                      _isEditing ? Icons.save : Icons.chevron_right,
+                      size: 20,
+                      color: Colors.white,
+                    ),
+                    const SizedBox(width: 8),
                     Text(
-                      'Continue',
+                      _isEditing ? 'Save' : 'Continue',
                       style: GoogleFonts.inter(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
                         color: Colors.white,
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    const Icon(
-                      Icons.chevron_right,
-                      size: 20,
-                      color: Colors.white,
                     ),
                   ],
                 ),
