@@ -509,9 +509,9 @@ class _NewMeetingPageState extends ConsumerState<NewMeetingPage> {
                 child: Container(
                   width: double.infinity,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFC5C5C5),
+                    color: Colors.white,
                     border: Border.all(
-                      color: const Color(0xFFDDDDDD),
+                      color: const Color(0xFFEEEEEE),
                       width: 0.5,
                     ),
                     borderRadius: BorderRadius.circular(3),
