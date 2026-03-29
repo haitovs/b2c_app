@@ -59,6 +59,28 @@ class _PhoneInputFieldState extends State<PhoneInputField> {
   }
 
   @override
+  void didUpdateWidget(PhoneInputField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialPhone != widget.initialPhone) {
+      // Remove listener to avoid triggering onChanged during reinitialization
+      _localNumberController.removeListener(_notifyChange);
+      if (widget.initialPhone != null && widget.initialPhone!.isNotEmpty) {
+        final parsed = PhoneNumberUtil.fromE164(widget.initialPhone!);
+        setState(() {
+          _dialCode = parsed['dialCode']!;
+          _localNumberController.text = parsed['localNumber'] ?? '';
+        });
+      } else {
+        setState(() {
+          _dialCode = '+993';
+          _localNumberController.text = '';
+        });
+      }
+      _localNumberController.addListener(_notifyChange);
+    }
+  }
+
+  @override
   void dispose() {
     _localNumberController.removeListener(_notifyChange);
     _localNumberController.dispose();
@@ -100,6 +122,7 @@ class _PhoneInputFieldState extends State<PhoneInputField> {
                 borderRadius: BorderRadius.circular(7),
                 clipBehavior: Clip.antiAlias,
                 child: CountryCodePicker(
+                key: ValueKey(_dialCode),
                 onChanged: (country) {
                   setState(() {
                     _dialCode = country.dialCode ?? '+993';
