@@ -495,7 +495,25 @@ class _VisaApplicationFormPageState
     }
   }
 
+  static const _historicalCountries = [
+    'USSR (Soviet Union)',
+    'Yugoslavia',
+    'Czechoslovakia',
+    'East Germany (GDR)',
+    'West Germany (FRG)',
+  ];
+
   Future<void> _loadCitiesForCountry(String country) async {
+    // Historical countries have no city data — let user type manually
+    if (_historicalCountries.contains(country)) {
+      if (mounted) {
+        setState(() {
+          _availableCities = [];
+          _isLoadingCities = false;
+        });
+      }
+      return;
+    }
     setState(() => _isLoadingCities = true);
     try {
       await _loadCityCache();
