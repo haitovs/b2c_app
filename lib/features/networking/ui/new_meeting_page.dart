@@ -110,7 +110,8 @@ class _NewMeetingPageState extends ConsumerState<NewMeetingPage> {
     if (_govEntities.isNotEmpty) return;
     try {
       final meetingService = ref.read(meetingServiceProvider);
-      final entities = await meetingService.fetchGovEntities();
+      final eventId = int.tryParse(widget.eventId) ?? 0;
+      final entities = await meetingService.fetchGovEntities(eventId: eventId);
       setState(() {
         _govEntities = entities;
         _applyFilters();

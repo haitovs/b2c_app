@@ -2046,7 +2046,7 @@ class _VisaApplicationFormPageState
 
   void _showCountryPickerDialog(TextEditingController controller, [VoidCallback? onChanged]) {
     String searchQuery = '';
-    final countries = ref.read(countriesProvider).value ?? [];
+    final countries = ref.read(countriesWithHistoricalProvider).value ?? ref.read(countriesProvider).value ?? [];
     showDialog(
       context: context,
       builder: (ctx) {
@@ -2366,20 +2366,26 @@ class _VisaApplicationFormPageState
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildPhotoBox(
-            width: 123, height: 154, label: 'Upload files Picture (5:6)',
-            hasImage: (kIsWeb ? _photoBytes != null : _photoFile != null) || _existingPhotoUrl != null,
-            imageWidget: _buildPortraitImage(),
-            previewAsset: 'assets/visa_application/profile_preview.jpg',
-            onUpload: _pickImage, onDelete: _deletePhoto,
+          Expanded(
+            flex: 5,
+            child: _buildPhotoBox(
+              height: 154, label: 'Upload files Picture (5:6)',
+              hasImage: (kIsWeb ? _photoBytes != null : _photoFile != null) || _existingPhotoUrl != null,
+              imageWidget: _buildPortraitImage(),
+              previewAsset: 'assets/visa_application/profile_preview.jpg',
+              onUpload: _pickImage, onDelete: _deletePhoto,
+            ),
           ),
           const SizedBox(width: 16),
-          _buildPhotoBox(
-            width: 216, height: 154, label: 'Upload files',
-            hasImage: (kIsWeb ? _passportScanBytes != null : _passportScanFile != null) || _existingPassportScanUrl != null,
-            imageWidget: _buildPassportScanImage(),
-            previewAsset: 'assets/visa_application/visa_preview.png',
-            onUpload: _pickPassportScan, onDelete: _deletePassportScan,
+          Expanded(
+            flex: 7,
+            child: _buildPhotoBox(
+              height: 154, label: 'Upload files',
+              hasImage: (kIsWeb ? _passportScanBytes != null : _passportScanFile != null) || _existingPassportScanUrl != null,
+              imageWidget: _buildPassportScanImage(),
+              previewAsset: 'assets/visa_application/visa_preview.png',
+              onUpload: _pickPassportScan, onDelete: _deletePassportScan,
+            ),
           ),
         ],
       ),
@@ -2387,20 +2393,20 @@ class _VisaApplicationFormPageState
   }
 
   Widget _buildPhotoBox({
-    required double width, required double height, required String label,
+    required double height, required String label,
     required bool hasImage, required Widget imageWidget,
     required String previewAsset,
     required VoidCallback onUpload, required VoidCallback onDelete,
   }) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF1E1E1E))),
         const SizedBox(height: 6),
         Stack(
           children: [
             Container(
-              width: width, height: height,
+              height: height,
               decoration: BoxDecoration(
                 border: Border.all(color: hasImage ? _primaryColor : _borderColor, width: hasImage ? 2 : 1),
                 borderRadius: BorderRadius.circular(5),
@@ -2412,7 +2418,7 @@ class _VisaApplicationFormPageState
                       borderRadius: BorderRadius.circular(4),
                       child: Opacity(
                         opacity: 0.4,
-                        child: Image.asset(previewAsset, width: width, height: height, fit: BoxFit.cover),
+                        child: Image.asset(previewAsset, height: height, width: double.infinity, fit: BoxFit.cover),
                       ),
                     ),
             ),
@@ -2454,7 +2460,6 @@ class _VisaApplicationFormPageState
         ),
         const SizedBox(height: 8),
         SizedBox(
-          width: width,
           height: 32,
           child: ElevatedButton(
             onPressed: onUpload,

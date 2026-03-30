@@ -32,10 +32,11 @@ class ReferenceDataService {
     throw result.error ?? Exception('Failed to load positions');
   }
 
-  Future<List<String>> getCountries() async {
+  Future<List<String>> getCountries({bool includeHistorical = false}) async {
     final result = await _api.get<Map<String, dynamic>>(
       '/api/v1/reference/countries',
       auth: false,
+      queryParams: includeHistorical ? {'include_historical': 'true'} : null,
     );
 
     if (result.isSuccess && result.data != null) {

@@ -1711,12 +1711,14 @@ class _MetaBadge extends StatelessWidget {
         children: [
           Icon(icon, size: isMobile ? 12 : 16, color: const Color(0xFF9CA4CC)),
           const SizedBox(width: 4),
-          Text(
-            text,
-            style: GoogleFonts.roboto(
-              fontSize: isMobile ? 12 : 14,
-              fontWeight: FontWeight.w400,
-              color: Colors.black,
+          Flexible(
+            child: Text(
+              text,
+              style: GoogleFonts.roboto(
+                fontSize: isMobile ? 12 : 14,
+                fontWeight: FontWeight.w400,
+                color: Colors.black,
+              ),
             ),
           ),
         ],

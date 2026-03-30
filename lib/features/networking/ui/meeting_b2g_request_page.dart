@@ -120,7 +120,8 @@ class _MeetingB2GRequestPageState
   Future<void> _fetchGovEntity() async {
     try {
       final meetingService = ref.read(meetingServiceProvider);
-      final entities = await meetingService.fetchGovEntities();
+      final eventId = int.tryParse(widget.eventId) ?? 0;
+      final entities = await meetingService.fetchGovEntities(eventId: eventId);
       final entity = entities.firstWhere(
         (e) => e['id'].toString() == widget.govEntityId,
         orElse: () => <String, dynamic>{},

@@ -143,9 +143,10 @@ class MeetingService {
   }
 
   /// Get government entities list (for B2G meetings)
-  Future<List<Map<String, dynamic>>> fetchGovEntities() async {
+  Future<List<Map<String, dynamic>>> fetchGovEntities({required int eventId}) async {
     final result = await _api.get<List<dynamic>>(
       '/api/v1/meetings/gov-entities',
+      queryParams: {'event_id': eventId.toString()},
     );
 
     if (result.isSuccess && result.data != null) {

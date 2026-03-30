@@ -23,6 +23,12 @@ final countriesProvider = FutureProvider<List<String>>((ref) {
   return ref.watch(referenceDataServiceProvider).getCountries();
 });
 
+/// Fetch countries list including historical countries (USSR, Yugoslavia, etc.)
+/// Use this for visa form "country of birth" field.
+final countriesWithHistoricalProvider = FutureProvider<List<String>>((ref) {
+  return ref.watch(referenceDataServiceProvider).getCountries(includeHistorical: true);
+});
+
 /// Fetch cities for a given country.
 final citiesProvider = FutureProvider.family<List<String>, String>((ref, country) {
   return ref.watch(referenceDataServiceProvider).getCities(country);
