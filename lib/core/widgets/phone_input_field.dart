@@ -38,6 +38,7 @@ class PhoneInputField extends StatefulWidget {
 class _PhoneInputFieldState extends State<PhoneInputField> {
   late TextEditingController _localNumberController;
   late String _dialCode;
+  bool _isUserEditing = false;
 
   @override
   void initState() {
@@ -61,8 +62,9 @@ class _PhoneInputFieldState extends State<PhoneInputField> {
   @override
   void didUpdateWidget(PhoneInputField oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.initialPhone != widget.initialPhone) {
-      // Remove listener to avoid triggering onChanged during reinitialization
+    // Only reset from external changes (e.g., loading saved data),
+    // NOT from the user's own typing which triggers onChanged → setState
+    if (oldWidget.initialPhone != widget.initialPhone && !_isUserEditing) {
       _localNumberController.removeListener(_notifyChange);
       if (widget.initialPhone != null && widget.initialPhone!.isNotEmpty) {
         final parsed = PhoneNumberUtil.fromE164(widget.initialPhone!);
@@ -88,8 +90,13 @@ class _PhoneInputFieldState extends State<PhoneInputField> {
   }
 
   void _notifyChange() {
+    _isUserEditing = true;
     final e164 = PhoneNumberUtil.toE164(_dialCode, _localNumberController.text);
     widget.onChanged(e164);
+    // Reset flag after the rebuild cycle completes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _isUserEditing = false;
+    });
   }
 
   @override
