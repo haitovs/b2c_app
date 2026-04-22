@@ -162,6 +162,7 @@ class _AgendaPageState extends ConsumerState<AgendaPage> {
                 'company': s['company'] ?? '',
                 'country': s['country'] ?? '',
                 'photo': _buildImageUrl(s['photo'] ?? s['photo_url']),
+                'description': s['description'] ?? '',
               })
           .toList();
     }
@@ -175,6 +176,7 @@ class _AgendaPageState extends ConsumerState<AgendaPage> {
                 'position': m['position'] ?? '',
                 'company': m['company'] ?? '',
                 'photo': _buildImageUrl(m['photo'] ?? m['photo_url']),
+                'description': m['description'] ?? '',
               })
           .toList();
     }
@@ -2158,6 +2160,7 @@ class _SpeakerMiniCard extends StatelessWidget {
     final photoUrl = speaker['photo']?.toString() ?? '';
     final position = speaker['position'] ?? '';
     final country = speaker['country'] ?? '';
+    final description = (speaker['description'] ?? '').toString().trim();
 
     return GestureDetector(
       onTap: () {
@@ -2233,7 +2236,20 @@ class _SpeakerMiniCard extends StatelessWidget {
                       color: Colors.black,
                     ),
                   ),
-                  if (country.isNotEmpty) ...[
+                  if (description.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      description,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.roboto(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w400,
+                        color: Colors.black54,
+                        height: 1.3,
+                      ),
+                    ),
+                  ] else if (country.isNotEmpty) ...[
                     const SizedBox(height: 2),
                     Text(
                       'Keynote \u2022 $country',
